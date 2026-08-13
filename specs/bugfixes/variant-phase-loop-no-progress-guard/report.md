@@ -7,23 +7,35 @@
 
 The variant phase loop re-runs a phase indefinitely when the phase's only
 remaining task is human-gated (a `STOP` task that no agent can complete). Each
-iteration starts a **fresh agent session** that re-executes the whole phase —
-including its full build and test suite — concludes correctly that the work is
-not agent-executable, exits cleanly, and is then started again. Nothing detects
-that no progress was made.
+iteration starts a **fresh agent session**, which re-enters the phase, concludes
+correctly that the work is not agent-executable, exits cleanly, and is then
+started again. Nothing detects that no progress was made.
 
 Measured on a real run (`ui/glucose-lock-widget`, one `orbit run` invocation):
 
-| Variant | Phase | Sessions | Recorded cost | Wall time |
-|---|---|---|---|---|
-| 1 (fable) | 4 | **1223** | $269.45 | 11.12 h |
-| 2 (opus) | 4 | **1394** | $499.78 | 10.96 h |
+| Variant | Phase | Sessions | Mean per session | Mean cost | Total |
+|---|---|---|---|---|---|
+| 1 (fable) | 4 | **1223** | 32.7 s | $0.220 | $269.45 |
+| 2 (opus) | 4 | **1394** | 28.3 s | $0.359 | $499.78 |
+| 1 (fable) | 5 | 7 | 1373.7 s | $11.356 | $79.49 |
+| 2 (opus) | 5 | 12 | 1453.9 s | $10.568 | $126.82 |
 
 Phase 4's sole open task was `14. Human-gated on-device verification (STOP)`.
 Combined across both variants and all phases the run recorded **$1089.53**, of
 which roughly **$830 was spent looping on `STOP` tasks that no agent could ever
 complete**. This is the direct cause of the account hitting its usage limit,
 which in turn triggered `claude-out-of-usage-credits`.
+
+**The loop has two distinct cost profiles, and both matter.** In phase 4 the
+agent recognised the gate quickly and exited in about 30 seconds, so each
+iteration was individually cheap — the damage is purely volumetric, 2617
+iterations at $0.22–$0.36. In phase 5 each iteration ran the repository's full
+verification, and the measured `make test` for that repo is 19 m 51 s wall
+(3.4 CPU-hours), which accounts for essentially all of the 23–24 minute mean
+session time. So a stalled phase costs either a lot of cheap iterations or a few
+very expensive ones depending on what the phase does, and an iteration ceiling
+tuned for one profile is wrong for the other. This is the argument for making
+progress detection the primary guard rather than a count or a budget.
 
 **Reproduction steps:**
 1. Author a tasks file whose next phase contains only a task that an agent

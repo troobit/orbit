@@ -6,11 +6,18 @@ Orbit currently has no guarantee that a run ends. On 2026-08-13 a single
 `orbit run --variants 2 --parallel` invocation re-ran one phase **1223 times**
 on variant 1 and **1394 times** on variant 2, because the phase's only open task
 was human-gated and could never be completed by an agent. Each iteration started
-a fresh agent session, re-executed the phase in full (including the repository's
-test suite), correctly concluded the work was not agent-executable, exited
-cleanly, and was started again. The run recorded **$1089.53**, of which roughly
-**$830 bought no forward progress**, and ended only when the account's usage
-credits were exhausted.
+a fresh agent session, re-entered the phase, correctly concluded the work was not
+agent-executable, exited cleanly, and was started again. The run recorded
+**$1089.53**, of which roughly **$830 bought no forward progress**, and ended
+only when the account's usage credits were exhausted.
+
+The loop has two cost profiles, which is why requirement 2's ceiling cannot be
+the primary guard. Where the agent recognised the gate quickly it exited in about
+30 seconds, so 2617 iterations were individually cheap and the damage was purely
+volumetric. Where the phase ran the repository's verification, each iteration
+cost 23–24 minutes — the measured `make test` for that repository is 19 m 51 s
+wall and 3.4 CPU-hours — so a mere handful of iterations cost $206. A ceiling
+tuned for one profile is wrong for the other.
 
 That exhaustion was then misreported. The Claude CLI's credit-exhaustion message
 matches none of orbit's classifier patterns, so it surfaced as a bare
