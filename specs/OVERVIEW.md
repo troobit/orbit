@@ -36,6 +36,7 @@
 | [Shared Retry Executor](#shared-retry-executor) | 2026-02-18 | No Tasks | Consolidate four near-identical retry executors into a single shared implementation. |
 | [Message Metadata](#message-metadata) | 2026-03-12 | Done | Show timestamps and model identifiers inline in rendered Apsis transcripts. |
 | [Finalize Show Verify](#finalize-show-verify) | 2026-05-10 | Done | Show variant agent and warn on consolidation mismatch in `orbit finalize`. |
+| [Run Termination Guarantees](#run-termination-guarantees) | 2026-08-13 | Not Started | Guarantee every run ends: stop stalled phase loops, classify credit exhaustion, and always record a terminal state. |
 
 ---
 
@@ -347,3 +348,12 @@ Show variant agent and warn on consolidation mismatch in `orbit finalize`.
 - [decision_log.md](finalize-show-verify/decision_log.md)
 - [smolspec.md](finalize-show-verify/smolspec.md)
 - [tasks.md](finalize-show-verify/tasks.md)
+
+## Run Termination Guarantees
+
+Guarantee every run ends: stop stalled phase loops, classify credit exhaustion, and always record a terminal state.
+
+- [decision_log.md](run-termination/decision_log.md)
+- [design.md](run-termination/design.md)
+- [requirements.md](run-termination/requirements.md)
+- [tasks.md](run-termination/tasks.md)
