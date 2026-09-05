@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Claude Code session-limit messages using the new `"You've hit your session limit"` wording now wait until the reported reset time while retaining support for the older message.
+- Codex usage-limit messages (`"You've hit your usage limit. ... try again at 4:18 PM"`, including the dated `"try again at Sep 5th, 2026 1:39 AM"` form) are now classified as rate-limit waits that sleep until the reported retry time, instead of failing the phase after generic retries.
 
 ## [0.9.0] - 2026-04-11
 
