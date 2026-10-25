@@ -3,7 +3,7 @@
 ## Decision 1: Drive Local Models Through the Existing OpenCode Agent
 
 **Date**: 2026-08-02
-**Status**: accepted
+**Status**: superseded by Decision 13
 
 ### Context
 
@@ -47,7 +47,7 @@ The layers are separable: baseRT remains the model runtime and every token still
 ## Decision 2: Do Not Manage or Health-Check the Local Server
 
 **Date**: 2026-08-02
-**Status**: accepted
+**Status**: superseded by Decision 13
 
 ### Context
 
@@ -122,7 +122,7 @@ Any fixed ceiling requires guessing a number above "slow" but below "stuck", and
 ## Decision 4: Report Tokens Without a Currency Figure
 
 **Date**: 2026-08-02
-**Status**: accepted
+**Status**: superseded by Decision 13
 
 ### Context
 
@@ -190,7 +190,7 @@ This is the largest unknown in the feature and it can invalidate design assumpti
 ## Decision 6: apsis Transcript Support Is Out of Scope
 
 **Date**: 2026-08-02
-**Status**: accepted
+**Status**: superseded by Decision 13
 
 ### Context
 
@@ -224,7 +224,7 @@ The gap is pre-existing and belongs to OpenCode support generally, not to local 
 ## Decision 7: Bound Local Runs at Two Hours Rather Than Leaving Them Unbounded
 
 **Date**: 2026-08-02
-**Status**: accepted (supersedes Decision 3)
+**Status**: superseded by Decision 13 (previously superseded Decision 3)
 
 ### Context
 
@@ -266,7 +266,7 @@ Two hours is far above any plausible healthy phase on local hardware and far bel
 ## Decision 8: Scope the Spike to Plumbing Feasibility, Not Model Capability
 
 **Date**: 2026-08-02
-**Status**: accepted (supersedes Decision 5)
+**Status**: superseded by Decision 13 (previously superseded Decision 5)
 
 ### Context
 
@@ -320,7 +320,7 @@ Decision 5 stated only that a negative result would "reshape the design", which 
 ## Decision 9: Express Locality as a Distinct Agent Type
 
 **Date**: 2026-08-02
-**Status**: accepted
+**Status**: superseded by Decision 13
 
 ### Context
 
@@ -363,7 +363,7 @@ Requirement [3.3](requirements.md#3.3) now states the single-run and variant mod
 ## Decision 10: Stop the Run After Two Consecutive No-Progress Phases
 
 **Date**: 2026-08-02
-**Status**: accepted
+**Status**: superseded by Decision 13
 
 ### Context
 
@@ -405,7 +405,7 @@ Two consecutive occurrences distinguishes a genuine stall from a single phase th
 ## Decision 11: Capture Agent Output Incrementally
 
 **Date**: 2026-08-02
-**Status**: accepted
+**Status**: superseded by Decision 13
 
 ### Context
 
@@ -440,7 +440,7 @@ This is the minimum that makes a long local run observable, and it does not reve
 ## Decision 12: Document the Existing Comparison Agent Split Rather Than Change It
 
 **Date**: 2026-08-02
-**Status**: accepted
+**Status**: superseded by Decision 13
 
 ### Context
 
@@ -477,3 +477,51 @@ The in-run path already does the privacy-preserving thing, so no change is neede
 - A developer needing strict locality must avoid the standalone commands specifically, not comparison generally
 
 ---
+
+## Decision 13: Replace the prototype with an Orbit local preset
+
+**ID**: 13
+**Date**: 2026-10-25
+**Status**: accepted
+
+### Context
+
+The user requested uplifting and testing the recent agentic-coding
+`local-next-task` work in Orbit. That prototype already uses Codex's native
+LM Studio provider. The earlier draft's assumption that only OpenCode supports
+local inference is obsolete. The prototype duplicates Orbit's session loop,
+timeouts and logging, but has selection and halt checks Orbit needs to retain.
+This decision replaces the earlier unimplemented requirements and Decisions
+1–12 for this deliverable. Existing supersession links remain historical.
+
+### Decision
+
+Expose `orbit local` and a `local-next-task` compatibility command as presets
+of the existing Orbit loop and Codex agent. Orbit selects one task by default;
+phase and model-driven selection are explicit switches. Preserve the
+prototype's 30-minute timeout and 20-iteration defaults. Stop on the first
+failed or unproductive iteration and leave edits for review.
+
+### Rationale
+
+Orchestration belongs in Orbit. Explicit task dispatch reduces tool turns for
+local models. A separate preset isolates these behavioral defaults from hosted
+runs and needs no new agent type or inference client.
+
+### Alternatives Considered
+
+- Keep the Python runner and call it from Orbit: rejected because it retains
+  two lifecycle implementations and separate logging/recovery behavior.
+- Build a new local agent type or direct inference tool loop: rejected because
+  Codex already supplies LM Studio integration and tool execution.
+- Change every hosted run to this contract: rejected because custom hosted
+  prompts and commit workflows have different completion semantics.
+
+### Consequences
+
+Positive: one orchestration loop, deterministic dispatch, retained diagnostics,
+and existing Orbit summaries and registry integration.
+
+Negative: recent Codex flags and an installed rune CLI are prerequisites;
+local model quality and latency remain variable. Windows only has direct-process
+cancellation. Model selection mode requires the installed next-task skill.

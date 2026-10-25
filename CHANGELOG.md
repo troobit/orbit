@@ -9,11 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `orbit local <tasks.md>` implements an explicit rune task file through Codex and LM Studio, using the `8-bit` model by default with fresh sessions, task or phase selection, and configurable timeout and iteration limits.
+- Local runs retain prompts and live stdout/stderr, report elapsed time, and stop on halt signals, changed task graphs, worker failures, or lack of completed work. Unix cancellation terminates worker child processes.
+- `make install-local-next-task` installs Orbit and a compatible `local-next-task` command, replacing the known agentic-coding prototype link while preserving unrelated files.
+- An `8-bit` implementation quick guide, local-runner runbook, and recorded live-model verification document setup, execution, diagnostics, and recovery.
 - `orbit finalize` now displays the variant's agent (alias, type, model) in its preamble, falling back to "Agent: unknown" when none of the fields are populated.
 - `orbit finalize` now reads the spec's `consolidation-log.json` and prints a warning before the confirmation prompt when the requested `--variant` differs from the most recent consolidation entry. The warning fires under `--force` as well so it remains visible in CI output.
 
 ### Fixed
 
+- Local completion checks include in-progress tasks so interrupted work is dispatched again when resuming.
+- Codex JSONL execution detects failed turns even when the CLI exits successfully and retains the stream in Orbit's standard session artifacts.
 - Claude Code session-limit messages using the new `"You've hit your session limit"` wording now wait until the reported reset time while retaining support for the older message.
 
 ## [0.9.0] - 2026-04-11

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -18,6 +19,7 @@ var (
 // knownSubcommands lists all valid subcommands.
 var knownSubcommands = map[string]bool{
 	"run":         true,
+	"local":       true,
 	"serve":       true,
 	"register":    true,
 	"demo":        true,
@@ -30,6 +32,12 @@ var knownSubcommands = map[string]bool{
 }
 
 func main() {
+	if filepath.Base(os.Args[0]) == "local-next-task" {
+		if err := localCommand(os.Args[1:]); err != nil {
+			log.Fatalf("Error: %v", err)
+		}
+		return
+	}
 	// Handle top-level --help and --version before subcommand parsing
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
@@ -49,6 +57,8 @@ func main() {
 	switch cmd {
 	case "run":
 		err = runCommand(cmdArgs)
+	case "local":
+		err = localCommand(cmdArgs)
 	case "serve":
 		err = serveCommand(cmdArgs)
 	case "register":
@@ -195,6 +205,7 @@ Usage: orbit <command> [options]
 Commands:
   init         Create a default .orbit.yaml configuration file
   run          Orchestrate agent sessions to implement spec phases (default)
+  local        Run an explicit task file through a local LM Studio model
   compare      Regenerate comparison report for existing variants
   consolidate  Merge improvements from non-chosen variants into chosen variant
   status       Show variant status for a spec

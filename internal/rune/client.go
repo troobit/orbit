@@ -2,6 +2,7 @@
 package rune
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -31,6 +32,8 @@ type Task struct {
 	Children   []Task   `json:"Children,omitempty"`
 	ParentID   string   `json:"ParentID,omitempty"`
 	Phase      string   `json:"Phase,omitempty"`
+	BlockedBy  []string `json:"blockedBy,omitempty"`
+	Stream     int      `json:"stream,omitempty"`
 }
 
 // ListResult represents the wrapper object from rune list --format json.
@@ -42,10 +45,45 @@ type ListResult struct {
 // PhaseTask represents a task from rune next --phase JSON output.
 // This uses different field names and status format than Task.
 type PhaseTask struct {
-	ID      string   `json:"id"`
-	Title   string   `json:"title"`
-	Status  string   `json:"status"`
-	Details []string `json:"details,omitempty"`
+	ID         string      `json:"id"`
+	Title      string      `json:"title"`
+	Status     string      `json:"status"`
+	Details    []string    `json:"details,omitempty"`
+	Children   []PhaseTask `json:"children,omitempty"`
+	BlockedBy  []string    `json:"blockedBy,omitempty"`
+	References []string    `json:"references,omitempty"`
+	Reqs       []string    `json:"requirements,omitempty"`
+}
+
+// Select returns explicit work for runner-controlled dispatch. Unlike the
+// legacy phase lookup, an empty selection is not interpreted as completion.
+func (c *Client) Select(phase bool) (*NextPhaseResult, error) {
+	args := []string{"next", c.tasksFile, "--format", "json"}
+	if phase {
+		args = append(args, "--phase")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, "rune", args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("rune next failed: %w", err)
+	}
+	var result struct {
+		NextPhaseResult
+		Success  bool       `json:"success"`
+		NextTask *PhaseTask `json:"next_task"`
+		Message  string     `json:"message"`
+	}
+	if err := json.Unmarshal(output, &result); err != nil {
+		return nil, fmt.Errorf("parse rune selection: %w", err)
+	}
+	if !result.Success {
+		return nil, fmt.Errorf("rune selection failed: %s", result.Message)
+	}
+	if result.NextTask != nil {
+		result.Tasks = []PhaseTask{*result.NextTask}
+	}
+	return &result.NextPhaseResult, nil
 }
 
 // NextPhaseResult represents the output of rune next --phase.

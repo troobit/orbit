@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/arjenschwarz/orbit/internal/agents"
@@ -236,11 +237,14 @@ func (a *Agent) execute(ctx context.Context, opts agents.RunOptions, _ bool) (*a
 	args := a.buildArgs(opts)
 
 	execResult := agents.Execute(ctx, agents.ExecuteConfig{
-		CLIPath: a.cliPath,
-		Args:    args,
-		WorkDir: opts.WorkDir,
-		Env:     opts.Env,
-		Timeout: opts.Timeout,
+		CLIPath:      a.cliPath,
+		Args:         args,
+		WorkDir:      opts.WorkDir,
+		Env:          opts.Env,
+		Timeout:      opts.Timeout,
+		Stdout:       opts.Stdout,
+		Stderr:       opts.Stderr,
+		ProcessGroup: opts.ProcessGroup,
 	})
 
 	result := &agents.RunResult{
@@ -254,6 +258,53 @@ func (a *Agent) execute(ctx context.Context, opts agents.RunOptions, _ bool) (*a
 	if execResult.Err != nil {
 		result.Error = execResult.Err
 	}
+	if slices.Contains(args, "--json") {
+		result.RawJSON = execResult.Stdout
+		parseEvents(result)
+		if opts.ProcessGroup && result.NumTurns == 0 && !result.IsError && execResult.Err == nil {
+			result.IsError = true
+			result.Errors = append(result.Errors, "Codex exited without a completed turn")
+		}
+	}
 
 	return result, execResult.Err
+}
+
+// parseEvents preserves raw output while identifying failed turns and assistant
+// text. Item-level tool errors are recoverable and are not failed turns.
+func parseEvents(result *agents.RunResult) {
+	for line := range strings.SplitSeq(result.Output, "\n") {
+		var event struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+			Error   struct {
+				Message string `json:"message"`
+			} `json:"error"`
+			Item struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"item"`
+		}
+		if json.Unmarshal([]byte(line), &event) != nil {
+			continue
+		}
+		switch event.Type {
+		case "turn.failed", "error":
+			result.IsError = true
+			message := event.Error.Message
+			if message == "" {
+				message = event.Message
+			}
+			if message == "" {
+				message = line
+			}
+			result.Errors = append(result.Errors, message)
+		case "turn.completed":
+			result.NumTurns++
+		case "item.completed":
+			if event.Item.Type == "agent_message" {
+				result.FinalOutput = event.Item.Text
+			}
+		}
+	}
 }

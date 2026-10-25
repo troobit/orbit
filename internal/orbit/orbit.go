@@ -130,6 +130,7 @@ type Config struct {
 	CommandTimeout   time.Duration // Timeout for shell commands (default 5m)
 	DateSubdirs      bool          // If true, use timestamped subdirectories for logs
 	ContinueSession  bool          // If true, continue existing Claude sessions when resuming
+	Local            *LocalConfig  // Explicit local preset; nil preserves hosted behavior
 
 	// Agent configuration
 	Agent        string                        // Agent name (claude-code, codex, kiro, copilot)
@@ -178,6 +179,7 @@ type Orbit struct {
 	variantRunID         string             // Shared ID to group variant registry entries
 	variantRegistryIDs   map[int]string     // Maps variant ID to registry entry ID
 	prePromptSessionID   string             // Session ID from pre-prompt to pass to phase 1
+	localIteration       *localIteration
 }
 
 // New creates a new Orbit instance.
@@ -505,4 +507,3 @@ func (o *Orbit) fail(err error) error {
 	}
 	return err
 }
-
