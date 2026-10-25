@@ -39,11 +39,19 @@ of capability. Tests use real rune in temporary Git repositories with a fake
 Codex; the live run uses the installed `8-bit` model and a disposable ledger.
 
 Local compatibility overrides are `web_search="disabled"`,
-`features.multi_agent=false` and `model_reasoning_summary="none"`. Codex
+`features.multi_agent=false`, `features.apps=false` and
+`model_reasoning_summary="none"`. Codex
 0.164.0 otherwise advertises web search and a `multi_agent_v1` namespace that
 LM Studio ignores. Delegation is already prohibited by the iteration contract.
 The overrides retain shell execution, file access and project instructions.
 They belong to the local preset, rather than the shared Codex adapter.
+
+Normal Codex authentication can add connected-app namespaces even when user
+configuration is ignored. A follow-up request capture using the real login
+found seven app namespaces absent from the disposable-CODEX_HOME fixture.
+`features.apps=false` removes these while retaining function tools and shell
+network permission. Test both authentication contexts when assessing provider
+compatibility; a clean home does not represent an authenticated installation.
 
 The installed Codex still sends `prompt_cache_key`, developer-role messages
 and `include: ["reasoning.encrypted_content"]` to its local provider. These
@@ -79,6 +87,11 @@ an error. JSONL already records tool activity; terminal presentation is deferred
 at the user's request. Smaller task dispatch and an alternate harness remain
 options, but nested subtasks currently share a session with their selected
 parent, so merely adding children does not reduce the work unit.
+
+Reusing a flat log directory increments its run number and marks it running.
+Clear the previous summary error and completion timestamp at that point;
+otherwise the live summary combines the new status with an old failure. Keep
+session history and the existing phase-resumption state.
 
 Risks: local inference can take minutes per tool turn; the timeout is adjustable.
 Sandbox enforcement depends on Codex/platform support. Project instructions can

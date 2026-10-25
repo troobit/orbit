@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Local Codex runs exclude connected ChatGPT app namespaces that appear under normal authentication despite ignored user configuration.
+- Restarting a run in an existing log directory clears the previous error and completion timestamp while preserving session history.
 - Local Codex workers receive explicit context and compaction budgets and bounded tool-output history to reduce prompt truncation, with guidance for focused reads and dependency blockers.
 - Failed worker attempts retain diagnostics without increasing the summary's completed-phase count.
 - Local Codex runs disable unsupported web search and delegation tools and unused reasoning summaries; setup guidance explains the remaining LM Studio protocol warnings.

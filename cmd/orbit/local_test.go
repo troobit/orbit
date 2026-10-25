@@ -95,7 +95,7 @@ func TestLocalCommandDispatch(t *testing.T) {
 				}
 				// Codex's OSS defaults still advertise tools LM Studio drops.
 				// These must be explicit config overrides on every iteration.
-				for _, setting := range []string{`web_search="disabled"`, "features.multi_agent=false", `model_reasoning_summary="none"`,
+				for _, setting := range []string{`web_search="disabled"`, "features.multi_agent=false", "features.apps=false", `model_reasoning_summary="none"`,
 					"model_context_window=32768", "model_auto_compact_token_limit=20480", "tool_output_token_limit=2048", "sandbox_workspace_write.network_access=false"} {
 					index := slices.Index(args, setting)
 					require.Positive(t, index, "missing local compatibility setting %s", setting)

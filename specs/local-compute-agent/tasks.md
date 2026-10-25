@@ -41,3 +41,11 @@ references:
 - [x] 8. Bound local context and correct dependency and completion handling
   - Verified explicit context and compaction budgets, opt-in sandbox networking and corrected failed-attempt completion counts. Real-Codex loopback checks activated compaction and completed two tasks with shell/Makefile/rune, including HTTP tool calls with networking enabled. Build, tests, lint, document links and rune parsing passed; installed launcher updated. Documented task sizing and harness alternatives; visual activity rendering excluded.
   - References: specs/bugfixes/local-context-progress/report.md, specs/local-compute-agent/verification.md
+
+- [x] 9. Exclude authenticated app namespaces and record the longer live run
+  - Authenticated capture reproduced seven connected-app namespaces; apps=false removed them while retaining shell tools and network access. Rebuilt authenticated fixture completed two tasks and HTTP checks; build, tests and lint passed. Observed live iteration 1 complete after real compaction (20243 to 10947 server tokens), three tests and Ruff checks, in 1098.955s with no middle truncation. Orbit accepted the ledger and began iteration 2; overall run continues undisturbed.
+  - References: specs/bugfixes/local-provider-warnings/report.md, specs/local-compute-agent/verification.md
+
+- [x] 10. Clear previous terminal state when restarting a flat-log run
+  - Existing-summary regression reproduced stale error and completion timestamp on a running restart. New starts clear terminal fields while preserving history; build, tests and lint pass. Active user summary left untouched.
+  - References: specs/bugfixes/local-context-progress/report.md

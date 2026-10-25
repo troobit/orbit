@@ -235,6 +235,8 @@ func NewManagerWithOptions(baseDir, branchName, workingDir string, opts ManagerO
 			// Increment run number for new orchestration run
 			m.summary.RunNumber++
 			m.summary.Status = "running"
+			m.summary.CompletedAt = nil
+			m.summary.Error = ""
 			m.summary.BranchName = branchName // Update to current branch
 		}
 	} else {

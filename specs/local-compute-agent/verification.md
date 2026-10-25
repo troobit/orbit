@@ -148,15 +148,71 @@ The rebuilt Orbit also passed the earlier two-task real-Codex protocol fixture
 with the new defaults. A second run with `--network` completed both tasks,
 executed two Makefile checks and made two HTTP requests from sandboxed shell
 tools to the loopback server. No dependencies were installed in another project.
-No model reload or server overflow-policy change was made. New long-context
-live inference remains untested; tokenizer differences and oversized individual
-reads can still cause overflow despite earlier compaction.
+No model reload or server overflow-policy change was made. These fixtures did
+not test long-context live inference; see the follow-up below. Tokenizer
+differences and oversized individual reads can still cause overflow despite
+earlier compaction.
 
 Terminal-only activity display was excluded after clarification because events
 are already retained in JSONL. Smaller top-level tasks and an OpenCode comparison
 remain documented options; neither task ledgers nor the driver were replaced.
 See [the report](../bugfixes/local-context-progress/report.md) and Decision 15.
 
-A longer user-driven run is in progress. Its outcome is pending at the time
-of this commit; the automated and loopback results above do not replace that
-live-model validation.
+At commit `cdc95c6`, the longer user-driven run was in progress and its result
+was pending. Its observed first-iteration outcome is recorded below.
+
+## Authenticated live-run follow-up
+
+The user supplied `phase-1-87438257-97a0-4883-a6cb-cb3b6dc88814.stdout.jsonl`
+as a live test. It began at 17:15:44 on 2026-10-25. Its active Codex arguments
+confirmed the 32768/20480 budgets, disabled delegation/web search, 2048-token
+tool history and disabled shell networking. Raw events and stderr were present.
+The user subsequently authorized and preferred networking for future invocations;
+the active process's sandbox was left unchanged.
+
+A normal-login loopback capture reproduced seven connected-app namespaces
+despite ignored user configuration. `features.apps=false` removed them while
+retaining seven function tools. The isolated-home fixture alone had missed this.
+A rebuilt-Orbit fixture using normal authentication and `--network` completed
+two tasks, ran two Makefile checks and made two HTTP requests from sandboxed
+tools. The dispatch regression failed before the app setting and passed after it.
+
+The live run also exposed stale restart state: status was running alongside
+the previous invocation's error and completion timestamp. The existing-summary
+test reproduced that combination. New starts now clear those terminal fields
+while preserving history and run numbering. `make build test lint` passed for
+both follow-up fixes. The active summary was not edited externally.
+
+At 17:26:04, the actual LM Studio request had zero tools and the explicit
+`CONTEXT CHECKPOINT COMPACTION` marker. The preceding ordinary request had
+seven connected-app namespaces; server cache accounting was 19712 cached plus
+531 uncached tokens. The compaction prefill reported 18280 uncached tokens.
+The worker had recovered from a failing CLI test and subsequently reported
+three passing tests.
+
+At 17:30:34 the worker resumed a normal request with tools. Conversation items
+fell from 55 to five. Server cache accounting for the resumed request was 8192
+cached plus 2755 uncached tokens (10947), down from 20243 before compaction.
+No TruncateMiddle events occurred during the observed first iteration.
+
+After resumption, the worker passed Ruff lint, Ruff format checking and pytest
+(three tests), wrote an implementation note and completed task 1 with rune.
+It returned `turn.completed`; Orbit accepted the ledger changes, saved a
+successful session entry and began iteration 2 with a fresh session. The
+first session ran from 17:15:44.394588 to 17:34:03.386180: 1098.955 seconds,
+about 18 minutes 19 seconds. Reported aggregate usage was 287160 input tokens,
+241152 cached input tokens and 7038 output tokens, including 5339 reasoning
+tokens; aggregate usage is not the maximum prompt size.
+
+This is a successful longer live iteration and a real compaction/resumption
+check. The overall multi-task run is still running; later iterations were not
+included in this result. The worker still used some pipelines/trailing echoes
+despite the prompt's exit-status guidance, although it noticed the actual test
+failure and the final validators reported success. Prompt instructions remain
+advisory and do not enforce shell semantics.
+
+The authenticated namespace exclusion and restart-state fix were installed for
+new invocations. The active parent retains its original app and network flags;
+it was not restarted. Subsequent invocations of this user run should include
+the authorized `--network` flag. No target-project files or active summaries
+were changed by the observer.

@@ -88,6 +88,7 @@ func localCommand(args []string) error {
 				"--ephemeral", "--json", "--sandbox", "workspace-write", "-c", `approval_policy="never"`,
 				// OSS mode retains Codex defaults for tools LM Studio does not support.
 				"-c", `web_search="disabled"`, "-c", "features.multi_agent=false",
+				"-c", "features.apps=false",
 				"-c", `model_reasoning_summary="none"`,
 				"-c", fmt.Sprintf("model_context_window=%d", *contextWindow),
 				"-c", fmt.Sprintf("model_auto_compact_token_limit=%d", *compactAt),

@@ -105,8 +105,21 @@ Documentation links, rune parsing and `git diff --check` passed. The existing
 installed launcher was updated through `make install-local-next-task`; it
 matches the validated build and exposes all three new options in `--help`.
 
-A longer user-driven run is in progress; its result is pending when these
-changes are committed.
+The longer user-driven run was pending when the initial context controls were
+committed. Its first iteration subsequently passed: real compaction reduced
+the server-side prompt count from 20243 to 10947 tokens, tools resumed, three
+tests and Ruff checks passed, task 1 completed through rune, and Orbit accepted
+the result before starting iteration 2. Duration was 1098.955 seconds. No
+TruncateMiddle events occurred within that observed iteration. The overall run
+continues; see the feature verification for the scope and remaining limitations.
+
+### Restarted-summary follow-up
+
+The next live run reported `status: running` with the previous run's error and
+completion time still set. The existing-summary regression reproduced these
+stale fields. New invocations now clear `Error` and `CompletedAt` when marking
+the summary running, while preserving session history and incremented run
+numbering. The active user's summary was not edited while the worker owned it.
 
 ## Prevention
 

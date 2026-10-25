@@ -38,7 +38,8 @@ local entry point backed by the existing Codex agent and orchestration loop.
    a disposable repository. Model, timings, commands and limitations MUST be
    recorded in this spec.
 10. The local preset MUST explicitly disable built-in web search, delegation
-    tools and reasoning summaries. Setup documentation MUST distinguish these
+    tools, connected-app tools and reasoning summaries. Setup documentation MUST
+    distinguish these
     unsupported capabilities from remaining Codex request metadata warnings,
     without promising warning-free compatibility or removing task instructions.
 11. Local workers MUST receive an explicit context window (default 32768), an
@@ -53,6 +54,8 @@ local entry point backed by the existing Codex agent and orchestration loop.
 13. Failed worker attempts MUST retain diagnostics without advancing the
     summary's completed-phase count. Existing JSONL files remain the source for
     detailed tool activity; additional terminal activity display is out of scope.
+    A new invocation reusing a log directory MUST clear the previous terminal
+    error and completion time while preserving session history and run numbering.
 
 Model downloads, server lifecycle management, variants, comparison changes, and
 new transcript formats are outside this change. The local runtime is managed

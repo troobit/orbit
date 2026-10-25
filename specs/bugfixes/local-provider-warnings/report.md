@@ -32,7 +32,7 @@ without explaining the actual compatibility boundary.
   `reasoning.summary="auto"`, a cache key, two developer messages and the
   encrypted reasoning include.
 - Disabling web search and multi-agent support removes both unsupported tool
-  types. `model_reasoning_summary="none"` removes the summary request.
+  types in the isolated profile. `model_reasoning_summary="none"` removes the summary request.
 - Tested `model_supports_reasoning_summaries=false`: OSS mode still sends
   the summary and encrypted include. Setting summary to `none` still leaves
   the encrypted include. Neither is a fix for that include warning.
@@ -55,7 +55,8 @@ itself imply instruction text was discarded.
 **Changes made:**
 
 - The local preset explicitly sets `web_search="disabled"`,
-  `features.multi_agent=false` and `model_reasoning_summary="none"`.
+  `features.multi_agent=false`, `features.apps=false` and
+  `model_reasoning_summary="none"`.
 - The dispatch integration test checks those actual arguments on every task
   and phase invocation, alongside existing progress and log checks.
 - Setup documentation explains every warning, how to apply the updated preset,
@@ -122,8 +123,23 @@ compatibility link. The installed binary matches the checked build, and
 ## Prevention
 
 Verify local-provider defaults at the HTTP boundary when updating Codex.
+Include the normal authenticated profile as well as a clean Codex home.
 Distinguish unsupported tools from ignored metadata and preserved instruction
 text. Do not add flags solely from their names or hide server warnings.
+
+## Authenticated-profile follow-up
+
+The longer user-started run still reported `namespace` after delegation was
+disabled. A request capture using the normal login reproduced seven connected
+ChatGPT app namespaces, including Pets, Sites and app management. The original
+disposable-CODEX_HOME fixture omitted this authentication-dependent behavior.
+
+Setting `features.apps=false` removed all seven namespace definitions in that
+capture while retaining seven function tools and enabled sandbox tool networking.
+The dispatch regression first failed on the missing setting before the fix.
+The remaining cache, role and encrypted-include warnings are unchanged. This
+fix applies to newly started Orbit invocations; it cannot change the arguments
+of the already-running parent process.
 
 ## Related
 

@@ -51,7 +51,8 @@
   populated, alongside the unique live stdout artifacts.
 - Codex 0.164.0 OSS defaults still advertise `web_search` and a `multi_agent_v1`
   namespace. Local ExtraArgs explicitly set `web_search="disabled"`,
-  `features.multi_agent=false` and `model_reasoning_summary="none"`. Keep these
+  `features.multi_agent=false`, `features.apps=false` and
+  `model_reasoning_summary="none"`. Keep these
   scoped to the local preset. The dispatch test checks their actual argv in
   both task and phase mode.
 - A real-Codex loopback request capture reproduced the LM Studio warnings.
@@ -80,3 +81,21 @@
   nested children are still bundled. OpenCode remains an alternative to evaluate,
   but its current Orbit adapter expects one JSON document and does not pass live
   writers or process-group cancellation through.
+- The longer authenticated run exposed seven additional connected-app namespaces
+  (Pets, Sites, app management and others). `--ignore-user-config` still uses
+  normal authentication, which can expose apps absent from a clean Codex home.
+  An authenticated loopback capture reproduced them; `features.apps=false`
+  removed them and retained seven function tools with shell networking enabled.
+  This is separate from the `--network` permission; the user prefers networking
+  enabled for subsequent invocations of the observed run.
+- Flat-directory restarts must clear summary Error and CompletedAt when setting
+  Status to running. The live run otherwise showed a prior failure alongside
+  the new active session. Preserve history and phase-resumption state; do not
+  patch a summary file owned by an active runner.
+- The longer authenticated iteration `87438257-97a0-4883-a6cb-cb3b6dc88814`
+  completed task 1 in 1098.955 seconds. Live compaction at 17:26:04 resumed
+  at 17:30:34, reducing conversation items from 55 to five and server prompt
+  count from 20243 to 10947. No middle truncation appeared in that iteration;
+  tests and Ruff checks passed, rune completed the task and Orbit began iteration
+  2. This does not validate the entire continuing ledger run. The worker still
+  ignored some pipeline/echo guidance, so treat prompts as advisory.

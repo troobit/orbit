@@ -17,7 +17,7 @@ equivalent entry point: replace `orbit local` with `local-next-task` in the
 commands below. No `.orbit.yaml` is needed for this workflow.
 
 Reinstall after updating Orbit to pick up its local compatibility settings.
-The preset disables unsupported web search and delegation tools. LM Studio
+The preset disables unsupported web search, delegation and connected-app tools. LM Studio
 may still warn about cache keys, developer-role conversion and encrypted
 reasoning metadata; see the [warning guide](local-next-task.md#lm-studio-compatibility-warnings)
 for what each means.

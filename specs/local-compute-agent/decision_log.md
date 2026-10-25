@@ -630,3 +630,51 @@ Negative: budgets depend on operator-supplied loaded context, compaction remains
 lossy and tokenizer estimates can differ. Tool output retained in history is
 limited; raw artifacts remain available. Network access is still opt-in and
 does not make external caches writable. Alternate harnesses remain unmeasured.
+
+---
+
+## Decision 16: Exclude connected-app schemas from local workers
+
+**ID**: 16
+**Date**: 2026-10-25
+**Status**: accepted
+
+### Context
+
+The longer authenticated run still reported an unsupported namespace after
+delegation was disabled. The original protocol check used a disposable Codex
+home, which omitted normal-login app tools. An authenticated capture found
+seven connected-app namespaces, including Pets, Sites and app management.
+
+### Decision
+
+Add `features.apps=false` to the local preset. Include normal authentication
+in protocol checks as well as an isolated home. Keep shell network access a
+separate option; the user authorized and prefers it for subsequent invocations
+of the observed run. Do not restart the active worker to change these settings.
+
+### Rationale
+
+The authenticated capture with apps disabled retained seven function tools,
+removed all namespace schemas and completed a turn. A rebuilt-Orbit fixture
+using the normal login completed two dependent tasks and made two sandboxed
+HTTP requests with `--network`, confirming that app exclusion does not disable
+shell downloads.
+
+### Alternatives Considered
+
+- Leave apps enabled and accept the warnings: rejected because the local server
+  drops those tools and they are unrelated to the selected coding task.
+- Replace the user's Codex home or authentication: rejected because a scoped
+  feature setting removes the schemas without changing login state.
+- Disable all networking: rejected because app schemas and shell network
+  permission are independent and dependency downloads are explicitly authorized.
+
+### Consequences
+
+Positive: fewer unsupported schemas and protocol checks representative of the
+normal authenticated installation, while local shell tools remain available.
+
+Negative: local workers cannot use connected ChatGPT apps; other namespace
+sources still require investigation if introduced later. Existing Orbit parents
+retain their original arguments until restarted.
