@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `orbit local` accepts `--context-window`, `--compact-at`, and opt-in `--network` controls for local model budgets and sandboxed dependency downloads.
 - `orbit local <tasks.md>` implements an explicit rune task file through Codex and LM Studio, using the `8-bit` model by default with fresh sessions, task or phase selection, and configurable timeout and iteration limits.
 - Local runs retain prompts and live stdout/stderr, report elapsed time, and stop on halt signals, changed task graphs, worker failures, or lack of completed work. Unix cancellation terminates worker child processes.
 - `make install-local-next-task` installs Orbit and a compatible `local-next-task` command, replacing the known agentic-coding prototype link while preserving unrelated files.
@@ -18,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Local Codex workers receive explicit context and compaction budgets and bounded tool-output history to reduce prompt truncation, with guidance for focused reads and dependency blockers.
+- Failed worker attempts retain diagnostics without increasing the summary's completed-phase count.
 - Local Codex runs disable unsupported web search and delegation tools and unused reasoning summaries; setup guidance explains the remaining LM Studio protocol warnings.
 - Local completion checks include in-progress tasks so interrupted work is dispatched again when resuming.
 - Codex JSONL execution detects failed turns even when the CLI exits successfully and retains the stream in Orbit's standard session artifacts.

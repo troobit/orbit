@@ -573,3 +573,60 @@ setup guidance that identifies what the preset can actually control.
 
 Negative: local tasks have no built-in web search or delegation, some server
 warnings remain, and future Codex/LM Studio versions need another wire check.
+
+---
+
+## Decision 15: Budget local context and separate environment failures from progress
+
+**ID**: 15
+**Date**: 2026-10-25
+**Status**: accepted
+
+### Context
+
+LM Studio removed intermediate history from a 33340-token request against a
+32768-token loaded context. Code edits continued, but missing dependencies and
+sandbox networking blocked validation. Orbit correctly failed the iteration for
+no ledger progress, while its summary incorrectly counted the failed phase.
+The user asked to consider smaller tasks and alternate harnesses, then clarified
+that extra terminal-only tool activity display was unnecessary.
+
+### Decision
+
+Pin configurable context and compaction budgets, bound retained tool output,
+offer explicit sandbox network opt-in, improve blocker/validation guidance and
+correct failed-attempt accounting. Keep the current Codex driver for this fix;
+document smaller top-level work units, larger loaded context and OpenCode as
+options to evaluate. Do not rewrite task ledgers or change server loading and
+overflow policy automatically. Leave terminal activity presentation unchanged.
+
+### Rationale
+
+A loopback check with installed Codex 0.164.0 and 22000 reported input tokens
+triggered a summary request under the 20480 threshold, followed by a regular
+tool-enabled request. These controls work without adopting a new harness.
+Dependency access is independent of inference routing or task granularity, and
+saving diagnostics must not imply that a phase passed validation.
+
+### Alternatives Considered
+
+- Only shrink tasks: useful, but rejected as the sole fix because it cannot
+  satisfy missing dependencies or prevent an oversized read from overflowing.
+- Increase the loaded context only: retained as an option, but rejected as the
+  default because it requires resources, a reload and corresponding client limits.
+- Switch immediately to OpenCode: retained for a measured comparison; rejected
+  for this fix because the current adapter expects one JSON document and lacks
+  local live-output/cancellation forwarding. No equivalent live-model comparison
+  has established better task completion.
+- Build a direct LM Studio harness: retained as a future option; rejected here
+  because it requires owning tool execution, history management and recovery.
+
+### Consequences
+
+Positive: explicit budgets, fewer unbounded reads, clearer dependency blockers
+and accurate failed-attempt summaries, with the existing orchestration intact.
+
+Negative: budgets depend on operator-supplied loaded context, compaction remains
+lossy and tokenizer estimates can differ. Tool output retained in history is
+limited; raw artifacts remain available. Network access is still opt-in and
+does not make external caches writable. Alternate harnesses remain unmeasured.

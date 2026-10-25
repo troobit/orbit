@@ -21,6 +21,7 @@ type LocalConfig struct {
 	Phase         bool
 	MaxIterations int
 	SkillPath     string
+	Network       bool
 }
 
 type localIteration struct {
@@ -252,6 +253,10 @@ func (o *Orbit) localPrompt(work *rune.NextPhaseResult) (string, error) {
 		}
 		retrieval = fmt.Sprintf("Read the next-task skill at %s. Retrieve the same selection using rune next %s%s --format json. If selected IDs differ, halt for review. Do not advance beyond this selection.", o.config.Local.SkillPath, tasks, phase)
 	}
+	network := "Tool network access is disabled. Do not retry online dependency downloads."
+	if o.config.Local.Network {
+		network = "Tool network access is enabled; filesystem writes remain sandboxed."
+	}
 	return fmt.Sprintf(`%s
 
 Explicit tasks file: %s
@@ -264,17 +269,22 @@ Selected work (rune JSON):
 Rune commands (complete children before parents):
 %s
 Execute only this selection and its subtasks sequentially; do not delegate.
-Read project instructions, referenced spec documents, and relevant
-docs/agent-notes before editing. Resolve references from the repository root
+Read project instructions and the referenced sections and relevant agent notes
+needed for this selection. Use bounded searches and excerpts; avoid dumping
+whole documents or command output. Resolve references from the repository root
 or relative to the task file. Use the absolute tasks path in all rune commands.
 Validate using the project's Makefile when present. Mark work complete only
 after validation. Keep task IDs, titles, dependencies and graph unchanged.
+Run validation commands directly. If a pipeline is necessary, enable pipefail
+and preserve the failing command's exit status; a trailing echo or tail is not
+proof of success. %s If required dependencies or writable caches are unavailable,
+halt with the blocker rather than cycling through downloads or copying caches.
 Leave changes for review without committing or pushing. Update relevant notes.
 This is an unattended iteration; do not ask questions. If blocked or approval
 is required, write .orbit/halt in the repository root with a one-line reason
 and finish with ORBIT-HALT: <reason>. Otherwise report completed task IDs,
 changed files and validation, then stop. Orbit starts the next session.
-`, retrieval, o.config.TasksFile, o.config.WorkingDir, data, commands.String()), nil
+`, retrieval, o.config.TasksFile, o.config.WorkingDir, data, commands.String(), network), nil
 }
 
 func (o *Orbit) validateLocalProgress() error {

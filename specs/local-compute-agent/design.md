@@ -54,6 +54,32 @@ include in this version's OSS mode. Disabling summaries removes the summary
 request but leaves that include. Document the boundary rather than add an
 ineffective flag, strip instructions or introduce a request-rewriting proxy.
 
+Context budgeting: pass `model_context_window` (default 32768),
+`model_auto_compact_token_limit` (default five eighths of the window: 20480)
+and `tool_output_token_limit=2048` to each worker. CLI flags `--context-window`
+and `--compact-at` make the first two explicit; a zero compact-at requests the
+derived default. Validate positive budgets and a threshold below the window.
+The operator must match the loaded server context and reserve generation space.
+Codex's tokenizer estimates and compaction do not guarantee that every request
+fits LM Studio; do not silently reload models, raise context or change overflow
+policies. Prefer server rejection over middle truncation, and verify long-turn
+behavior before depending on compaction.
+
+The optional `--network` flag sets sandbox tool network access while retaining
+workspace-write filesystem restrictions. The default remains disabled. Worker
+prompts tell the model to halt on missing prerequisites and to preserve shell
+pipeline failures. Package caches must be writable inside the sandbox; prepare
+dependencies before dispatch or configure a workspace cache. This does not
+alter inference routing or enable Codex's built-in web search.
+
+Progress accounting: `logs.Manager.SaveSession` must advance completed phases
+only for successful results, while retaining failed attempts and their costs
+and output. Local ledger validation already turns a no-progress result into
+an error. JSONL already records tool activity; terminal presentation is deferred
+at the user's request. Smaller task dispatch and an alternate harness remain
+options, but nested subtasks currently share a session with their selected
+parent, so merely adding children does not reduce the work unit.
+
 Risks: local inference can take minutes per tool turn; the timeout is adjustable.
 Sandbox enforcement depends on Codex/platform support. Project instructions can
 still be read by Codex. Neither task completion nor passing a smoke test proves

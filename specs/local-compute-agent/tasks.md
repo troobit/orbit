@@ -37,3 +37,7 @@ references:
 - [x] 7. Disable unsupported local tools and document Codex protocol warnings
   - Dispatch regression failed before the fix and passed afterward. Real Codex 0.164.0 loopback captures verified removal of unsupported tool types, retained protocol metadata, and two actual shell/Makefile/rune iterations. make test-local, make build test lint, Markdown links and rune parsing passed. Installed launcher updated and checked.
   - References: specs/bugfixes/local-provider-warnings/report.md, specs/local-compute-agent/verification.md
+
+- [x] 8. Bound local context and correct dependency and completion handling
+  - Verified explicit context and compaction budgets, opt-in sandbox networking and corrected failed-attempt completion counts. Real-Codex loopback checks activated compaction and completed two tasks with shell/Makefile/rune, including HTTP tool calls with networking enabled. Build, tests, lint, document links and rune parsing passed; installed launcher updated. Documented task sizing and harness alternatives; visual activity rendering excluded.
+  - References: specs/bugfixes/local-context-progress/report.md, specs/local-compute-agent/verification.md

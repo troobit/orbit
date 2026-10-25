@@ -62,3 +62,21 @@
   compatible or strip project instructions to silence role-conversion logs.
   The runbook explains each warning; the feature verification records the
   protocol check separately from real-model inference.
+- Local budgets are explicit: `--context-window` defaults to 32768 and
+  `--compact-at 0` derives five eighths (20480). Tool-output history is capped
+  at 2048 tokens. Match loaded LM Studio context, not the advertised maximum.
+  A Codex 0.164.0 loopback check reporting 22000 input tokens triggered a local
+  summary request with no tools, followed by a normal request with tools.
+  This verifies config behavior, not tokenizer agreement or model summary quality.
+- `--network` opts shell tools into networking without removing workspace-write
+  restrictions. Cache writes outside that sandbox can still fail. Bounded
+  prompts ask for direct validation commands or pipefail, and halt on unavailable
+  prerequisites rather than repeat online/offline/cache workarounds.
+- `SaveSession` retains failed diagnostics but must not increase completed phases
+  for an error, nonzero exit or execution error. A successful Codex turn can
+  still fail local ledger validation; code edits are not task completion.
+- Tool activity already lives in JSONL; additional terminal rendering was
+  excluded after clarification. Smaller top-level tasks reduce dispatch;
+  nested children are still bundled. OpenCode remains an alternative to evaluate,
+  but its current Orbit adapter expects one JSON document and does not pass live
+  writers or process-group cancellation through.

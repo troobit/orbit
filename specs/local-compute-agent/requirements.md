@@ -41,6 +41,18 @@ local entry point backed by the existing Codex agent and orchestration loop.
     tools and reasoning summaries. Setup documentation MUST distinguish these
     unsupported capabilities from remaining Codex request metadata warnings,
     without promising warning-free compatibility or removing task instructions.
+11. Local workers MUST receive an explicit context window (default 32768), an
+    earlier compaction threshold (default five eighths of that window), and a
+    bounded tool-output history. The CLI MUST reject invalid context/compaction
+    values before creating logs. These settings MUST be documented as budgets,
+    not a guarantee against server-side truncation or tokenizer differences.
+12. Sandbox tool networking MUST remain disabled unless `--network` is passed.
+    Worker guidance MUST distinguish blocked dependencies from a model failure,
+    preserve validation command exit status, and halt when prerequisites cannot
+    be satisfied. Local inference does not imply offline dependency resolution.
+13. Failed worker attempts MUST retain diagnostics without advancing the
+    summary's completed-phase count. Existing JSONL files remain the source for
+    detailed tool activity; additional terminal activity display is out of scope.
 
 Model downloads, server lifecycle management, variants, comparison changes, and
 new transcript formats are outside this change. The local runtime is managed

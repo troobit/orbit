@@ -41,6 +41,9 @@ review without committing or pushing.
 | Option | Default | Meaning |
 |---|---|---|
 | `--model` | `8-bit` | Exact LM Studio model identifier |
+| `--context-window` | `32768` | Token window actually loaded in LM Studio |
+| `--compact-at` | `0` | History compaction threshold; 0 derives five eighths of the window (20480 by default) |
+| `--network` | false | Permit network access for sandboxed shell tools, including dependency downloads |
 | `--phase` | false | Execute the next phase instead of one task |
 | `--selection` | `runner` | `model` delegates retrieval to the installed next-task skill |
 | `--timeout` | `30m` | Positive Go duration per worker session |
@@ -60,6 +63,11 @@ every iteration. These disable built-in web search, delegation tools and
 reasoning summaries that the local workflow does not use. Shell/file tools
 and project instructions remain available.
 
+Each worker also receives `model_context_window`,
+`model_auto_compact_token_limit`, `tool_output_token_limit=2048` and the chosen
+`sandbox_workspace_write.network_access` value. The first two come from the
+context flags above. These settings are independent of built-in web search.
+
 The installed Codex must support those flags; see its `exec --help` and the
 [official CLI reference](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
 The [official configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
@@ -67,6 +75,85 @@ describes the web-search, feature and reasoning settings.
 Model calls use the local provider; Orbit does not add comparison, consolidation,
 hosted pre/post prompts or shell hooks to this preset. Codex may still load
 project instructions and tools supplied by its installation.
+
+## Context and dependency blockers
+
+`TruncateMiddle` is actual context loss. A worker can continue editing after
+the server drops intermediate tool results or instructions, so continued output
+does not establish that the conversation remains intact. Match
+`--context-window` to the **loaded** context reported by `lms ps --json`, not
+the model's advertised maximum. Orbit does not reload the model for you.
+The [LM Studio Codex guide](https://lmstudio.ai/docs/integrations/codex)
+recommends more than roughly 25k context because Codex itself uses substantial
+context.
+
+For a model loaded at 32768, the default budgets are explicit:
+
+```bash
+orbit local /path/to/specs/feature/tasks.md \
+  --context-window 32768 --compact-at 20480 --max-iterations 1
+```
+
+The compaction margin reserves room for tool results, summary instructions and
+generation. Tool outputs stored in history are limited to 2048 tokens; raw
+stdout/stderr artifacts remain available. Tokenizers differ, and compaction
+is lossy: these budgets reduce risk but cannot guarantee that every request
+fits. In LM Studio's applicable model/prediction settings, prefer rejecting or
+stopping at the context limit over silently truncating the middle; the exact
+control depends on the runtime/API. Its SDK documents the
+[overflow policies](https://beta.lmstudio.ai/docs/typescript/api-reference/llm-prediction-config-input).
+Do not assume a client flag changes the server's policy. If truncation persists,
+lower `--compact-at`, reduce task/context size, or deliberately reload a larger
+supported context and then match Orbit's setting. Stop active work before a
+reload. A longer timeout does not prevent truncation.
+
+`turn.completed` token usage is cumulative over model calls in that turn.
+For example, 476522 input tokens with 452096 cached tokens is not evidence of
+a single 476522-token prompt. Use server per-request logs for that diagnosis.
+
+Local inference and offline shell execution are separate choices. The default
+workspace-write sandbox blocks tool networking. Prepare dependencies before
+starting the worker, or explicitly pass `--network` when downloads are needed.
+This retains filesystem restrictions, so caches still need a writable location
+inside the workspace or allowed temporary directory. A missing package in an
+offline cache cannot be repaired by repeated offline retries. Worker guidance
+now asks for a halt on unavailable prerequisites and bounded document reads.
+
+Run validation commands directly. `command | tail; echo "$?"` reports the
+pipeline/tail status, which can hide the first command's failure. If piping is
+necessary, enable `pipefail` and preserve the command's real status. A printed
+`lock-exit=0` after `run_silent: exit 2` is not successful dependency resolution.
+
+Repeated `codex_models_manager` decode errors are a separate catalog-format
+compatibility issue. The observed worker continued calling tools despite them;
+the explicit budgets avoid relying on inferred context metadata. This change
+does not fix catalog decoding. `Reading additional input from stdin...` is
+Codex's input notice; Orbit supplies EOF rather than waiting for user input.
+
+## Smaller work units and alternate harnesses
+
+For constrained local models, use one independently verifiable change per
+top-level task. Split scaffolding, dependency preparation and the first behavior
+test into separate work units where they have separate validation. Avoid
+`--phase` and `--selection model` when minimizing session scope. Adding child
+tasks alone does not shrink dispatch: the selected parent and all descendants
+currently share one worker session. Orbit does not rewrite another project's
+ledger automatically.
+
+| Approach | Benefit | Limit or prerequisite |
+|---|---|---|
+| Smaller tasks with tuned Codex budgets | Fresh context per verified unit; retains the existing tool loop and logs | Prerequisites must still work; a single oversized read can still overflow |
+| Larger LM Studio context | More room for instructions and tool history | Requires memory and a deliberate model reload; may increase latency |
+| OpenCode against LM Studio | Custom provider/model limits and harness-owned compaction are available | Needs an adapter check: Orbit's current adapter expects one JSON document and does not forward local output writers or process-group cancellation |
+| Direct LM Studio API/SDK integration | Full control of context, tools and overflow policy | Requires implementing or adopting a tool-execution loop, recovery and transcript support |
+
+OpenCode is a candidate for a separate measured run, not established as a better
+choice by the current evidence. Its [provider settings](https://opencode.ai/v2/docs/providers)
+support local compatible endpoints and explicit model limits; its
+[compaction settings](https://opencode.ai/v2/docs/compaction) expose summary and
+retained-history controls. A fair comparison uses the same small coding task,
+loaded context and validation, measuring successful tool calls, truncation,
+recovery and completion rather than a text-only response.
 
 ## LM Studio compatibility warnings
 

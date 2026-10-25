@@ -55,13 +55,23 @@ Check the preview's repository root, selected task and references.
 
 ```bash
 orbit local "$tasks_file" --model 8-bit \
-  --selection runner --timeout 30m --max-iterations 20
+  --context-window 32768 --selection runner --timeout 30m --max-iterations 20
 ```
 
 Orbit passes one selected task and its subtasks to each worker session. The
 worker implements that selection, runs the project's validation, updates the
 ledger with rune and leaves changes for review. Orbit continues while work
 remains and each iteration completes at least one selected task.
+
+Match `--context-window` to the context actually loaded in LM Studio. The
+default starts history compaction at 20480 tokens and limits saved tool-output
+history. A `TruncateMiddle` server message means context is being removed;
+see [context and dependency blockers](local-next-task.md#context-and-dependency-blockers).
+
+Prepare dependencies before running, or add `--network` to allow sandboxed
+tools to download them. Package caches must still be writable in the sandbox.
+Use small, separately verifiable top-level tasks: a selected parent and all its
+children run together, so adding subtasks alone does not reduce session scope.
 
 For a larger selection, add `--phase` to execute a whole phase per session.
 Increase `--timeout` to `1h` if needed. To inspect the first iteration before

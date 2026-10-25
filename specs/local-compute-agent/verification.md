@@ -122,3 +122,41 @@ iteration. See [the bugfix report](../bugfixes/local-provider-warnings/report.md
 `make install-local-next-task` updated `~/.local/bin/orbit` and its existing
 `local-next-task -> orbit` link. The installed binary matches the validated
 build, and the installed compatibility command's `--help` succeeds.
+
+## Context and dependency handling check
+
+Date: 2026-10-25. The reported real run ended with no selected task completed;
+its artifacts were present. LM Studio's model listing showed 32768 loaded
+tokens despite a 262144 advertised maximum. The previous preset had no
+explicit context budget. The run's summary counted a failed phase as completed,
+which `SaveSession` did unconditionally.
+
+New regression assertions failed before implementation: default budgets were
+absent, custom budget flags were unknown, and both failed-turn and nonzero-exit
+results increased completed-phase counts. They now pass, including execution
+errors, preflight validation and explicit network permission in the worker prompt.
+`make build test lint` and a subsequent `make test lint` passed.
+
+An installed-Codex 0.164.0 loopback check used explicit 32768/20480 budgets and
+reported 22000 input tokens after a real shell call. The next request was a
+local summary request with zero tools; the following request restored seven
+function tools. The process returned `turn.completed`. This verifies automatic
+compaction activation with the configured limits without calling a hosted
+compaction service. It does not measure local-model summary quality.
+
+The rebuilt Orbit also passed the earlier two-task real-Codex protocol fixture
+with the new defaults. A second run with `--network` completed both tasks,
+executed two Makefile checks and made two HTTP requests from sandboxed shell
+tools to the loopback server. No dependencies were installed in another project.
+No model reload or server overflow-policy change was made. New long-context
+live inference remains untested; tokenizer differences and oversized individual
+reads can still cause overflow despite earlier compaction.
+
+Terminal-only activity display was excluded after clarification because events
+are already retained in JSONL. Smaller top-level tasks and an OpenCode comparison
+remain documented options; neither task ledgers nor the driver were replaced.
+See [the report](../bugfixes/local-context-progress/report.md) and Decision 15.
+
+A longer user-driven run is in progress. Its outcome is pending at the time
+of this commit; the automated and loopback results above do not replace that
+live-model validation.

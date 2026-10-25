@@ -95,7 +95,8 @@ func TestLocalCommandDispatch(t *testing.T) {
 				}
 				// Codex's OSS defaults still advertise tools LM Studio drops.
 				// These must be explicit config overrides on every iteration.
-				for _, setting := range []string{`web_search="disabled"`, "features.multi_agent=false", `model_reasoning_summary="none"`} {
+				for _, setting := range []string{`web_search="disabled"`, "features.multi_agent=false", `model_reasoning_summary="none"`,
+					"model_context_window=32768", "model_auto_compact_token_limit=20480", "tool_output_token_limit=2048", "sandbox_workspace_write.network_access=false"} {
 					index := slices.Index(args, setting)
 					require.Positive(t, index, "missing local compatibility setting %s", setting)
 					require.Equal(t, "-c", args[index-1], "setting must be a Codex config override")
@@ -104,6 +105,8 @@ func TestLocalCommandDispatch(t *testing.T) {
 				prompt := args[len(args)-1]
 				require.Contains(t, prompt, "Do not retrieve or select work again")
 				require.Contains(t, prompt, "design.md")
+				require.Contains(t, prompt, "Tool network access is disabled")
+				require.Contains(t, prompt, "enable pipefail")
 				require.Contains(t, prompt, "'\"'\"'")
 			}
 			if !phase {
@@ -126,6 +129,17 @@ func TestLocalCommandDispatch(t *testing.T) {
 				require.Contains(t, string(data), `"type":"turn.completed"`)
 			}
 		})
+	}
+}
+
+func TestLocalCommandContextAndNetwork(t *testing.T) {
+	root, tasks := localFixture(t)
+	require.NoError(t, localCommand([]string{tasks, "--context-window", "65536", "--compact-at", "40000", "--network"}))
+	for _, args := range localCalls(t, root) {
+		for _, setting := range []string{"model_context_window=65536", "model_auto_compact_token_limit=40000", "sandbox_workspace_write.network_access=true"} {
+			require.Contains(t, args, setting)
+		}
+		require.Contains(t, args[len(args)-1], "Tool network access is enabled")
 	}
 }
 
@@ -156,7 +170,7 @@ func TestLocalCommandStops(t *testing.T) {
 }
 
 func TestLocalCommandPreflight(t *testing.T) {
-	for _, mode := range []string{"halt", "stop-child", "blocked", "dry-run", "bad-model", "bad-selection", "bad-limit", "bad-timeout", "directory", "missing", "not-git"} {
+	for _, mode := range []string{"halt", "stop-child", "blocked", "dry-run", "bad-model", "bad-selection", "bad-limit", "bad-timeout", "bad-context", "bad-compact", "compact-at-limit", "directory", "missing", "not-git"} {
 		t.Run(mode, func(t *testing.T) {
 			root, tasks := localFixture(t)
 			args := []string{tasks, "--dry-run"}
@@ -184,6 +198,15 @@ func TestLocalCommandPreflight(t *testing.T) {
 			case "bad-timeout":
 				args = append(args, "--timeout=0s")
 				expected = "must be positive"
+			case "bad-context":
+				args = append(args, "--context-window=0")
+				expected = "context window"
+			case "bad-compact":
+				args = append(args, "--compact-at=-1")
+				expected = "compaction threshold"
+			case "compact-at-limit":
+				args = append(args, "--context-window=32768", "--compact-at=32768")
+				expected = "compaction threshold"
 			case "directory":
 				args[0] = root
 				expected = "regular tasks file"

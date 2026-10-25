@@ -104,6 +104,36 @@ func TestManager_SaveSession(t *testing.T) {
 	}
 }
 
+func TestManager_FailedSessionDoesNotAdvanceProgress(t *testing.T) {
+	for _, result := range []*agents.RunResult{
+		{SessionID: "failed-turn", IsError: true},
+		{SessionID: "failed-process", ExitCode: 1},
+		{SessionID: "execution-error", Error: os.ErrPermission},
+	} {
+		t.Run(result.SessionID, func(t *testing.T) {
+			m, err := NewManager(t.TempDir(), "test", t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := m.SaveSession(1, &agents.RunResult{SessionID: "success"}, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			if err := m.SaveSession(2, result, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			if m.summary.PhasesCompleted != 1 {
+				t.Fatalf("failed attempt advanced completed phases to %d", m.summary.PhasesCompleted)
+			}
+			if len(m.summary.Sessions) != 2 {
+				t.Fatal("failed attempt diagnostics were not retained")
+			}
+			if !m.summary.Sessions[1].IsError {
+				t.Fatal("failed attempt was not marked as an error")
+			}
+		})
+	}
+}
+
 func TestManager_Complete(t *testing.T) {
 	tmpDir := t.TempDir()
 
