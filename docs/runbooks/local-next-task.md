@@ -54,11 +54,48 @@ satisfy. STOP gates and unmet dependencies outside the selection halt preflight.
 
 Codex runs with `--oss --local-provider lmstudio --ignore-user-config
 --ephemeral --json --sandbox workspace-write -c approval_policy="never"`.
+The preset also passes `-c web_search="disabled"`,
+`-c features.multi_agent=false` and `-c model_reasoning_summary="none"` on
+every iteration. These disable built-in web search, delegation tools and
+reasoning summaries that the local workflow does not use. Shell/file tools
+and project instructions remain available.
+
 The installed Codex must support those flags; see its `exec --help` and the
 [official CLI reference](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
+The [official configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
+describes the web-search, feature and reasoning settings.
 Model calls use the local provider; Orbit does not add comparison, consolidation,
 hosted pre/post prompts or shell hooks to this preset. Codex may still load
 project instructions and tools supplied by its installation.
+
+## LM Studio compatibility warnings
+
+Codex 0.164.0's native LM Studio integration still sends some Responses API
+fields the server does not support. These warnings alone do not establish
+that task text or references were discarded:
+
+| Warning | Meaning and action |
+|---|---|
+| `Ignoring unsupported tool type(s): namespace, web_search` | Codex defaults advertise delegation in a `multi_agent_v1` namespace and built-in web search. The local preset now disables both. If these persist, rebuild/reinstall with `make install-local-next-task` from the Orbit checkout and check that `command -v orbit` / `command -v local-next-task` resolve to the new install. Project or installation tools may need separate investigation if they introduce another namespace. |
+| `prompt_cache_key ... ignored` | Codex sends a cache-routing key. This server does not use it; it is request metadata, not task context. This warning can remain. It does not prove that all local caching is disabled. |
+| `Developer role detected - replacing it with system role` | LM Studio converts the instruction role. It reports replacement, rather than deletion of the instruction text. Codex's built-in instructions and execution constraints account for developer messages even with user configuration ignored. Keep those instructions; this warning can remain. |
+| `include ... reasoning.encrypted_content ... ignored` | Codex requests encrypted reasoning data in the response. LM Studio does not provide that Responses API feature. This warning can remain even with reasoning summaries disabled; it is not a request to add more task context and does not disable the model's own reasoning. |
+
+Request captures with this Codex version confirmed that
+`model_supports_reasoning_summaries=false` does **not** remove the encrypted
+include in OSS mode. `model_reasoning_summary="none"` removes the summary
+request but leaves that include. `--ignore-user-config` isolates user
+configuration; it does not remove built-in tools or instructions. There is no
+verified preset setting here to remove the remaining fields. Orbit delegates
+HTTP serialization to Codex and does not rewrite requests or filter warnings.
+
+After rebuilding, restart the iteration to use the new preset. Review whether
+the worker runs shell/file tools, produces `turn.completed`, and completes the
+selected ledger work. A failed turn or no progress still stops Orbit. If tools
+are missing or work stalls, keep the warnings and the live stdout/stderr for
+diagnosis rather than treating a successful text response as proof of tool
+compatibility. See the [bugfix report](../../specs/bugfixes/local-provider-warnings/report.md)
+and [request-capture results](../../specs/local-compute-agent/verification.md#protocol-compatibility-check).
 
 ## Diagnostics and recovery
 

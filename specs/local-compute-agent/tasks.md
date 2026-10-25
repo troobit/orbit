@@ -33,3 +33,7 @@ references:
 
 - [x] 6. Include in-progress tasks when checking local run completion
   - Regression reproduced with a final in-progress task. Local completion now checks all statuses. make build test lint passed; installed dry-run selects the unfinished task without mutations.
+
+- [x] 7. Disable unsupported local tools and document Codex protocol warnings
+  - Dispatch regression failed before the fix and passed afterward. Real Codex 0.164.0 loopback captures verified removal of unsupported tool types, retained protocol metadata, and two actual shell/Makefile/rune iterations. make test-local, make build test lint, Markdown links and rune parsing passed. Installed launcher updated and checked.
+  - References: specs/bugfixes/local-provider-warnings/report.md, specs/local-compute-agent/verification.md

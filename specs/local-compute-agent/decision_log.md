@@ -525,3 +525,51 @@ and existing Orbit summaries and registry integration.
 Negative: recent Codex flags and an installed rune CLI are prerequisites;
 local model quality and latency remain variable. Windows only has direct-process
 cancellation. Model selection mode requires the installed next-task skill.
+
+---
+
+## Decision 14: Restrict local capabilities and document protocol compatibility
+
+**ID**: 14
+**Date**: 2026-10-25
+**Status**: accepted
+
+### Context
+
+LM Studio warns that Codex 0.164.0 sends unsupported `namespace` and
+`web_search` tools, a cache key, developer roles and an encrypted reasoning
+include. Capturing requests against a loopback stub reproduced each field
+with the same local CLI flags. The namespace contains delegation tools despite
+Orbit's local prompt prohibiting delegation.
+
+### Decision
+
+Disable web search, multi-agent tools and reasoning summaries in the local
+preset. Document the remaining cache-key, role-conversion and encrypted-include
+warnings as version-specific compatibility limits. Retain project instructions
+and the existing Codex tool loop.
+
+### Rationale
+
+Explicit capability settings remove tools the server drops. The remaining
+fields originate inside Codex; captures show that disabling summaries does not
+remove the encrypted include, and the OSS path ignores a false
+`model_supports_reasoning_summaries` override. Request metadata does not by
+itself establish that task context is lost.
+
+### Alternatives Considered
+
+- Document every warning without changing the preset: rejected because web
+  search and delegation can be disabled and do not belong in this local loop.
+- Rewrite requests in a compatibility proxy: rejected because owning streaming,
+  tool schemas and instruction-role conversion is unnecessary for this fix.
+- Remove Codex/project instructions: rejected because role conversion does not
+  establish that their content is useless; they include execution constraints.
+
+### Consequences
+
+Positive: fewer unsupported capabilities, less tool/instruction overhead, and
+setup guidance that identifies what the preset can actually control.
+
+Negative: local tasks have no built-in web search or delegation, some server
+warnings remain, and future Codex/LM Studio versions need another wire check.

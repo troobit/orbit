@@ -37,6 +37,10 @@ local entry point backed by the existing Codex agent and orchestration loop.
    iteration bounds, paths, and real inference completing at least two tasks in
    a disposable repository. Model, timings, commands and limitations MUST be
    recorded in this spec.
+10. The local preset MUST explicitly disable built-in web search, delegation
+    tools and reasoning summaries. Setup documentation MUST distinguish these
+    unsupported capabilities from remaining Codex request metadata warnings,
+    without promising warning-free compatibility or removing task instructions.
 
 Model downloads, server lifecycle management, variants, comparison changes, and
 new transcript formats are outside this change. The local runtime is managed

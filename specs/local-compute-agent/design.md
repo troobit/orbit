@@ -38,6 +38,22 @@ direct-process termination. The model ID is a runtime identifier, not a measure
 of capability. Tests use real rune in temporary Git repositories with a fake
 Codex; the live run uses the installed `8-bit` model and a disposable ledger.
 
+Local compatibility overrides are `web_search="disabled"`,
+`features.multi_agent=false` and `model_reasoning_summary="none"`. Codex
+0.164.0 otherwise advertises web search and a `multi_agent_v1` namespace that
+LM Studio ignores. Delegation is already prohibited by the iteration contract.
+The overrides retain shell execution, file access and project instructions.
+They belong to the local preset, rather than the shared Codex adapter.
+
+The installed Codex still sends `prompt_cache_key`, developer-role messages
+and `include: ["reasoning.encrypted_content"]` to its local provider. These
+warnings describe ignored metadata or role conversion, not evidence of lost
+task text. A loopback request capture verified that
+`model_supports_reasoning_summaries=false` does not suppress the encrypted
+include in this version's OSS mode. Disabling summaries removes the summary
+request but leaves that include. Document the boundary rather than add an
+ineffective flag, strip instructions or introduce a request-rewriting proxy.
+
 Risks: local inference can take minutes per tool turn; the timeout is adjustable.
 Sandbox enforcement depends on Codex/platform support. Project instructions can
 still be read by Codex. Neither task completion nor passing a smoke test proves

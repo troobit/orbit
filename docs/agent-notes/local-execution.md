@@ -49,3 +49,16 @@
   Studio server. These did not prevent tool execution or completed turns.
   JSONL execution also sets RawJSON so Orbit's standard session JSON files are
   populated, alongside the unique live stdout artifacts.
+- Codex 0.164.0 OSS defaults still advertise `web_search` and a `multi_agent_v1`
+  namespace. Local ExtraArgs explicitly set `web_search="disabled"`,
+  `features.multi_agent=false` and `model_reasoning_summary="none"`. Keep these
+  scoped to the local preset. The dispatch test checks their actual argv in
+  both task and phase mode.
+- A real-Codex loopback request capture reproduced the LM Studio warnings.
+  Cache keys, developer roles and `include: ["reasoning.encrypted_content"]`
+  remain with the overrides. OSS mode ignored
+  `model_supports_reasoning_summaries=false`; summary `none` removed the summary
+  request but not the include. Do not claim these settings make requests fully
+  compatible or strip project instructions to silence role-conversion logs.
+  The runbook explains each warning; the feature verification records the
+  protocol check separately from real-model inference.

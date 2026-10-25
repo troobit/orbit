@@ -93,6 +93,13 @@ func TestLocalCommandDispatch(t *testing.T) {
 				for _, flag := range []string{"--oss", "--local-provider", "lmstudio", "--ignore-user-config", "--ephemeral", "--json", "workspace-write"} {
 					require.Contains(t, args, flag)
 				}
+				// Codex's OSS defaults still advertise tools LM Studio drops.
+				// These must be explicit config overrides on every iteration.
+				for _, setting := range []string{`web_search="disabled"`, "features.multi_agent=false", `model_reasoning_summary="none"`} {
+					index := slices.Index(args, setting)
+					require.Positive(t, index, "missing local compatibility setting %s", setting)
+					require.Equal(t, "-c", args[index-1], "setting must be a Codex config override")
+				}
 				require.NotContains(t, args, "--dangerously-bypass-approvals-and-sandbox")
 				prompt := args[len(args)-1]
 				require.Contains(t, prompt, "Do not retrieve or select work again")

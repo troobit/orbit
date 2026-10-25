@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Local Codex runs disable unsupported web search and delegation tools and unused reasoning summaries; setup guidance explains the remaining LM Studio protocol warnings.
 - Local completion checks include in-progress tasks so interrupted work is dispatched again when resuming.
 - Codex JSONL execution detects failed turns even when the CLI exits successfully and retains the stream in Orbit's standard session artifacts.
 - Claude Code session-limit messages using the new `"You've hit your session limit"` wording now wait until the reported reset time while retaining support for the older message.

@@ -73,7 +73,10 @@ func localCommand(args []string) error {
 		AgentConfig: agents.AgentConfig{
 			Type: "codex", Timeout: *timeout, Options: map[string]string{"model": *model},
 			ExtraArgs: []string{"--oss", "--local-provider", "lmstudio", "--ignore-user-config",
-				"--ephemeral", "--json", "--sandbox", "workspace-write", "-c", `approval_policy="never"`},
+				"--ephemeral", "--json", "--sandbox", "workspace-write", "-c", `approval_policy="never"`,
+				// OSS mode retains Codex defaults for tools LM Studio does not support.
+				"-c", `web_search="disabled"`, "-c", "features.multi_agent=false",
+				"-c", `model_reasoning_summary="none"`},
 		},
 	}
 	log.Printf("Local agent: codex / lmstudio / %s; selection: %s; timeout: %s", *model, *selection, *timeout)

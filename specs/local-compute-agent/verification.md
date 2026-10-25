@@ -73,3 +73,52 @@ The live check also exposed empty standard Codex JSON artifacts. The final
 adapter now populates RawJSON for JSONL execution; regression tests verify the
 standard Orbit session files contain completed-turn events. The live UUID
 stdout files already retained the original inference streams throughout.
+
+## Protocol compatibility check
+
+Date: 2026-10-25. Driver: `codex-cli 0.164.0`, macOS arm64. This check uses
+the installed Codex against a loopback HTTP stub, **not model inference** or a
+new LM Studio coding-quality test. The stub implements model listing and
+Responses SSE events. `CODEX_OSS_BASE_URL` points to its `/v1` endpoint;
+`CODEX_HOME` and the Git repository are disposable. The actual worker request
+is distinguished from Codex's startup probe by its `tools` field.
+
+| Request field | Previous local preset | Updated local preset |
+|---|---|---|
+| Tool types | `function`, `namespace`, `web_search` | `function` only |
+| Delegation tools | `multi_agent_v1` namespace | Absent |
+| Shell tools | `exec_command`, `write_stdin` | Both retained |
+| `reasoning` | `{"summary":"auto"}` | `{}` |
+| `include` | `["reasoning.encrypted_content"]` | Unchanged |
+| `prompt_cache_key` | Present | Present |
+| Developer instruction roles | Present | Present |
+
+Also tested `model_supports_reasoning_summaries=false` independently with the
+OSS flags: the outgoing summary and encrypted include remained. The preset
+uses `model_reasoning_summary="none"`, which removes the summary request;
+the encrypted include still remains. General config documentation alone is
+insufficient to establish this version's local-provider behavior.
+
+End-to-end command: `./orbit local <scratch>/specs/protocol/tasks.md
+--timeout 30s --max-iterations 2`, with the loopback endpoint override. The
+stub supplied two `exec_command` tool calls in separate iterations. Actual
+Codex executed `make test` and `rune complete` for each selected task, returning
+tool outputs to the stub before receiving its final assistant message.
+
+Assertions passed: two real shell calls, two Makefile validation runs, both
+dependent ledger tasks completed, four worker requests containing only function
+tools, and two retained JSONL streams with `turn.completed`. A marker from the
+scratch repository's `AGENTS.md` remained in every worker request. Cache keys,
+developer messages and the encrypted include were still present as documented.
+This verifies removal of unsupported tool definitions and continued shell
+execution; it does not establish full LM Studio protocol compatibility.
+
+`TestLocalCommandDispatch` first failed for both task and phase mode because
+the overrides were missing, then passed after the preset change.
+`make test-local` and `make build test lint` passed. The runbooks now explain
+each server warning and the need to rebuild/reinstall before starting a new
+iteration. See [the bugfix report](../bugfixes/local-provider-warnings/report.md).
+
+`make install-local-next-task` updated `~/.local/bin/orbit` and its existing
+`local-next-task -> orbit` link. The installed binary matches the validated
+build, and the installed compatibility command's `--help` succeeds.
