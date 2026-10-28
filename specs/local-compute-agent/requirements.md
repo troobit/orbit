@@ -15,6 +15,10 @@ local entry point backed by the existing Codex agent and orchestration loop.
    descendants, details, references, and explicit rune commands to the worker.
    `--phase` MUST select a whole phase. `--selection model` MAY delegate retrieval
    to the installed next-task skill, bounded by Orbit's preflight selection.
+   `--leaf` MUST optionally dispatch just the first ready unfinished leaf within
+   the selected task, retaining ancestor context without assigning sibling work.
+   It MUST respect ancestor dependencies and STOP gates, preserve the ledger,
+   and reject combination with phase or model-driven selection before logging.
 4. Orbit MUST stop before dispatch on a repository `.orbit/halt`, a selected
    STOP gate (including descendants), an external unmet dependency, or an empty
    selection while work remains. Dependencies internal to a phase MAY be
@@ -56,6 +60,10 @@ local entry point backed by the existing Codex agent and orchestration loop.
     detailed tool activity; additional terminal activity display is out of scope.
     A new invocation reusing a log directory MUST clear the previous terminal
     error and completion time while preserving session history and run numbering.
+14. Worker guidance MUST review existing partial changes before repeating work,
+    avoid rereading the supplied ledger, and honor explicit tests-first task
+    acceptance criteria. An expected red test is acceptable only for a task
+    explicitly asking for it; implementation tasks still require passing checks.
 
 Model downloads, server lifecycle management, variants, comparison changes, and
 new transcript formats are outside this change. The local runtime is managed

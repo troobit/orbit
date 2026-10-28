@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `orbit local` accepts `--leaf` to run one ready leaf subtask per session with read-only ancestor context, enabling focused work on deeply nested task hierarchies.
 - `orbit local` accepts `--context-window`, `--compact-at`, and opt-in `--network` controls for local model budgets and sandboxed dependency downloads.
 - `orbit local <tasks.md>` implements an explicit rune task file through Codex and LM Studio, using the `8-bit` model by default with fresh sessions, task or phase selection, and configurable timeout and iteration limits.
 - Local runs retain prompts and live stdout/stderr, report elapsed time, and stop on halt signals, changed task graphs, worker failures, or lack of completed work. Unix cancellation terminates worker child processes.

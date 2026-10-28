@@ -24,6 +24,7 @@ func localCommand(args []string) error {
 	network := fs.Bool("network", false, "Allow sandboxed tools to access the network, e.g. for dependency downloads")
 	selection := fs.String("selection", "runner", "Who retrieves work: runner or model")
 	phase := fs.Bool("phase", false, "Select a whole phase per iteration")
+	leaf := fs.Bool("leaf", false, "Run one ready leaf subtask per session, with read-only ancestor context")
 	limit := fs.Int("max-iterations", 20, "Maximum worker sessions per invocation")
 	timeout := fs.Duration("timeout", 30*time.Minute, "Timeout per worker session (e.g. 30m, 2h)")
 	dryRun := fs.Bool("dry-run", false, "Print selected work and prompt without writing logs or running inference")
@@ -43,6 +44,9 @@ func localCommand(args []string) error {
 	if strings.TrimSpace(*model) == "" || (*selection != "runner" && *selection != "model") || *limit < 1 || *timeout <= 0 {
 		return fmt.Errorf("model must be nonempty, selection must be runner or model, and timeout and max-iterations must be positive")
 	}
+	if *leaf && (*phase || *selection != "runner") {
+		return fmt.Errorf("--leaf requires runner selection without --phase")
+	}
 	if *contextWindow <= 0 {
 		return fmt.Errorf("context window must be positive and match the loaded LM Studio context")
 	}
@@ -61,7 +65,7 @@ func localCommand(args []string) error {
 			return fmt.Errorf("required command %s: %w", name, err)
 		}
 	}
-	local := &orbit.LocalConfig{Selection: *selection, Phase: *phase, MaxIterations: *limit, Network: *network}
+	local := &orbit.LocalConfig{Selection: *selection, Phase: *phase, Leaf: *leaf, MaxIterations: *limit, Network: *network}
 	if *selection == "model" {
 		home, err := os.UserHomeDir()
 		if err != nil {

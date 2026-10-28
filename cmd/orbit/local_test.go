@@ -265,6 +265,106 @@ func TestLocalCommandChildrenAndAncestorCompletion(t *testing.T) {
 	require.NotContains(t, prompt, "Second task")
 }
 
+func TestLocalCommandLeafDispatchAndResume(t *testing.T) {
+	root, tasks := localFixture(t)
+	localRune(t, root, "update", tasks, "1", "--details", "Shared parent context")
+	localRune(t, root, "add", tasks, "--title", "Write failing tests", "--parent", "1")
+	localRune(t, root, "add", tasks, "--title", "Implement behavior", "--parent", "1", "--blocked-by", "1.1")
+
+	require.ErrorContains(t, localCommand([]string{tasks, "--leaf", "--max-iterations", "1"}), "iteration limit")
+	var ledger rune.ListResult
+	require.NoError(t, json.Unmarshal(localRune(t, root, "list", tasks, "--format", "json"), &ledger))
+	require.NotEqual(t, rune.StatusCompleted, ledger.Tasks[0].Status)
+	require.Equal(t, rune.StatusCompleted, ledger.Tasks[0].Children[0].Status)
+	require.Equal(t, rune.StatusPending, ledger.Tasks[0].Children[1].Status)
+
+	require.NoError(t, localCommand([]string{tasks, "--leaf", "--max-iterations", "2"}))
+	calls := localCalls(t, root)
+	require.Len(t, calls, 3)
+	for i, id := range []string{"1.1", "1.2", "2"} {
+		prompt := calls[i][len(calls[i])-1]
+		start := strings.Index(prompt, "<selected-work>\n") + len("<selected-work>\n")
+		end := strings.Index(prompt, "\n</selected-work>")
+		var work rune.NextPhaseResult
+		require.NoError(t, json.Unmarshal([]byte(prompt[start:end]), &work))
+		require.Len(t, work.Tasks, 1)
+		require.Equal(t, id, work.Tasks[0].ID)
+		require.Empty(t, work.Tasks[0].Children)
+		if i < 2 {
+			require.Contains(t, prompt, "Ancestor context (read only)")
+			require.Contains(t, prompt, "Shared parent context")
+			require.NotContains(t, prompt, "Second task")
+		}
+	}
+	require.NotContains(t, calls[0][len(calls[0])-1], "Implement behavior")
+	require.NoError(t, json.Unmarshal(localRune(t, root, "list", tasks, "--format", "json"), &ledger))
+	for _, task := range ledger.Tasks {
+		require.Equal(t, rune.StatusCompleted, task.Status)
+	}
+}
+
+func TestLocalCommandLeafGuards(t *testing.T) {
+	for _, mode := range []string{"phase", "model", "stop", "ancestor-blocked", "no-ready-leaf", "outside-selection"} {
+		t.Run(mode, func(t *testing.T) {
+			root, tasks := localFixture(t)
+			localRune(t, root, "add", tasks, "--title", "First child", "--parent", "1")
+			args := []string{tasks, "--leaf"}
+			expected := ""
+			switch mode {
+			case "phase":
+				args = append(args, "--phase")
+				expected = "--leaf requires runner selection without --phase"
+			case "model":
+				args = append(args, "--selection", "model")
+				expected = "--leaf requires runner selection without --phase"
+			case "stop":
+				localRune(t, root, "add", tasks, "--title", "[STOP] Review later child", "--parent", "1")
+				expected = "requires human review"
+			case "ancestor-blocked":
+				localRune(t, root, "add", tasks, "--title", "External prerequisite")
+				localRune(t, root, "update", tasks, "1", "--blocked-by", "3")
+				expected = "no ready leaf"
+			case "no-ready-leaf":
+				localRune(t, root, "update", tasks, "1.1", "--blocked-by", "2")
+				expected = "no ready leaf"
+			case "outside-selection":
+				t.Setenv("ORBIT_LOCAL_TEST_MODE", "unselected")
+				expected = "outside the selection"
+			}
+			err := localCommand(args)
+			require.ErrorContains(t, err, expected)
+			if mode == "outside-selection" {
+				require.Len(t, localCalls(t, root), 1)
+			} else {
+				require.Empty(t, localCalls(t, root))
+			}
+			if mode == "phase" || mode == "model" {
+				_, err := os.Stat(filepath.Join(root, ".orbit", "local"))
+				require.True(t, os.IsNotExist(err), "invalid flags created logs")
+			}
+		})
+	}
+}
+
+func TestLocalCommandLeafSkipsBlockedSibling(t *testing.T) {
+	root, tasks := localFixture(t)
+	localRune(t, root, "add", tasks, "--title", "Blocked child", "--parent", "1")
+	localRune(t, root, "add", tasks, "--title", "Ready child", "--parent", "1")
+	localRune(t, root, "update", tasks, "1.1", "--blocked-by", "1.2")
+	localRune(t, root, "progress", tasks, "1.2")
+
+	require.ErrorContains(t, localCommand([]string{tasks, "--leaf", "--max-iterations", "1"}), "iteration limit")
+	calls := localCalls(t, root)
+	require.Len(t, calls, 1)
+	prompt := calls[0][len(calls[0])-1]
+	require.Contains(t, prompt, "Ready child")
+	require.NotContains(t, prompt, "Blocked child")
+	var ledger rune.ListResult
+	require.NoError(t, json.Unmarshal(localRune(t, root, "list", tasks, "--format", "json"), &ledger))
+	require.Equal(t, rune.StatusPending, ledger.Tasks[0].Children[0].Status)
+	require.Equal(t, rune.StatusCompleted, ledger.Tasks[0].Children[1].Status)
+}
+
 func TestLocalCommandRelativePathFromAnotherDirectory(t *testing.T) {
 	root, tasks := localFixture(t)
 	t.Chdir(filepath.Dir(root))

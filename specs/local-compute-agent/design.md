@@ -98,3 +98,26 @@ Sandbox enforcement depends on Codex/platform support. Project instructions can
 still be read by Codex. Neither task completion nor passing a smoke test proves
 correctness of arbitrary generated code. Record observed limitations in the
 verification report.
+
+Optional leaf dispatch: `--leaf` descends through the task selected by rune in
+document order and selects one unfinished leaf whose own and ancestor
+dependencies are complete. Ancestors supply read-only title, details and
+references, without siblings or commands to complete the parent. STOP checks
+retain the full original selection so narrowing cannot hide a review gate.
+An unknown dependency remains a preflight error. If no leaf is ready, halt;
+do not search unrelated tasks or rewrite the ledger. Rune still owns status
+changes and automatic ancestor completion. Reject `--leaf --phase` and
+`--leaf --selection model` because those selection contracts conflict.
+
+Tests-first tasks may intentionally end with an expected failing behavioral
+test. Prompt guidance must distinguish that explicit acceptance criterion from
+an implementation task's passing checks, while ledger validation continues to
+require a completed selected task. Review partial edits first and avoid loading
+the entire ledger again. These instructions are advisory, not shell enforcement.
+
+Delegation remains disabled: the installed LM Studio integration drops Codex's
+multi-agent namespace. Fresh sequential leaf workers provide smaller contexts
+through the existing runner. Enabling an unsupported delegation flag would not
+constitute a functioning local delegation option. Live efficacy checks compare
+the same benign fixture with bundled and leaf dispatch, retaining prompts,
+timings, independent checks and any contention with other model users.

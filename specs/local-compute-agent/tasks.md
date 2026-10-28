@@ -49,3 +49,6 @@ references:
 - [x] 10. Clear previous terminal state when restarting a flat-log run
   - Existing-summary regression reproduced stale error and completion timestamp on a running restart. New starts clear terminal fields while preserving history; build, tests and lint pass. Active user summary left untouched.
   - References: specs/bugfixes/local-context-progress/report.md
+
+- [x] 11. Add optional leaf dispatch and measure repeated local coding runs
+  - Added runner-only --leaf with read-only ancestor context, dependency and STOP guards, tests-first guidance and integration coverage. make test-local and make build test lint passed; installed command checked. Benign live baseline completed in 378.773s; reviewed red/green leaf sessions completed in 396.267s and 359.476s with unchanged tests and automatic parent completion. Leaf handoff works but was slower on this small supervised sample; native delegation remains unsupported.

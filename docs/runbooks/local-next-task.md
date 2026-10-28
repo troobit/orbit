@@ -45,6 +45,7 @@ review without committing or pushing.
 | `--compact-at` | `0` | History compaction threshold; 0 derives five eighths of the window (20480 by default) |
 | `--network` | false | Permit network access for sandboxed shell tools, including dependency downloads |
 | `--phase` | false | Execute the next phase instead of one task |
+| `--leaf` | false | Execute one ready leaf within the next task; retain read-only ancestor context |
 | `--selection` | `runner` | `model` delegates retrieval to the installed next-task skill |
 | `--timeout` | `30m` | Positive Go duration per worker session |
 | `--max-iterations` | `20` | Positive bound per invocation |
@@ -134,16 +135,38 @@ Codex's input notice; Orbit supplies EOF rather than waiting for user input.
 ## Smaller work units and alternate harnesses
 
 For constrained local models, use one independently verifiable change per
-top-level task. Split scaffolding, dependency preparation and the first behavior
-test into separate work units where they have separate validation. Avoid
-`--phase` and `--selection model` when minimizing session scope. Adding child
-tasks alone does not shrink dispatch: the selected parent and all descendants
-currently share one worker session. Orbit does not rewrite another project's
-ledger automatically.
+task. Split scaffolding, dependency preparation and the first behavior test
+where they have separate validation. Default dispatch still bundles a parent
+and descendants. Use `--leaf` for a fresh session per ready leaf, without
+rewriting the ledger:
+
+```bash
+orbit local /path/to/specs/feature/tasks.md --leaf --network --max-iterations 1
+```
+
+Ancestors contribute context, while only the selected leaf receives progress
+and completion commands. Dependencies on every ancestor must be complete.
+The runner checks STOP gates throughout the original selected subtree before
+narrowing, and halts if it contains no ready leaf. It does not switch to an
+unrelated task. `--leaf` cannot combine with `--phase` or `--selection model`.
+Rerun after reviewing the first result, or raise the iteration limit to continue
+through successive leaves automatically.
+
+For an explicitly tests-first task, verify the intended failure and record its
+cause before completing that task. A missing dependency, malformed test or
+unrelated collection error does not establish the expected red behavior.
+The later implementation task must pass its checks. The worker should inspect
+existing partial changes before repeating investigation or rewriting tests.
+
+Native multi-agent delegation remains disabled because this LM Studio
+integration ignores Codex's delegation namespace. Fresh sequential workers are
+the supported way to hand off smaller work units locally. Parallel local
+delegation needs a provider/tool compatibility check and isolated workspaces
+before it can be offered as a working option.
 
 | Approach | Benefit | Limit or prerequisite |
 |---|---|---|
-| Smaller tasks with tuned Codex budgets | Fresh context per verified unit; retains the existing tool loop and logs | Prerequisites must still work; a single oversized read can still overflow |
+| Smaller tasks or `--leaf` with tuned Codex budgets | Fresh context per verified unit; retains the existing tool loop and logs | Extra session setup; prerequisites must still work; a single oversized read can still overflow |
 | Larger LM Studio context | More room for instructions and tool history | Requires memory and a deliberate model reload; may increase latency |
 | OpenCode against LM Studio | Custom provider/model limits and harness-owned compaction are available | Needs an adapter check: Orbit's current adapter expects one JSON document and does not forward local output writers or process-group cancellation |
 | Direct LM Studio API/SDK integration | Full control of context, tools and overflow policy | Requires implementing or adopting a tool-execution loop, recovery and transcript support |

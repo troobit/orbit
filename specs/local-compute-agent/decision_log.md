@@ -678,3 +678,53 @@ normal authenticated installation, while local shell tools remain available.
 Negative: local workers cannot use connected ChatGPT apps; other namespace
 sources still require investigation if introduced later. Existing Orbit parents
 retain their original arguments until restarted.
+
+---
+
+## Decision 17: Offer sequential leaf workers for smaller local work units
+
+**ID**: 17
+**Date**: 2026-10-25
+**Status**: accepted
+
+### Context
+
+The supplied local-run logs show repeated broad context reads, cache retries
+and a 30-minute timeout after writing an expected failing configuration test.
+Bundling a parent with all children prevents an operator from measuring or
+retrying one tests-first task independently. The user requested iterative live
+verification and task breakdown or delegation where sensible.
+
+### Decision
+
+Add opt-in `--leaf` dispatch with read-only ancestor context, dependency and
+STOP checks, and fresh sequential sessions. Retain bundled dispatch by default.
+Clarify existing-work review and explicit red-test acceptance in worker prompts.
+Measure the behavior on benign coding fixtures and retain observed failures.
+Keep native delegation disabled until the provider supports its tool schema.
+
+### Rationale
+
+Existing task boundaries provide reviewable units without rewriting another
+project's ledger. Independent fresh sessions allow a tests-first task and its
+implementation to be checked separately. The installed provider ignores the
+delegation namespace, so enabling it would add overhead without verified tools.
+
+### Alternatives Considered
+
+- Automatically split or rewrite tasks: rejected because task scope, acceptance
+  criteria and dependencies require judgment; graph changes also invalidate the
+  current progress contract.
+- Enable Codex native delegation: rejected for this provider because its
+  namespace is unsupported and no working local child-agent run is established.
+- Increase timeouts alone: rejected because repeated context retrieval still
+  consumes the session and hides whether smaller units improve completion.
+
+### Consequences
+
+Positive: optional smaller sessions, preserved task identity, explicit red-test
+acceptance, and comparable live evidence through Orbit's existing logs.
+
+Negative: leaf execution adds session setup overhead, cannot repair poorly
+specified tasks, and remains sequential. Prompt guidance cannot force a model
+to obey bounded reads or validation semantics.

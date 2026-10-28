@@ -216,3 +216,106 @@ new invocations. The active parent retains its original app and network flags;
 it was not restarted. Subsequent invocations of this user run should include
 the authorized `--network` flag. No target-project files or active summaries
 were changed by the observer.
+
+## Iterative efficacy check and leaf dispatch
+
+Date: 2026-10-25. The supplied `../atk/redteam/.orbit/local/` logs were read
+without changing the main ledger or its active runner. They show repeated
+context retrieval and dependency-cache retries; the 1800-second attempt wrote
+a configuration test and reached its expected missing-module failure without
+completing the selected parent. Shorter interrupted attempts have no completed
+turn, so their logs alone do not establish a model failure.
+
+Added opt-in `--leaf`, retaining bundled dispatch as the default. Real-rune
+integration tests cover separate child sessions, review/resume between leaves,
+automatic ancestor completion, an in-progress ready sibling behind a blocked
+sibling, blocked ancestors, STOP gates in later children, unrelated advancement,
+and incompatible CLI flags before log creation. The initial tests failed while
+`--leaf` was unknown. `make test-local`, then `make build test lint`, passed.
+The updated command was installed with `make install-local-next-task`; installed
+`local-next-task --help` lists `--leaf`. A dry run selected only leaf `1.1` and
+retained ancestor details without the sibling task.
+
+Live checks use separate standalone Git roots under:
+
+```text
+/Users/r/repos/atk/redteam/.orbit/local/evaluations/bundled
+/Users/r/repos/atk/redteam/.orbit/local/evaluations/leaf
+```
+
+Both start with the same standard-library Python utility stub, design, Makefile
+and rune ledger at `specs/word-utils/tasks.md`. A parent contains two dependent
+children: first write three expected failing normalization tests without editing
+the stub, then implement normalization and pass those unchanged tests. The
+cases cover trimming, whitespace collapse, lowercase conversion and empty input.
+No dependencies need downloading. Each fixture has its own Git root and logs;
+the main target project's source and active summary remain outside that root.
+
+Driver/model: Codex 0.164.0, LM Studio `8-bit`, loaded context 32768, compaction
+20480, workspace-write with `--network`, 12-minute session timeout. The existing
+main-project worker was also using the server; timings include contention and
+are observations, not a controlled throughput comparison.
+
+The original preset ran the bundled fixture with:
+
+```bash
+orbit local specs/word-utils/tasks.md --network --timeout 12m --max-iterations 1
+```
+
+Session `73dc9bd3-f3d0-46b8-8e1d-0f5c05726036` completed the parent and both
+children in 378.773 seconds (6m19s). It retained a completed turn, and Orbit
+reported success. Independent `run_silent make test` passed all three tests.
+
+The updated preset runs the leaf fixture with:
+
+```bash
+orbit local specs/word-utils/tasks.md --leaf --network --timeout 12m --max-iterations 1
+```
+
+The first leaf produced three failures specifically from the original stub's
+`NotImplementedError`. Independent validation confirmed `make test` exits 2,
+reports exactly three errors, and the implementation stub is byte-for-byte
+unchanged. The raw independent output is retained in the fixture's
+`red-validation.txt`. Workers still reread the ledger and used trailing echoes
+despite guidance; prompts cannot enforce shell exit-status handling.
+
+Session `f16afaa2-dffd-4245-b000-020297ff746b` finished in 396.267 seconds
+(6m36s). Only `1.1` was completed; the parent and implementation task remained
+unfinished and the session was recorded without an error. The invocation exited
+1 solely because the requested one-iteration limit was reached with work left.
+After reviewing that checkpoint, the installed `~/.local/bin/orbit` was invoked
+again with the same options to select `1.2` in a fresh session.
+
+The independent red-output file was written after the worker had observed its
+test failure; the worker later read it during its final checks. This is a
+supervised workflow check rather than a blind model evaluation. The red leaf
+alone took longer than the bundled baseline, so no speed improvement is claimed.
+
+Session `2d88ab9b-a2ff-44dd-ab0c-8a68827520ff` completed `1.2` in 359.476
+seconds (5m59s). Rune automatically completed the parent. Orbit accepted the
+progress, recorded a completed turn and ended the resumed invocation with
+success. Both leaf sessions remain in the summary and neither has an error.
+The generated test file's SHA-256 is unchanged across the implementation
+session. Independent `make test` passed all three tests, along with additional
+empty-input and mixed-whitespace assertions. Its output is retained as
+`specs/word-utils/.orbit/local/independent-green-validation.txt` in the fixture.
+
+| Mode | Worker sessions | Worker time | Observed result |
+|---|---|---|---|
+| Original bundled preset | 1 | 378.773 s (6m19s) | Parent and both children complete; three tests pass |
+| Leaf tests-first checkpoint | 1 | 396.267 s (6m36s) | Only `1.1` complete; three expected stub failures; implementation unchanged |
+| Installed leaf restart | 1 | 359.476 s (5m59s) | `1.2` and parent complete; unchanged tests pass |
+| Leaf combined | 2 | 755.743 s (12m36s) | Successful reviewed handoff across fresh sessions |
+
+The evaluation directory's `results.json` retains durations, session IDs,
+completed command counts and limitations. Both fixtures retain their own
+prompts, JSONL, stderr and standard Orbit summaries. The resumed leaf recovered
+from one incorrect reference lookup; it did not edit the tests or commit work.
+
+This establishes opt-in smaller dispatch, expected-red acceptance and a real
+installed-command restart. It does not establish improved throughput, reliable
+validation shell semantics, arbitrary-project completion or working native
+delegation. Leaf mode doubled worker time on this tiny supervised sample;
+use it for reviewable or otherwise oversized work units, rather than assume
+that more sessions are faster. The supplied main ledger was not driven end to
+end; the user's existing runner and source changes were left untouched.

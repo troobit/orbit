@@ -78,7 +78,8 @@
   still fail local ledger validation; code edits are not task completion.
 - Tool activity already lives in JSONL; additional terminal rendering was
   excluded after clarification. Smaller top-level tasks reduce dispatch;
-  nested children are still bundled. OpenCode remains an alternative to evaluate,
+  nested children are bundled by default; `--leaf` dispatches them separately.
+  OpenCode remains an alternative to evaluate,
   but its current Orbit adapter expects one JSON document and does not pass live
   writers or process-group cancellation through.
 - The longer authenticated run exposed seven additional connected-app namespaces
@@ -99,3 +100,24 @@
   tests and Ruff checks passed, rune completed the task and Orbit began iteration
   2. This does not validate the entire continuing ledger run. The worker still
   ignored some pipeline/echo guidance, so treat prompts as advisory.
+- `--leaf` is runner-only and incompatible with `--phase`. It descends through
+  rune's selected subtree in document order, skips blocked leaves, and checks
+  dependencies on every ancestor. STOP checks inspect the original subtree
+  before narrowing so a later gate cannot disappear. No ready leaf is an error;
+  the runner does not move to an unrelated top-level task.
+- Leaf prompts include ancestor details/references as read-only context, omit
+  sibling work, and give rune commands only for the leaf. The existing snapshot
+  and progress validator still own graph/status checks and allow automatic
+  ancestor completion. Use normalized snapshot children when descending so
+  their parent links remain available for context construction.
+- Tests-first acceptance must explicitly describe the expected failure. Worker
+  guidance permits that red checkpoint without implementing the next task;
+  implementation tasks still need passing checks. Verify the actual failure
+  independently: live workers still use trailing echoes and reread the ledger.
+  A one-iteration invocation exits with a limit error if work remains even when
+  its recorded worker session succeeded; rerun after reviewing that checkpoint.
+- Native delegation remains disabled because LM Studio ignores its namespace.
+  Leaf workers run sequentially with fresh contexts. Extra session setup can
+  cost more than bundling tiny tasks; the live efficacy report in
+  `specs/local-compute-agent/verification.md` records supervised fixture runs,
+  limitations and retained artifacts under the target's `.orbit/local/evaluations`.

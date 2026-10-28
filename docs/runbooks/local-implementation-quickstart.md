@@ -70,8 +70,18 @@ see [context and dependency blockers](local-next-task.md#context-and-dependency-
 
 Prepare dependencies before running, or add `--network` to allow sandboxed
 tools to download them. Package caches must still be writable in the sandbox.
-Use small, separately verifiable top-level tasks: a selected parent and all its
-children run together, so adding subtasks alone does not reduce session scope.
+Use small, separately verifiable tasks. By default, a selected parent and all
+its children run together. Add `--leaf` to give one ready subtask its own fresh
+session, with the parent's details supplied as read-only context:
+
+```bash
+orbit local "$tasks_file" --model 8-bit --leaf --network --max-iterations 1
+```
+
+Review the result and rerun to dispatch the next ready subtask. Orbit preserves
+the ledger and dependencies. For tests-first work, make the expected failing
+test explicit in that task's acceptance criteria; implementation tasks still
+require passing checks. Leaf mode requires runner selection without `--phase`.
 
 For a larger selection, add `--phase` to execute a whole phase per session.
 Increase `--timeout` to `1h` if needed. To inspect the first iteration before

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 type LocalConfig struct {
 	Selection     string
 	Phase         bool
+	Leaf          bool
 	MaxIterations int
 	SkillPath     string
 	Network       bool
@@ -99,6 +101,34 @@ func selectedTask(task rune.Task) rune.PhaseTask {
 	return result
 }
 
+// readyLocalLeaf keeps document order and checks dependencies at every level.
+// A child must not bypass a blocked ancestor just because its own list is empty.
+func readyLocalLeaf(task rune.Task, snapshot map[string]rune.Task) (rune.Task, bool, error) {
+	if task.Status == rune.StatusCompleted {
+		return rune.Task{}, false, nil
+	}
+	blocked := false
+	for _, id := range task.BlockedBy {
+		dependency, exists := snapshot[id]
+		if !exists {
+			return rune.Task{}, false, fmt.Errorf("task %s has unknown dependency %s", task.ID, id)
+		}
+		blocked = blocked || dependency.Status != rune.StatusCompleted
+	}
+	if blocked {
+		return rune.Task{}, false, nil
+	}
+	if len(task.Children) == 0 {
+		return task, true, nil
+	}
+	for _, child := range task.Children {
+		if leaf, ready, err := readyLocalLeaf(snapshot[child.ID], snapshot); err != nil || ready {
+			return leaf, ready, err
+		}
+	}
+	return rune.Task{}, false, nil
+}
+
 func (o *Orbit) prepareLocalIteration() (*rune.NextPhaseResult, error) {
 	tasks, err := o.runeClient.ListAll()
 	if err != nil {
@@ -145,14 +175,43 @@ func (o *Orbit) prepareLocalIteration() (*rune.NextPhaseResult, error) {
 	if len(iteration.selected) == 0 {
 		return nil, fmt.Errorf("incomplete tasks have no ready work")
 	}
+	// Inspect the original subtree before narrowing, including later STOP gates.
+	for id := range iteration.selected {
+		task := before[id]
+		if task.Status != rune.StatusCompleted && stopTask.MatchString(task.Title) {
+			return nil, fmt.Errorf("task %s requires human review: %s", id, task.Title)
+		}
+	}
+	var ancestors []rune.PhaseTask
+	if o.config.Local.Leaf {
+		var leaf rune.Task
+		found := false
+		for _, task := range work.Tasks {
+			leaf, found, err = readyLocalLeaf(before[task.ID], before)
+			if err != nil {
+				return nil, err
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("no ready leaf within the selected work; review dependencies and parent status")
+		}
+		for id := leaf.ParentID; id != ""; id = before[id].ParentID {
+			parent := before[id]
+			parent.Children = nil
+			ancestors = append(ancestors, selectedTask(parent))
+		}
+		slices.Reverse(ancestors)
+		work.Tasks = []rune.PhaseTask{selectedTask(leaf)}
+		iteration.selected = map[string]bool{leaf.ID: true}
+	}
 	ready := false
 	for id := range iteration.selected {
 		task := before[id]
 		if task.Status == rune.StatusCompleted {
 			continue
-		}
-		if stopTask.MatchString(task.Title) {
-			return nil, fmt.Errorf("task %s requires human review: %s", id, task.Title)
 		}
 		blocked := false
 		for _, dependency := range task.BlockedBy {
@@ -169,7 +228,7 @@ func (o *Orbit) prepareLocalIteration() (*rune.NextPhaseResult, error) {
 	if !ready {
 		return nil, fmt.Errorf("selected tasks have no ready work")
 	}
-	iteration.prompt, err = o.localPrompt(work)
+	iteration.prompt, err = o.localPrompt(work, ancestors)
 	if err != nil {
 		return nil, err
 	}
@@ -228,10 +287,18 @@ func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
-func (o *Orbit) localPrompt(work *rune.NextPhaseResult) (string, error) {
+func (o *Orbit) localPrompt(work *rune.NextPhaseResult, ancestors []rune.PhaseTask) (string, error) {
 	data, err := json.MarshalIndent(work, "", "  ")
 	if err != nil {
 		return "", err
+	}
+	context := ""
+	if len(ancestors) > 0 {
+		data, err := json.MarshalIndent(ancestors, "", "  ")
+		if err != nil {
+			return "", err
+		}
+		context = fmt.Sprintf("\nAncestor context (read only):\n%s\nUse this context only to understand the selected leaf. Do not implement or complete ancestor or sibling work. Rune completes parents automatically when their children finish.\n", data)
 	}
 	tasks := shellQuote(o.config.TasksFile)
 	var commands strings.Builder
@@ -265,16 +332,25 @@ Selected work (rune JSON):
 <selected-work>
 %s
 </selected-work>
+%s
 
 Rune commands (complete children before parents):
 %s
 Execute only this selection and its subtasks sequentially; do not delegate.
-Read project instructions and the referenced sections and relevant agent notes
+First inspect existing selected files and partial changes; continue from them
+instead of repeating completed investigation or rewriting existing work.
+The selection above is authoritative; do not reread the whole task ledger.
+Read project instructions and only the referenced sections and relevant agent notes
 needed for this selection. Use bounded searches and excerpts; avoid dumping
 whole documents or command output. Resolve references from the repository root
 or relative to the task file. Use the absolute tasks path in all rune commands.
-Validate using the project's Makefile when present. Mark work complete only
-after validation. Keep task IDs, titles, dependencies and graph unchanged.
+Validate using the project's Makefile when present. Follow the selected task's
+acceptance criteria: an explicitly tests-first task may complete after verifying
+the intended failing behavioral tests, without implementing the later task.
+Record the expected failure and confirm it is caused by the missing behavior,
+not a broken test or environment. Implementation tasks require passing checks.
+Mark work complete only after its validation. Keep task IDs, titles,
+dependencies and graph unchanged.
 Run validation commands directly. If a pipeline is necessary, enable pipefail
 and preserve the failing command's exit status; a trailing echo or tail is not
 proof of success. %s If required dependencies or writable caches are unavailable,
@@ -284,7 +360,7 @@ This is an unattended iteration; do not ask questions. If blocked or approval
 is required, write .orbit/halt in the repository root with a one-line reason
 and finish with ORBIT-HALT: <reason>. Otherwise report completed task IDs,
 changed files and validation, then stop. Orbit starts the next session.
-`, retrieval, o.config.TasksFile, o.config.WorkingDir, data, commands.String(), network), nil
+`, retrieval, o.config.TasksFile, o.config.WorkingDir, data, context, commands.String(), network), nil
 }
 
 func (o *Orbit) validateLocalProgress() error {
