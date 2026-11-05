@@ -13,3 +13,8 @@
 - Use a golangci-lint build that supports the selected Go toolchain. An older
   linter can panic when asked to analyze standard-library files from a newer Go
   release, even when the project's go.mod declares an older language version.
+- `exec.CommandContext` kills the direct child, but descendants can survive
+  and retain stdout/stderr pipes. Use the shared executor's process-group
+  cleanup and bounded pipe wait for CLI deadlines. Propagate the owning run's
+  context into metadata and task-list queries too; worker deadlines do not
+  cover those calls. Test with a child that would leave an observable marker.

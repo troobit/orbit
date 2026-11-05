@@ -66,7 +66,7 @@ func (o *Orbit) executeVariantShellCommand(
 		}
 	}
 	phaseCount := 0
-	if summaries, err := rune.NewClient(tasksFile).GetPhaseSummaries(); err == nil {
+	if summaries, err := rune.NewClientContext(ctx, tasksFile).GetPhaseSummaries(); err == nil {
 		phaseCount = len(summaries)
 	}
 
@@ -509,7 +509,7 @@ func (o *Orbit) runVariant(ctx context.Context, v *variants.Variant) error {
 		}
 	}
 	o.debug.Log("Variant %d using tasks file: %s", v.ID, tasksFile)
-	variantRuneClient := rune.NewClient(tasksFile)
+	variantRuneClient := rune.NewClientContext(ctx, tasksFile)
 	variantRuneClient.SetDebug(o.config.Debug)
 
 	// Create log manager for this variant
@@ -1009,4 +1009,3 @@ func (o *Orbit) tasksFileRel() string {
 	}
 	return relPath
 }
-

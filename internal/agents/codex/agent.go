@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -13,6 +14,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/arjenschwarz/orbit/internal/agents"
 )
@@ -63,14 +65,19 @@ func (a *Agent) IsInstalled() bool {
 	return err == nil
 }
 
-// Version returns the installed Codex CLI version.
+// Version returns the installed Codex CLI version. Startup can stall before the
+// CLI reaches its argument parser, so even this metadata probe needs a deadline.
 func (a *Agent) Version() (string, error) {
-	cmd := exec.Command(a.cliPath, "--version")
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
+	result := agents.Execute(context.Background(), agents.ExecuteConfig{
+		CLIPath:      a.cliPath,
+		Args:         []string{"--version"},
+		Timeout:      5 * time.Second,
+		ProcessGroup: true,
+	})
+	if result.Err != nil {
+		return "", fmt.Errorf("get Codex version: %w", result.Err)
 	}
-	return string(bytes.TrimSpace(output)), nil
+	return string(bytes.TrimSpace(result.Stdout)), nil
 }
 
 // DefaultSessionDir returns the default session storage directory.

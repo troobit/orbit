@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/arjenschwarz/orbit/internal/agents"
 	"github.com/arjenschwarz/orbit/internal/orbit"
@@ -19,13 +21,14 @@ import (
 func localCommand(args []string) error {
 	fs := flag.NewFlagSet("local", flag.ContinueOnError)
 	model := fs.String("model", "8-bit", "Exact LM Studio model identifier")
+	instructionsFile := fs.String("instructions-file", "", "Replace Codex's built-in worker instructions with this UTF-8 file")
 	contextWindow := fs.Int("context-window", 32768, "Token context window loaded in LM Studio")
 	compactAt := fs.Int("compact-at", 0, "Compact history at this token count (0 uses five eighths of context-window)")
 	network := fs.Bool("network", false, "Allow sandboxed tools to access the network, e.g. for dependency downloads")
 	selection := fs.String("selection", "runner", "Who retrieves work: runner or model")
 	phase := fs.Bool("phase", false, "Select a whole phase per iteration")
 	leaf := fs.Bool("leaf", false, "Run one ready leaf subtask per session, with read-only ancestor context")
-	limit := fs.Int("max-iterations", 20, "Maximum worker sessions per invocation")
+	limit := fs.Int("max-iterations", 0, "Maximum worker sessions (0 derives a finite budget from unfinished tasks)")
 	timeout := fs.Duration("timeout", 30*time.Minute, "Timeout per worker session (e.g. 30m, 2h)")
 	dryRun := fs.Bool("dry-run", false, "Print selected work and prompt without writing logs or running inference")
 	fs.Usage = func() {
@@ -41,8 +44,11 @@ func localCommand(args []string) error {
 	if fs.NArg() != 1 || strings.TrimSpace(fs.Arg(0)) == "" {
 		return fmt.Errorf("provide one explicit tasks file: orbit local <tasks.md>")
 	}
-	if strings.TrimSpace(*model) == "" || (*selection != "runner" && *selection != "model") || *limit < 1 || *timeout <= 0 {
-		return fmt.Errorf("model must be nonempty, selection must be runner or model, and timeout and max-iterations must be positive")
+	if strings.TrimSpace(*model) == "" || (*selection != "runner" && *selection != "model") || *timeout <= 0 {
+		return fmt.Errorf("model must be nonempty, selection must be runner or model, and timeout must be positive")
+	}
+	if *limit < 0 {
+		return fmt.Errorf("max-iterations must be nonnegative (0 derives a finite budget from unfinished tasks)")
 	}
 	if *leaf && (*phase || *selection != "runner") {
 		return fmt.Errorf("--leaf requires runner selection without --phase")
@@ -60,6 +66,13 @@ func localCommand(args []string) error {
 	if err != nil {
 		return err
 	}
+	var instructionsPath string
+	if *instructionsFile != "" {
+		instructionsPath, err = resolveLocalInstructions(*instructionsFile)
+		if err != nil {
+			return err
+		}
+	}
 	for _, name := range []string{"rune", "codex"} {
 		if _, err := exec.LookPath(name); err != nil {
 			return fmt.Errorf("required command %s: %w", name, err)
@@ -75,6 +88,13 @@ func localCommand(args []string) error {
 		if info, err := os.Stat(local.SkillPath); err != nil || !info.Mode().IsRegular() {
 			return fmt.Errorf("model selection requires the installed next-task skill: %s", local.SkillPath)
 		}
+	}
+	worker, err := agents.Get("codex", agents.AgentConfig{})
+	if err != nil {
+		return err
+	}
+	if _, err := worker.Version(); err != nil {
+		return fmt.Errorf("codex CLI startup check failed: %w", err)
 	}
 	branchCmd := exec.Command("git", "-C", root, "branch", "--show-current")
 	branch, err := branchCmd.Output()
@@ -100,6 +120,12 @@ func localCommand(args []string) error {
 				"-c", fmt.Sprintf("sandbox_workspace_write.network_access=%t", *network)},
 		},
 	}
+	if instructionsPath != "" {
+		// A JSON string is also a TOML basic string, including quoted paths.
+		encoded, _ := json.Marshal(instructionsPath)
+		cfg.AgentConfig.ExtraArgs = append(cfg.AgentConfig.ExtraArgs, "-c", "model_instructions_file="+string(encoded))
+		log.Printf("Worker instructions: %s", instructionsPath)
+	}
 	log.Printf("Local agent: codex / lmstudio / %s; selection: %s; timeout: %s", *model, *selection, *timeout)
 	log.Printf("Context window: %d tokens; compact at: %d; tool network: %t", *contextWindow, *compactAt, *network)
 	o, err := orbit.New(cfg)
@@ -108,6 +134,31 @@ func localCommand(args []string) error {
 	}
 	defer o.Close()
 	return o.Run()
+}
+
+func resolveLocalInstructions(path string) (string, error) {
+	absolute, err := filepath.Abs(path)
+	if err == nil {
+		absolute, err = filepath.EvalSymlinks(absolute)
+	}
+	if err != nil {
+		return "", fmt.Errorf("resolve instructions file: %w", err)
+	}
+	info, err := os.Stat(absolute)
+	if err != nil {
+		return "", fmt.Errorf("read instructions file: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("instructions file must be regular: %s", absolute)
+	}
+	data, err := os.ReadFile(absolute)
+	if err != nil {
+		return "", fmt.Errorf("read instructions file: %w", err)
+	}
+	if !utf8.Valid(data) || strings.TrimSpace(string(data)) == "" {
+		return "", fmt.Errorf("instructions file must contain nonempty UTF-8 text: %s", absolute)
+	}
+	return absolute, nil
 }
 
 func resolveLocalTasks(path string) (string, string, error) {

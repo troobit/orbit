@@ -5,6 +5,36 @@ Codex agent. It replaces the standalone Python loop in agentic-coding. The
 compatibility name `local-next-task` routes to the same command by executable
 name. Hosted `orbit run` keeps its current defaults.
 
+The original preset and leaf-dispatch tasks are complete. An optional
+`--instructions-file` passes a validated absolute path to Codex's
+`model_instructions_file` override. This lets operators use shorter worker base
+instructions without a PATH wrapper. Resolve it from the caller's directory,
+validate regular/nonempty UTF-8 content before logs, and encode the path as a
+TOML basic string. Keep the bounded task prompt and all existing flags intact.
+Default invocations retain Codex's built-in instructions. The pending
+[local-run-comparison](../local-run-comparison/smolspec.md) work uses standard
+variant orchestration, not `LocalConfig`. Its aliases reproduce worker flags,
+not local selection, graph validation, run-once retries or process-group cleanup.
+Local SDD authoring is a later milestone described in [the readiness review](review.md).
+
+Local reliability follow-up: `--max-iterations 0` derives a finite invocation
+budget from the initial number of incomplete tasks, including descendants.
+Every accepted iteration completes selected work and the graph cannot grow,
+so that budget permits a valid larger ledger to finish without an unbounded
+loop. Explicit positive limits still stop with an error when work remains.
+Negative limits fail before execution.
+
+Rune queries use a finite subprocess deadline and Orbit's shutdown context.
+This includes the initial phase overview, selection, full-ledger reads and
+post-worker verification: a worker timeout cannot protect the process while it
+is waiting on rune. Malformed or unsuccessful list output must be an error,
+not an empty ledger. Preserve the existing public client operations while
+allowing the local runner to bind them to its shutdown lifecycle.
+The Codex adapter's version probe uses the shared process-group executor with
+a five-second deadline. Local CLI preflight calls it before constructing Orbit,
+so a launch-blocked Codex fails before logs, even for a dry run. Tests replace
+the old assertion-free host version probe with isolated fake CLI behavior.
+
 `cmd/orbit/local.go` resolves symlinks, validates a regular task file, discovers
 its Git root, and builds an explicit configuration. It does not load home or
 project Orbit aliases, prompts, or Codex user configuration. Model and provider

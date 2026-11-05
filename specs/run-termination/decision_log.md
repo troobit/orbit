@@ -3,7 +3,7 @@
 ## Decision 1: Stall detection is the primary termination guard
 
 **Date**: 2026-08-13
-**Status**: proposed
+**Status**: proposed; variant fingerprint superseded by Decision 6
 
 ### Context
 
@@ -72,7 +72,7 @@ and the blocking task.
 ## Decision 2: A blocked run is a distinct terminal state, not a failure
 
 **Date**: 2026-08-13
-**Status**: proposed
+**Status**: proposed; variant-stall state superseded by Decision 6
 
 ### Context
 
@@ -301,5 +301,54 @@ choice is between a defined path and an undefined one.
   communicated well or agents will keep writing an inert file.
 - Requires lifecycle care: a stale sentinel must be cleared at variant start or
   it will halt an unrelated later run.
+
+---
+
+## Decision 6: Give the First Variant Guard One Implementation Owner
+
+**ID**: 6
+**Date**: 2026-10-29
+**Status**: accepted
+
+### Context
+
+The later local-run-comparison plan needs the same no-progress guard as this
+spec, but deliberately retains the existing failed status. Neither guard has
+landed. Running both task plans would duplicate work and introduce conflicting
+terminal semantics. The local-compute-agent preset already has stronger local
+checks; its sentinel path cannot be treated as absent across Orbit today.
+
+### Decision
+
+Delegate the first variant completion guard and its regression tests to
+[local-run-comparison Decision 4](../local-run-comparison/decision_log.md#decision-4-prove-small-execution-units-before-the-sanarte-trial).
+Use its selected-identity completion check and existing failed path. Do not add
+a blocked state or sentinel as part of that repair. Tasks 2–4 and 7 below are
+historical overlap to reconcile, not a second implementation or completed work.
+Task 1 becomes a STOP/replanning gate before this older ledger can execute.
+Replan the remaining single-run, bounds, classification and accounting work
+against what actually lands; preserve human review of wider state changes.
+
+### Rationale
+
+One owner avoids parallel implementations and lets the smaller repair land
+without making it depend on the wider termination proposal. Explicit delegation
+keeps the remaining defects visible without falsely marking them complete.
+
+### Alternatives Considered
+
+- Implement both guards: rejected because status and progress semantics would
+  conflict in the same loop.
+- Require all 25 termination tasks before a local fixture: rejected because the
+  adapter repair and selected-completion guard are independently testable and
+  the local runner already bounds its own execution.
+
+### Consequences
+
+**Positive:** one variant guard, clear pending ownership, no persisted state
+change needed for the immediate repair.
+
+**Negative:** the old ledger is deliberately gated until replanned; broader
+termination/accounting defects remain and need their own acceptance checks.
 
 ---

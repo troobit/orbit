@@ -41,6 +41,7 @@ review without committing or pushing.
 | Option | Default | Meaning |
 |---|---|---|
 | `--model` | `8-bit` | Exact LM Studio model identifier |
+| `--instructions-file` | unset | Optional nonempty UTF-8 worker base-instruction file |
 | `--context-window` | `32768` | Token window actually loaded in LM Studio |
 | `--compact-at` | `0` | History compaction threshold; 0 derives five eighths of the window (20480 by default) |
 | `--network` | false | Permit network access for sandboxed shell tools, including dependency downloads |
@@ -48,8 +49,13 @@ review without committing or pushing.
 | `--leaf` | false | Execute one ready leaf within the next task; retain read-only ancestor context |
 | `--selection` | `runner` | `model` delegates retrieval to the installed next-task skill |
 | `--timeout` | `30m` | Positive Go duration per worker session |
-| `--max-iterations` | `20` | Positive bound per invocation |
+| `--max-iterations` | `0` | Automatic finite bound from initial incomplete task count; a positive value sets an explicit cap |
 | `--dry-run` | false | Print selected work and prompt; no inference or logs |
+
+Local preflight checks Codex startup within five seconds before creating logs
+or invoking inference, including dry runs. A startup-check failure requires
+repairing the installed Codex executable; raising the worker timeout will not
+help that probe.
 
 Model selection mode requires `~/.agents/skills/next-task/SKILL.md`. It retains
 the prototype's widening of a selected top-level task to its whole phase.
@@ -149,8 +155,74 @@ and completion commands. Dependencies on every ancestor must be complete.
 The runner checks STOP gates throughout the original selected subtree before
 narrowing, and halts if it contains no ready leaf. It does not switch to an
 unrelated task. `--leaf` cannot combine with `--phase` or `--selection model`.
-Rerun after reviewing the first result, or raise the iteration limit to continue
-through successive leaves automatically.
+Rerun after reviewing the first result, or omit the explicit iteration limit
+to continue through successive leaves automatically.
+
+The following diagram traces the full pipeline from design to completed ledger,
+with the `--leaf` dispatch path highlighted:
+
+```mermaid
+flowchart LR
+    subgraph S1["① Idea · Design · Overall Aim"]
+        direction TB
+        A1["Spec<br/>smolspec.md / requirements.md<br/>design.md"]
+        A2["Overall aim +<br/>acceptance criteria"]
+        A1 --> A2
+    end
+
+    subgraph S2["② Broken into Tasks<br/>tasks.md · rune ledger"]
+        direction TB
+        B1["Task 1 (parent)<br/>Implement feature"]
+        B2["Task 1.1<br/>RED test (leaf)"]
+        B3["Task 1.2<br/>GREEN impl (leaf)<br/>blocked-by: 1.1"]
+        B4["Task 2 (parent)<br/>Next feature"]
+        B1 --> B2
+        B1 --> B3
+    end
+
+    subgraph S3["③ Work in Progress<br/>orbit local · --leaf"]
+        direction TB
+        C1["rune next →<br/>select ready work"]
+        C2["STOP-gate check on<br/>original subtree<br/>(halt if any STOP task)"]
+        C3{"--leaf?"}
+        C4["default:<br/>bundle parent +<br/>all descendants"]
+        C5["descend subtree<br/>(document order)<br/>skip blocked leaves"]
+        C6["ONE ready leaf +<br/>read-only ancestor ctx<br/>(siblings omitted)"]
+        C7["fresh worker session<br/>Codex + LM Studio"]
+        C8["validate progress<br/>(graph/status checks)"]
+        C1 --> C2 --> C3
+        C3 -- no --> C4
+        C3 -- yes --> C5
+        C5 --> C6
+        C4 --> C7
+        C6 --> C7
+    end
+
+    subgraph S4["④ Complete tasks.md<br/>rune"]
+        direction TB
+        D1["rune progress &lt;id&gt;"]
+        D2["rune complete &lt;id&gt;"]
+        D3["parents auto-complete<br/>when children finish"]
+        D1 --> D2 --> D3
+    end
+
+    S1 --> S2
+    S2 --> C1
+    C7 --> D1
+    D3 --> C8
+    C8 -. "next iteration:<br/>select next ready leaf" .-> C1
+
+    classDef design fill:#e3f2fd,stroke:#1565c0
+    classDef task fill:#fff8e1,stroke:#f9a825
+    classDef leaf fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef default fill:#eceff1,stroke:#78909c
+    classDef complete fill:#f3e5f5,stroke:#7b1fa2
+    class A1,A2 design
+    class B1,B2,B3,B4 task
+    class C5,C6 leaf
+    class C4 default
+    class D1,D2,D3 complete
+```
 
 For an explicitly tests-first task, verify the intended failure and record its
 cause before completing that task. A missing dependency, malformed test or
@@ -236,6 +308,13 @@ command. Keep `.orbit/halt` until its reason is resolved, then remove it
 explicitly. The next run selects remaining work from the ledger. Unix timeout
 and Ctrl+C terminate the worker process group; Windows terminates the direct
 worker process.
+
+Rune queries have a finite deadline and share Orbit's cancellation context,
+including phase display and post-worker ledger verification. An invalid or
+unsuccessful rune response fails the invocation instead of implying completion.
+The default iteration budget counts initial unfinished tasks, including nested
+children; it does not stop a productive larger ledger at twenty sessions.
+Explicit positive limits still return an error if work remains.
 
 The Python prototype's numeric `--timeout 1800` becomes `--timeout 30m` (or
 `1800s`). The old Make wrapper in agentic-coding remains that repository's

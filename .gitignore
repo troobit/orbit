@@ -14,3 +14,6 @@ testlog.html
 # Rapid property test failure files
 **/testdata/rapid/**/*.fail
 .kiro/
+
+# Local git worktrees
+.worktrees/

@@ -2,10 +2,14 @@ package codex
 
 import (
 	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/arjenschwarz/orbit/internal/agents"
 )
@@ -484,11 +488,46 @@ func TestAgent_DiscoverSessions_SkipsEmptyFiles(t *testing.T) {
 }
 
 func TestAgent_Version(t *testing.T) {
-	agent := New(agents.AgentConfig{})
-
-	// Version may return error if codex CLI is not installed
-	// We just verify it doesn't panic
-	_, _ = agent.Version()
+	if runtime.GOOS == "windows" {
+		t.Skip("fake version command uses a Unix shell")
+	}
+	for _, tc := range []struct {
+		name   string
+		script string
+	}{
+		{name: "success", script: "printf 'codex-cli 1.2.3\\n'"},
+		{name: "failure", script: "exit 7"},
+		{name: "timeout", script: "sleep 8 &\nwait"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "codex")
+			script := "#!/bin/sh\n[ \"$#\" -eq 1 ] && [ \"$1\" = --version ] || exit 9\n" + tc.script + "\n"
+			if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			agent := New(agents.AgentConfig{CLIPath: path})
+			started := time.Now()
+			version, err := agent.Version()
+			switch tc.name {
+			case "success":
+				if err != nil || version != "codex-cli 1.2.3" {
+					t.Fatalf("Version() = %q, %v; want codex-cli 1.2.3", version, err)
+				}
+			case "failure":
+				var exit *exec.ExitError
+				if !errors.As(err, &exit) || exit.ExitCode() != 7 {
+					t.Fatalf("Version() error = %v, want exit status 7", err)
+				}
+			case "timeout":
+				if !errors.Is(err, context.DeadlineExceeded) {
+					t.Fatalf("Version() error = %v, want deadline exceeded", err)
+				}
+				if elapsed := time.Since(started); elapsed > 7*time.Second {
+					t.Fatalf("Version() took %s; timeout must terminate the CLI and its child", elapsed)
+				}
+			}
+		})
+	}
 }
 
 func TestAgent_ArgOrder(t *testing.T) {

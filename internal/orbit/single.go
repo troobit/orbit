@@ -816,6 +816,10 @@ func (o *Orbit) runSingle() error {
 	}
 
 	iterations := 0
+	maxIterations := 0
+	if o.config.Local != nil {
+		maxIterations = o.config.Local.MaxIterations
+	}
 	for {
 		// Check for shutdown signal between phases
 		select {
@@ -849,13 +853,18 @@ func (o *Orbit) runSingle() error {
 			log.Println("All tasks complete!")
 			return o.complete()
 		}
+		if o.config.Local != nil && maxIterations == 0 {
+			// Every accepted iteration completes at least one selected task and
+			// the graph cannot grow, so this bounds a full run of any ledger.
+			maxIterations = len(pending)
+		}
 
 		// Get the next phase info
 		o.debug.Log("Getting next phase...")
 		var nextPhase *rune.NextPhaseResult
 		if o.config.Local != nil {
-			if iterations >= o.config.Local.MaxIterations {
-				return o.fail(fmt.Errorf("reached iteration limit (%d); re-run to continue", o.config.Local.MaxIterations))
+			if iterations >= maxIterations {
+				return o.fail(fmt.Errorf("reached iteration limit (%d); re-run to continue", maxIterations))
 			}
 			nextPhase, err = o.prepareLocalIteration()
 		} else {
@@ -905,7 +914,7 @@ func (o *Orbit) runSingle() error {
 		// Run the phase
 		iterations++
 		if o.config.Local != nil {
-			log.Printf("Iteration %d/%d", iterations, o.config.Local.MaxIterations)
+			log.Printf("Iteration %d/%d", iterations, maxIterations)
 		}
 		if err := o.runPhaseWithRetry(phaseNum); err != nil {
 			return o.fail(err)

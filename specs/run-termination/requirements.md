@@ -57,6 +57,13 @@ Three bugfix reports contain the full diagnosis and verified code references:
 
 ## Requirements
 
+**Scope reconciliation (2026-10-29):** The variant stall guard in 1.1–1.4 and
+1.6 is now owned by [local-run-comparison](../local-run-comparison/smolspec.md#variant-progress).
+For that guard, 1.3's proposed distinct state is superseded by Decision 6:
+use `failed` with an explicit stalled reason. This is pending work, not a
+delivered fix. The remainder below is the older proposal; replan it before
+dispatching this ledger. `orbit local` already has its own halt/selection guards.
+
 ### 1. The Phase Loop Terminates On Stall
 
 **User Story:** As an orbit user, I want a run that cannot make progress to stop

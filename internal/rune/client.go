@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arjenschwarz/orbit/internal/agents"
 	"github.com/arjenschwarz/orbit/internal/debug"
 )
 
@@ -62,9 +63,7 @@ func (c *Client) Select(phase bool) (*NextPhaseResult, error) {
 	if phase {
 		args = append(args, "--phase")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	output, err := exec.CommandContext(ctx, "rune", args...).Output()
+	output, err := c.commandOutput(args)
 	if err != nil {
 		return nil, fmt.Errorf("rune next failed: %w", err)
 	}
@@ -117,14 +116,48 @@ type PhaseSummary struct {
 type Client struct {
 	tasksFile string
 	debug     *debug.Logger
+	ctx       context.Context
 }
 
 // NewClient creates a new rune client.
 func NewClient(tasksFile string) *Client {
+	return NewClientContext(context.Background(), tasksFile)
+}
+
+// NewClientContext creates a client whose commands stop when the run is canceled.
+// Every command also has a 30-second deadline so ledger checks cannot hang a run.
+func NewClientContext(ctx context.Context, tasksFile string) *Client {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return &Client{
 		tasksFile: tasksFile,
 		debug:     debug.New(false, "rune"),
+		ctx:       ctx,
 	}
+}
+
+func (c *Client) commandOutput(args []string) ([]byte, error) {
+	ctx := c.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	result := agents.Execute(ctx, agents.ExecuteConfig{
+		CLIPath: "rune", Args: args, Timeout: 30 * time.Second, ProcessGroup: true,
+	})
+	if exitErr, ok := result.Err.(*exec.ExitError); ok {
+		exitErr.Stderr = result.Stderr
+	}
+	if result.Err == nil {
+		var response struct {
+			Success *bool  `json:"success"`
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(result.Stdout, &response) == nil && response.Success != nil && !*response.Success {
+			return result.Stdout, fmt.Errorf("rune reported failure: %s", response.Message)
+		}
+	}
+	return result.Stdout, result.Err
 }
 
 // SetDebug enables or disables debug logging.
@@ -144,8 +177,7 @@ func (c *Client) ListPending() ([]Task, error) {
 	c.debug.LogCmd("rune", args, "")
 
 	startTime := time.Now()
-	cmd := exec.Command("rune", args...)
-	output, err := cmd.Output()
+	output, err := c.commandOutput(args)
 	duration := time.Since(startTime)
 
 	if err != nil {
@@ -191,8 +223,7 @@ func (c *Client) GetNextPhase() (*NextPhaseResult, error) {
 	c.debug.LogCmd("rune", args, "")
 
 	startTime := time.Now()
-	cmd := exec.Command("rune", args...)
-	output, err := cmd.Output()
+	output, err := c.commandOutput(args)
 	duration := time.Since(startTime)
 
 	if err != nil {
@@ -298,8 +329,7 @@ func (c *Client) ListAll() ([]Task, error) {
 	c.debug.LogCmd("rune", args, "")
 
 	startTime := time.Now()
-	cmd := exec.Command("rune", args...)
-	output, err := cmd.Output()
+	output, err := c.commandOutput(args)
 	duration := time.Since(startTime)
 
 	if err != nil {
@@ -320,22 +350,33 @@ func (c *Client) ListAll() ([]Task, error) {
 
 	c.debug.LogCmdResult(0, string(output), "", duration)
 
-	trimmed := strings.TrimSpace(string(output))
-	if trimmed == "" || trimmed == "[]" || trimmed == "null" {
-		c.debug.Log("ListAll: no tasks (empty output)")
-		return []Task{}, nil
+	var result struct {
+		Tasks   json.RawMessage `json:"Tasks"`
+		Success bool            `json:"success"`
+		Count   *int            `json:"count"`
+		Data    json.RawMessage `json:"data"`
 	}
-
-	var result ListResult
 	if err := json.Unmarshal(output, &result); err != nil {
 		c.debug.LogJSON(false, err)
 		return nil, fmt.Errorf("failed to parse rune output: %w", err)
 	}
+	if result.Tasks == nil {
+		// Rune uses a distinct explicit envelope for a genuinely empty list.
+		// Missing or malformed task data must never imply successful completion.
+		if result.Success && result.Count != nil && *result.Count == 0 && strings.TrimSpace(string(result.Data)) == "[]" {
+			return []Task{}, nil
+		}
+		return nil, fmt.Errorf("rune list returned no task payload")
+	}
+	var tasks []Task
+	if err := json.Unmarshal(result.Tasks, &tasks); err != nil {
+		return nil, fmt.Errorf("failed to parse rune tasks: %w", err)
+	}
 
 	c.debug.LogJSON(true, nil)
-	c.debug.Log("ListAll: found %d tasks", len(result.Tasks))
+	c.debug.Log("ListAll: found %d tasks", len(tasks))
 
-	return result.Tasks, nil
+	return tasks, nil
 }
 
 // GetPhaseSummaries returns a summary of all phases with their task counts and status.

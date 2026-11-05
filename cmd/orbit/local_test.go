@@ -143,6 +143,73 @@ func TestLocalCommandContextAndNetwork(t *testing.T) {
 	}
 }
 
+func TestLocalCommandInstructionsFile(t *testing.T) {
+	root, tasks := localFixture(t)
+	instructions := filepath.Join(root, `worker ' " instructions.md`)
+	require.NoError(t, os.WriteFile(instructions, []byte("Implement only the selected work and run its checks.\n"), 0600))
+	t.Chdir(root)
+	require.NoError(t, localCommand([]string{tasks, "--instructions-file", filepath.Base(instructions)}))
+	calls := localCalls(t, root)
+	require.Len(t, calls, 2)
+	for _, args := range calls {
+		found := false
+		for index, arg := range args {
+			if value, ok := strings.CutPrefix(arg, "model_instructions_file="); ok {
+				var path string
+				require.NoError(t, json.Unmarshal([]byte(value), &path))
+				require.Equal(t, instructions, path)
+				require.Positive(t, index)
+				require.Equal(t, "-c", args[index-1])
+				found = true
+			}
+		}
+		require.True(t, found, "worker must receive the instruction file")
+		require.Contains(t, args, "--oss")
+		require.Contains(t, args, "workspace-write")
+		require.Contains(t, args[len(args)-1], "Do not retrieve or select work again")
+	}
+}
+
+func TestLocalCommandInstructionsPreflight(t *testing.T) {
+	for _, kind := range []string{"missing", "directory", "empty", "invalid-utf8"} {
+		t.Run(kind, func(t *testing.T) {
+			root, tasks := localFixture(t)
+			path := filepath.Join(root, "worker.md")
+			switch kind {
+			case "directory":
+				require.NoError(t, os.Mkdir(path, 0755))
+			case "empty":
+				require.NoError(t, os.WriteFile(path, []byte(" \n\t"), 0600))
+			case "invalid-utf8":
+				require.NoError(t, os.WriteFile(path, []byte{0xff, 0xfe}, 0600))
+			}
+			require.ErrorContains(t, localCommand([]string{tasks, "--instructions-file", path}), "instructions file")
+			require.Empty(t, localCalls(t, root))
+			_, err := os.Stat(filepath.Join(root, ".orbit", "local"))
+			require.True(t, os.IsNotExist(err), "invalid instructions created logs")
+		})
+	}
+}
+
+func TestLocalCommandStartupPreflight(t *testing.T) {
+	for _, mode := range []string{"startup-error", "startup-timeout"} {
+		t.Run(mode, func(t *testing.T) {
+			root, tasks := localFixture(t)
+			t.Setenv("ORBIT_LOCAL_TEST_MODE", mode)
+			started := time.Now()
+			err := localCommand([]string{tasks})
+			require.ErrorContains(t, err, "codex CLI startup check failed")
+			if mode == "startup-timeout" {
+				require.ErrorContains(t, err, "deadline exceeded")
+				require.Less(t, time.Since(started), 7*time.Second)
+			}
+			require.Empty(t, localCalls(t, root), "startup failure dispatched inference")
+			_, err = os.Stat(filepath.Join(root, ".orbit", "local"))
+			require.True(t, os.IsNotExist(err), "startup failure created logs")
+		})
+	}
+}
+
 func TestLocalCommandStops(t *testing.T) {
 	for mode, expected := range map[string]string{
 		"no-progress":     "no selected tasks completed",
@@ -193,8 +260,8 @@ func TestLocalCommandPreflight(t *testing.T) {
 				args = append(args, "--selection", "invalid")
 				expected = "selection must be"
 			case "bad-limit":
-				args = append(args, "--max-iterations=0")
-				expected = "must be positive"
+				args = append(args, "--max-iterations=-1")
+				expected = "max-iterations must be nonnegative"
 			case "bad-timeout":
 				args = append(args, "--timeout=0s")
 				expected = "must be positive"
@@ -237,6 +304,28 @@ func TestLocalCommandIterationLimitAndResume(t *testing.T) {
 	require.Len(t, localCalls(t, root), 1)
 	require.NoError(t, localCommand([]string{tasks, "--max-iterations", "1"}))
 	require.Len(t, localCalls(t, root), 2)
+}
+
+func TestLocalCommandAutomaticIterationBudget(t *testing.T) {
+	t.Run("default completes more than twenty tasks", func(t *testing.T) {
+		root, tasks := localFixture(t)
+		for i := 3; i <= 21; i++ {
+			localRune(t, root, "add", tasks, "--title", fmt.Sprintf("Task %d", i), "--phase", "Implementation")
+		}
+
+		require.NoError(t, localCommand([]string{tasks}))
+		require.Len(t, localCalls(t, root), 21)
+		var ledger rune.ListResult
+		require.NoError(t, json.Unmarshal(localRune(t, root, "list", tasks, "--format", "json"), &ledger))
+		for _, task := range ledger.Tasks {
+			require.Equal(t, rune.StatusCompleted, task.Status)
+		}
+	})
+	t.Run("explicit zero derives a finite budget", func(t *testing.T) {
+		root, tasks := localFixture(t)
+		require.NoError(t, localCommand([]string{tasks, "--max-iterations", "0"}))
+		require.Len(t, localCalls(t, root), 2)
+	})
 }
 
 func TestLocalCommandResumesInProgressTask(t *testing.T) {
@@ -374,6 +463,46 @@ func TestLocalCommandRelativePathFromAnotherDirectory(t *testing.T) {
 	require.Len(t, localCalls(t, root), 2)
 }
 
+func TestLocalCommandArbitraryTaskPaths(t *testing.T) {
+	for _, mode := range []string{"absolute", "relative", "symlink"} {
+		t.Run(mode, func(t *testing.T) {
+			root, original := localFixture(t)
+			tasks := filepath.Join(root, "nested ' plans", "custom ' work-list.txt")
+			require.NoError(t, os.MkdirAll(filepath.Dir(tasks), 0755))
+			require.NoError(t, os.Rename(original, tasks))
+			t.Chdir(t.TempDir())
+			outside, err := os.Getwd()
+			require.NoError(t, err)
+			input := tasks
+			switch mode {
+			case "relative":
+				input, err = filepath.Rel(outside, tasks)
+				require.NoError(t, err)
+			case "symlink":
+				input = filepath.Join(outside, "linked ledger.md")
+				require.NoError(t, os.Symlink(tasks, input))
+			}
+
+			require.NoError(t, localCommand([]string{input}))
+			calls := localCalls(t, root)
+			require.Len(t, calls, 2)
+			for _, call := range calls {
+				prompt := call[len(call)-1]
+				require.Contains(t, prompt, "Explicit tasks file: "+tasks)
+				require.Contains(t, prompt, "Repository root: "+root)
+			}
+			var ledger rune.ListResult
+			require.NoError(t, json.Unmarshal(localRune(t, root, "list", tasks, "--format", "json"), &ledger))
+			for _, task := range ledger.Tasks {
+				require.Equal(t, rune.StatusCompleted, task.Status)
+			}
+			logs, err := filepath.Glob(filepath.Join(filepath.Dir(tasks), ".orbit", "local", "*.prompt.txt"))
+			require.NoError(t, err)
+			require.Len(t, logs, 2)
+		})
+	}
+}
+
 func TestLocalCommandTimeout(t *testing.T) {
 	root, tasks := localFixture(t)
 	t.Setenv("ORBIT_LOCAL_TEST_MODE", "timeout")
@@ -411,6 +540,17 @@ func TestLocalWorkerProcess(t *testing.T) {
 	}
 	index := slices.Index(os.Args, "--")
 	args := os.Args[index+1:]
+	mode := os.Getenv("ORBIT_LOCAL_TEST_MODE")
+	if len(args) == 1 && args[0] == "--version" {
+		switch mode {
+		case "startup-timeout":
+			time.Sleep(8 * time.Second)
+		case "startup-error":
+			os.Exit(7)
+		}
+		fmt.Println("codex-cli test")
+		os.Exit(0)
+	}
 	encoded, err := json.Marshal(args)
 	require.NoError(t, err)
 	f, err := os.OpenFile("calls.jsonl", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
@@ -418,7 +558,6 @@ func TestLocalWorkerProcess(t *testing.T) {
 	_, err = f.Write(append(encoded, '\n'))
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
-	mode := os.Getenv("ORBIT_LOCAL_TEST_MODE")
 	if mode == "timeout" {
 		fmt.Println(`{"type":"working"}`)
 		time.Sleep(30 * time.Second)
@@ -437,6 +576,9 @@ func TestLocalWorkerProcess(t *testing.T) {
 		os.Exit(0)
 	}
 	prompt := args[len(args)-1]
+	_, taskLine, ok := strings.Cut(prompt, "Explicit tasks file: ")
+	require.True(t, ok, "worker must receive the explicit task file")
+	ledgerPath, _, _ := strings.Cut(taskLine, "\n")
 	start := strings.Index(prompt, "<selected-work>\n") + len("<selected-work>\n")
 	end := strings.Index(prompt, "\n</selected-work>")
 	var work rune.NextPhaseResult
@@ -451,7 +593,7 @@ func TestLocalWorkerProcess(t *testing.T) {
 			for _, task := range tasks {
 				complete(task.Children)
 				if !strings.EqualFold(task.Status, "completed") {
-					run("complete", "tasks.md", task.ID)
+					run("complete", ledgerPath, task.ID)
 				}
 			}
 		}
@@ -461,13 +603,13 @@ func TestLocalWorkerProcess(t *testing.T) {
 	case "halt-file":
 		require.NoError(t, os.WriteFile(filepath.Join(".orbit", "halt"), []byte("review marker"), 0600))
 	case "graph-change":
-		run("add", "tasks.md", "--title", "Unexpected task")
+		run("add", ledgerPath, "--title", "Unexpected task")
 	case "reopen":
-		run("uncomplete", "tasks.md", "2")
+		run("uncomplete", ledgerPath, "2")
 	case "unselected":
-		run("complete", "tasks.md", "2")
+		run("complete", ledgerPath, "2")
 	case "rename":
-		run("update", "tasks.md", "1", "--title", "Renamed task")
+		run("update", ledgerPath, "1", "--title", "Renamed task")
 	}
 	message := "Done"
 	if mode == "halt-output" {

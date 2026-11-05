@@ -2,6 +2,14 @@
 
 ## Overview
 
+**Current ownership (2026-10-29):** [Local run comparison](../local-run-comparison/smolspec.md#variant-progress)
+owns the first variant completion guard, using selected task identity/status
+transitions and the existing failed state. The progress measure and new terminal
+state sections below are **superseded for that variant guard by Decision 6**;
+they remain historical design context, not a second implementation assignment.
+The rest is pending proposal work. Reconcile its tasks and sentinel semantics
+before execution; none is required for the four comparison coding phases.
+
 Three independent defects combine to let a run consume an account's entire
 credit balance while reporting nothing useful. They are fixed in three places
 that do not overlap:

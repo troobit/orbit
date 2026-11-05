@@ -52,3 +52,31 @@ references:
 
 - [x] 11. Add optional leaf dispatch and measure repeated local coding runs
   - Added runner-only --leaf with read-only ancestor context, dependency and STOP guards, tests-first guidance and integration coverage. make test-local and make build test lint passed; installed command checked. Benign live baseline completed in 378.773s; reviewed red/green leaf sessions completed in 396.267s and 359.476s with unchanged tests and automatic parent completion. Leaf handoff works but was slower on this small supervised sample; native delegation remains unsupported.
+
+## Local worker instruction budgets
+
+- [x] 12. Allow an explicit local worker base-instruction file
+  - Scope: cmd/orbit/local.go and local_test.go; update local runbook and verification with actual M5 observations. Defaults, selected task prompts and sandbox flags remain unchanged.
+  - Requirements: [15.1](specs/local-compute-agent/requirements.md#15.1)
+  - [x] 12.1. RED: Verify instruction-file dispatch and invalid-file preflight <!-- id:hcum1hw -->
+    - Use the existing real-rune/fake-Codex CLI fixture. Assert absolute path configuration on every worker, including relative paths with spaces/quotes, and unchanged selected prompt/routing/sandbox. Missing, directory, empty and invalid UTF-8 inputs must not invoke Codex or create logs.
+    - Acceptance: make test-local fails on the new instruction-file assertions before implementation.
+    - Requirements: [15.1](specs/local-compute-agent/requirements.md#15.1)
+  - [x] 12.2. GREEN: Add the validated instruction-file option <!-- id:hcum1hx -->
+    - Add --instructions-file, resolve/validate it before logs and pass the supported model_instructions_file override without replacing selected task prompts. Document compact worker use and runtime reasoning-default findings.
+    - Acceptance: unchanged new tests, make test-local, make test, make lint and make build pass. Verify real M5 runs separately; do not claim success from fake agents.
+    - Blocked-by: hcum1hw (RED: Verify instruction-file dispatch and invalid-file preflight)
+    - Requirements: [15.1](specs/local-compute-agent/requirements.md#15.1)
+
+## Local execution reliability
+
+- [x] 13. Bound rune queries and cancel stalled ledger subprocesses
+  - All rune queries now use a 30-second deadline, shutdown context and shared process-group cleanup. Failure envelopes and malformed or missing task payloads fail closed. Cancellation/child-process and payload regressions passed; make build test lint and make test-local passed.
+  - References: specs/local-compute-agent/design.md
+
+- [x] 14. Complete arbitrary ledger paths without a fixed default session ceiling
+  - Default max-iterations zero derives a finite budget from initial incomplete tasks. RED reproduced the twenty-session cutoff; GREEN completes twenty-one tasks. Explicit caps, negative input, custom nested filenames, punctuation, relative paths and symlinks passed. Codex startup now fails within five seconds before logs. Updated command installed.
+
+- [x] 15. Verify both local models and record independent acceptance
+  - Both real two-task fixtures completed with exit zero and eight unchanged host tests passing: 8-bit 452.775s; Bonsai 503.738s. Both models returned completed independent code reviews. Final installed 15s timeout probes exited in 16.246s/15.571s without surviving workers or inference. Bonsai recovery passed in 216.645s; an extra 8-bit recovery hit its 600.156s deadline after completing correct code/statuses, then independent host acceptance and a no-inference replay finalised the ledger. That failed worker is retained and explicitly not counted as a successful recovery. All artifacts and limitations documented; models idle, no experiment workers remain.
+  - References: specs/local-compute-agent/verification-reliability.md

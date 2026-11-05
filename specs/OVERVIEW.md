@@ -36,7 +36,10 @@
 | [Shared Retry Executor](#shared-retry-executor) | 2026-02-18 | No Tasks | Consolidate four near-identical retry executors into a single shared implementation. |
 | [Message Metadata](#message-metadata) | 2026-03-12 | Done | Show timestamps and model identifiers inline in rendered Apsis transcripts. |
 | [Finalize Show Verify](#finalize-show-verify) | 2026-05-10 | Done | Show variant agent and warn on consolidation mismatch in `orbit finalize`. |
-| [Run Termination Guarantees](#run-termination-guarantees) | 2026-08-13 | Not Started | Guarantee every run ends: stop stalled phase loops, classify credit exhaustion, and always record a terminal state. |
+| [Run Termination Guarantees](#run-termination-guarantees) | 2026-08-13 | Planned | Guarantee every run ends: stop stalled phase loops, classify credit exhaustion, and always record a terminal state. |
+| [Local Compute Agent](#local-compute-agent) | 2026-08-13 | Done | Run approved rune tasks, phases or leaves through the local Codex/LM Studio preset with bounded dispatch and progress checks. |
+| [Local Run Comparison](#local-run-comparison) | Uncommitted | Planned | Repair OpenCode parsing and variant progress checks, then verify local harnesses with a disposable fixture before a gated Sanarte comparison. |
+| [Local Task Preparation](#local-task-preparation) | Uncommitted | Planned | Prepare approved source work as bounded local-worker packets, with rune lineage, host-verified acceptance and consistent local/variant dispatch. |
 
 ---
 
@@ -346,6 +349,7 @@ Show timestamps and model identifiers inline in rendered Apsis transcripts.
 Show variant agent and warn on consolidation mismatch in `orbit finalize`.
 
 - [decision_log.md](finalize-show-verify/decision_log.md)
+- [implementation.md](finalize-show-verify/implementation.md)
 - [smolspec.md](finalize-show-verify/smolspec.md)
 - [tasks.md](finalize-show-verify/tasks.md)
 
@@ -357,3 +361,38 @@ Guarantee every run ends: stop stalled phase loops, classify credit exhaustion, 
 - [design.md](run-termination/design.md)
 - [requirements.md](run-termination/requirements.md)
 - [tasks.md](run-termination/tasks.md)
+
+## Local Compute Agent
+
+Run approved rune tasks, phases or leaves through the local Codex/LM Studio preset with bounded dispatch and progress checks.
+
+- [decision_log.md](local-compute-agent/decision_log.md)
+- [design.md](local-compute-agent/design.md)
+- [requirements.md](local-compute-agent/requirements.md)
+- [requirements-superseded.md](local-compute-agent/requirements-superseded.md)
+- [review.md](local-compute-agent/review.md)
+- [tasks.md](local-compute-agent/tasks.md)
+- [verification.md](local-compute-agent/verification.md)
+- [verification-m5.md](local-compute-agent/verification-m5.md)
+- [verification-reliability.md](local-compute-agent/verification-reliability.md)
+
+## Local Run Comparison
+
+Repair OpenCode parsing and variant progress checks, then verify local harnesses with a disposable fixture before a gated Sanarte comparison.
+
+- [decision_log.md](local-run-comparison/decision_log.md)
+- [prerequisites.md](local-run-comparison/prerequisites.md)
+- [smolspec.md](local-run-comparison/smolspec.md)
+- [tasks-evaluation.md](local-run-comparison/tasks-evaluation.md)
+- [tasks.md](local-run-comparison/tasks.md)
+
+## Local Task Preparation
+
+Prepare approved source work as bounded local-worker packets, with rune lineage, host-verified acceptance and consistent local/variant dispatch.
+
+- [decision_log.md](local-task-preparation/decision_log.md)
+- [design.md](local-task-preparation/design.md)
+- [evaluation.md](local-task-preparation/evaluation.md)
+- [requirements.md](local-task-preparation/requirements.md)
+- [review.md](local-task-preparation/review.md)
+- [tasks.md](local-task-preparation/tasks.md)

@@ -1,5 +1,79 @@
 # Local execution
 
+- Reliability verification for 2026-10-30 lives in
+  `specs/local-compute-agent/verification-reliability.md`. Default
+  `--max-iterations 0` derives a finite budget from initial incomplete tasks,
+  including descendants; explicit positive limits retain their cap. Each
+  accepted iteration completes selected work and cannot grow the graph.
+- Both new two-task model fixtures pass eight unchanged host tests. The final
+  installed Bonsai timeout/recovery passes too. An additional eight-bit recovery
+  completed its code/statuses but kept verifying until the ten-minute deadline;
+  host tests passed and an independently accepted no-work replay finalised the
+  ledger. Preserve that failed turn: a successful replay with no incomplete
+  tasks is not evidence that the previous worker succeeded or validated code.
+- Rune queries now use the shared process-group executor, a 30-second deadline
+  and Orbit's shutdown context. Reject explicit failures and malformed/missing
+  task payloads; valid rune empty-list envelopes remain accepted. A worker's
+  timeout alone cannot bound the rune calls between sessions.
+- Local preflight probes Codex with a five-second bounded version check before
+  logging. Tests use fake CLI success, nonzero exits and a stalled child rather
+  than invoking a host-installed CLI in an assertion-free test.
+- A host Codex cask launch stalled before user code while its byte-identical,
+  signed app copy worked. Removing quarantine or replacing the inode did not
+  repair that resolved path. The original cask file/attributes were restored;
+  `/opt/homebrew/bin/codex` now points at the working app copy, version 0.165.0.
+  Original link target and verification evidence are retained under
+  `.orbit/local-reliability/codex-launch-quarantine-backup.json`. A future
+  Homebrew upgrade may replace this link; verify startup if that happens.
+- M5 verification is in `specs/local-compute-agent/verification-m5.md`: six
+  successful two-task runs, including the direct new `--instructions-file` option
+  and retained `AGENTS.md` guidance. Native dispatch needs no PATH wrapper.
+- The installed Qwen3.8 custom 8-bit MLX template defaulted to `xhigh`, while
+  its LM Studio entry did not expose a reasoning API setting. Both template
+  files were backed up and their fallback changed to `low`, then the same model
+  was reloaded. Runtime defaults and Codex base-instruction size are separate
+  controls; inspect actual model metadata/template rather than infer from alias.
+- Optional `--instructions-file` resolves from the invoking directory, validates
+  a regular nonempty UTF-8 file before logging, and uses an encoded absolute path
+  in Codex's supported `model_instructions_file` override. The example compact
+  policy is `docs/runbooks/local-worker-instructions.md`; defaults stay intact.
+- A supervised local planning prototype generated JSON that the host validated,
+  reviewed and materialised through rune for Sanarte. A truncated response was
+  rejected; a parseable follow-up still had a warning-argument arity mistake,
+  corrected in a separate reviewed plan. Its real RED/GREEN workers completed
+  and host checks passed all 16 tests, type checking and build. Structural
+  validity is not semantic acceptance. `orbit prepare` remains unimplemented.
+- A failed worker can leave a completed rune task even when no Orbit phase was
+  accepted: the Bonsai 32K trial timed out after its first implementation/task
+  update. Recheck retained code independently before resume. The sibling 16K
+  trial completed both tasks; the failed case then resumed at 16K and finished
+  its remaining task in 69.773s with all eight host tests passing. Do not infer
+  a worker budget from model max context.
+- `specs/local-task-preparation/` plans the next layer: source-ledger decomposition
+  into reviewed packets, host-owned rune completion, independent checks and
+  shared prepared dispatch in local/single/variant paths. It is not implemented.
+  Ordinary local execution still asks the model to update rune statuses.
+- Authorised Sanarte wt-2 trials on 2026-10-29 retained a 19m18.893s interrupted
+  broad task and a 10-minute five-scenario RED timeout, both without source edits.
+  Narrowing a title alone did not remove context retrieval/design overhead.
+  Further trials supply an exact regression packet; results and limitations
+  belong in the preparation spec's evaluation record. Do not treat narrow
+  diagnostics work as original iframe/provider/browser acceptance.
+- `specs/local-compute-agent/review.md` records execution readiness and the
+  boundary to future local SDD authoring. Its implementation ledger is complete;
+  `specs/local-run-comparison/tasks.md` owns pending OpenCode event parsing,
+  standard variant completion checks and disposable comparison fixtures.
+- Variant aliases copy worker arguments, not `LocalConfig` selection, graph
+  validation, retry bounds or process-group cleanup. Keep direct local smoke
+  acceptance separate from comparison results. The comparison evaluation ledger
+  has STOP gates; the older run-termination ledger must be replanned before use.
+- Rune JSON exposes numeric task IDs and deliberately omits stable IDs;
+  canonical Markdown retains stable markers. Batch `requirements_file` is a
+  request-level field, requirement IDs are numeric, and exit 0 can accompany
+  `success: false`. Read back the ledger after writes. Stream readiness does not
+  inherit parent blockers, so children that depend on earlier phases need
+  explicit prerequisites too.
+
 - `docs/runbooks/local-implementation-quickstart.md` is the short user guide for
   arbitrary rune ledgers with the explicit LM Studio `8-bit` model. The longer
   `local-next-task.md` runbook covers installation, diagnostics and recovery.

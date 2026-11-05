@@ -50,23 +50,57 @@ orbit local "$tasks_file" --model 8-bit --dry-run
 ```
 
 Check the preview's repository root, selected task and references.
+The preview also checks that Codex starts within five seconds; startup failures
+return before creating logs or invoking the model.
 
 **4. Run the implementation.**
 
 ```bash
 orbit local "$tasks_file" --model 8-bit \
-  --context-window 32768 --selection runner --timeout 30m --max-iterations 20
+  --context-window 32768 --selection runner --timeout 30m
 ```
 
 Orbit passes one selected task and its subtasks to each worker session. The
 worker implements that selection, runs the project's validation, updates the
 ledger with rune and leaves changes for review. Orbit continues while work
 remains and each iteration completes at least one selected task.
+The default session budget comes from the number of unfinished tasks in the
+ledger, so files with more than twenty tasks can finish in one invocation.
+Use `--max-iterations N` when you want an explicit smaller bound.
 
-Match `--context-window` to the context actually loaded in LM Studio. The
+For a shorter Codex worker instruction envelope, use the provided
+[worker instructions](local-worker-instructions.md):
+
+```bash
+orbit local "$tasks_file" --model 8-bit --leaf \
+  --instructions-file /absolute/path/to/orbit/docs/runbooks/local-worker-instructions.md
+```
+
+The option replaces Codex's built-in base instructions; the selected task prompt
+and sandbox settings remain. Paths resolve from the directory invoking Orbit.
+Without this option, existing Codex instructions remain in use. This controls
+instruction size, separately from the model's reasoning configuration.
+
+For Qwen-derived models, inspect the actual chat template when simple tool turns
+take minutes. A custom model entry may not expose a reasoning control even when
+its template defaults to `xhigh`. Lowering a Codex setting does not prove that
+the model received it. Retain the original template and validate the effective
+runtime settings; the M5 verification record covers the measured configuration.
+
+Set `--context-window` no larger than the context actually loaded in LM Studio.
+A smaller worker budget can be appropriate for a model; test it on the same
+ledger and retain failed attempts when changing the budget. The
 default starts history compaction at 20480 tokens and limits saved tool-output
 history. A `TruncateMiddle` server message means context is being removed;
 see [context and dependency blockers](local-next-task.md#context-and-dependency-blockers).
+
+For the loaded Bonsai model, use its exact identifier and the smaller worker
+budget exercised by the local verification:
+
+```bash
+orbit local "$tasks_file" --model bonsai-local --context-window 16384 \
+  --instructions-file /absolute/path/to/orbit/docs/runbooks/local-worker-instructions.md
+```
 
 Prepare dependencies before running, or add `--network` to allow sandboxed
 tools to download them. Package caches must still be writable in the sandbox.
@@ -98,5 +132,12 @@ A failure, timeout, STOP gate, halt signal or lack of completed work stops the
 run. Review partial changes before rerunning the same command; it selects the
 remaining work from the ledger. If the repository has `.orbit/halt`, resolve
 its reason and remove that marker before resuming. Ctrl+C interrupts a run.
+Rune queries also have deadlines and stop on interruption; malformed rune
+output is an error. A timed-out worker may have left useful code or task
+updates, so run independent checks before accepting those changes.
+If it already completed the whole ledger, rerunning can finish without another
+worker; that rerun does not perform independent code validation for you.
 
-See the [full runbook](local-next-task.md) for diagnostics and other options.
+See the [full runbook](local-next-task.md) for diagnostics and other options,
+and the [reliability verification](../../specs/local-compute-agent/verification-reliability.md)
+for the two-model execution and cancellation evidence.

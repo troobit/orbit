@@ -200,9 +200,6 @@ func New(config Config) (*Orbit, error) {
 		log.Printf("Centralized log: %s", dbg.Path())
 	}
 
-	runeClient := rune.NewClient(config.TasksFile)
-	runeClient.SetDebug(config.Debug)
-
 	// Set default clock for time operations
 	if config.Clock == nil {
 		config.Clock = RealClock{}
@@ -298,6 +295,8 @@ func New(config Config) (*Orbit, error) {
 	// Set up graceful shutdown context for signal handling
 	ctx, cancel := signal.NotifyContext(context.Background(),
 		os.Interrupt, syscall.SIGTERM)
+	runeClient := rune.NewClientContext(ctx, config.TasksFile)
+	runeClient.SetDebug(config.Debug)
 
 	// Initialize registry for web interface integration
 	// Failures are non-fatal (requirement 3.7)

@@ -27,8 +27,11 @@ local entry point backed by the existing Codex agent and orchestration loop.
    identity/graph, reopened completed task, progress outside the selection
    (except automatic ancestor completion), or no selected task completed.
    A claimed success in prose alone MUST NOT advance execution.
-6. Local execution MUST have positive configurable per-session timeout (default
-   30 minutes) and iteration limit (default 20). Timeout, interruption, failed
+6. Local execution MUST have a positive configurable per-session timeout (default
+   30 minutes) and a finite iteration budget. By default (`--max-iterations 0`),
+   derive the budget from the initial number of incomplete tasks, including
+   descendants. A positive explicit limit MUST retain its requested bound;
+   negative limits MUST fail preflight. Timeout, interruption, failed
    Codex events, and process failures MUST stop without automatically rerunning
    partially applied work. Unix cancellation MUST terminate the process group.
 7. Local logs MUST use Orbit's log manager, retain the prompt and live stdout
@@ -64,7 +67,35 @@ local entry point backed by the existing Codex agent and orchestration loop.
     avoid rereading the supplied ledger, and honor explicit tests-first task
     acceptance criteria. An expected red test is acceptable only for a task
     explicitly asking for it; implementation tasks still require passing checks.
+15. <a name="15.1"></a>`--instructions-file` MUST optionally select an explicit
+    Codex base-instruction file without changing the selected task prompt,
+    sandbox, model routing or default behaviour. Resolve relative paths from the
+    invoking directory, including spaces and quotes. Missing, non-regular,
+    empty or invalid UTF-8 files MUST fail before logs or inference.
+16. Rune subprocess queries MUST have a finite deadline and respect Orbit's
+    shutdown context, including selection, initial phase display and progress
+    verification. Failed, malformed or missing task-list output MUST NOT be
+    interpreted as an empty completed ledger. Local preflight MUST check Codex
+    startup with a five-second deadline before logs or inference; a broken CLI
+    MUST fail promptly instead of consuming the worker timeout.
+17. Verification MUST include a ledger exceeding twenty selected tasks and
+    custom nested filenames with shell punctuation, relative and absolute paths,
+    and symlinks invoked outside the target repository. Live code acceptance
+    MUST independently check both available local models, `8-bit` and
+    `bonsai-local`, and retain failed attempts as well as successful results.
 
 Model downloads, server lifecycle management, variants, comparison changes, and
 new transcript formats are outside this change. The local runtime is managed
 separately; an installed model is used for live verification.
+
+## Relationship to subsequent work
+
+This spec owns the `orbit local`
+preset and its runner-side selection, ledger validation and cancellation.
+[Local run comparison](../local-run-comparison/smolspec.md) owns the pending
+OpenCode adapter repair, standard variant-loop completion check and comparison
+fixtures. Copying local CLI flags into a variant alias does not enable this
+spec's runner guards. Neither spec implements local SDD authoring.
+
+See [readiness and next steps](review.md) for the evidence boundary and the
+small next milestone toward generating and executing approved rune ledgers.

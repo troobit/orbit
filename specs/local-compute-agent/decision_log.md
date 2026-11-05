@@ -1,5 +1,11 @@
 # Decision Log: Local Compute Agent
 
+Decisions 1–12 describe the superseded baseRT/OpenCode plan; their requirement
+links resolve to [the historical snapshot](requirements-superseded.md). Decision
+13 establishes the current local Codex preset. Alternate-harness comparison is
+owned by [local-run-comparison](../local-run-comparison/smolspec.md), not an
+unfinished part of that earlier plan. See [readiness review](review.md).
+
 ## Decision 1: Drive Local Models Through the Existing OpenCode Agent
 
 **Date**: 2026-08-02
@@ -68,7 +74,7 @@ Orbit has never owned a background process, and doing so introduces orphaned-pro
 
 ### Narrowing
 
-Review established that the original rationale claimed more than it supports. A refused connection does fail fast and is diagnosed by requirement [3.1](requirements.md#3.1). A server that accepts the connection while still loading weights, holding the wrong model, or swapping under memory pressure does not fail fast — it simply responds slowly or not at all.
+Review established that the original rationale claimed more than it supports. A refused connection does fail fast and is diagnosed by requirement [3.1](requirements-superseded.md#3.1). A server that accepts the connection while still loading weights, holding the wrong model, or swapping under memory pressure does not fail fast — it simply responds slowly or not at all.
 
 That residual risk is not addressed by this decision. It is bounded by Decision 7 (a 2-hour ceiling terminates the run) and made observable by Decision 11 (output is written incrementally, so the run can be tailed). Without both of those, this decision would leave a run that hangs silently and indefinitely.
 
@@ -80,7 +86,7 @@ That residual risk is not addressed by this decision. It is bounded by Decision 
 
 **Negative:**
 - The developer must remember to start the server; forgetting produces a failed run rather than a warning
-- Failure diagnostics become load-bearing — this is why requirement [3.3](requirements.md#3.3) classifies unreachable-endpoint errors as fatal rather than retryable, so a down server fails immediately instead of after five backoff attempts
+- Failure diagnostics become load-bearing — this is why requirement [3.3](requirements-superseded.md#3.3) classifies unreachable-endpoint errors as fatal rather than retryable, so a down server fails immediately instead of after five backoff attempts
 - A reachable-but-not-ready server is diagnosed only by timeout and by reading the incremental output, not by a purpose-built check
 
 ---
@@ -238,7 +244,7 @@ A phase run under the local agent type has a default execution timeout of 2 hour
 
 **Correction (2026-08-02):** this decision originally said the bound "applies to comparison and consolidation calls, replacing their 30-minute defaults", which conflated two paths that behave differently:
 
-- **Comparison already honours it.** `internal/orbit/comparison.go:51-54` and `cmd/orbit/compare.go:190-193` already prefer `AgentConfig.Timeout` over `comparison.DefaultTimeout`, so this needs no new plumbing. Requirement [2.6](requirements.md#2.6) now states it.
+- **Comparison already honours it.** `internal/orbit/comparison.go:51-54` and `cmd/orbit/compare.go:190-193` already prefer `AgentConfig.Timeout` over `comparison.DefaultTimeout`, so this needs no new plumbing. Requirement [2.6](requirements-superseded.md#2.6) now states it.
 - **Consolidation cannot honour it today.** `consolidation.Config.Timeout` (`internal/consolidation/types.go:26`) is set by no caller — neither `cmd/orbit/consolidate.go:135-144` nor `internal/orbit/comparison.go:134-141` populate it — so `agentTimeout()` always returns the 30-minute default. Extending the bound there needs plumbing no requirement authorises, so consolidation is **excluded** and keeps its 30-minute default.
 
 ### Rationale
@@ -248,7 +254,7 @@ Two hours is far above any plausible healthy phase on local hardware and far bel
 ### Alternatives Considered
 
 - **No timeout at all (Decision 3, superseded)**: Let local phases run until they finish or are interrupted - Rejected after review showed it composes with Decisions 2 and 6 into a run with no failure signal, no diagnostic, and no termination; the developer left to distinguish slow from stuck has no means to do so.
-- **Idle-based timeout**: Leave total runtime unbounded but fail after a period with no output - Still the better long-term answer, but deferred: it requires observing output as it streams. Requirement [6.1](requirements.md#6.1) adds exactly that capability, so this becomes available cheaply in a later iteration.
+- **Idle-based timeout**: Leave total runtime unbounded but fail after a period with no output - Still the better long-term answer, but deferred: it requires observing output as it streams. Requirement [6.1](requirements-superseded.md#6.1) adds exactly that capability, so this becomes available cheaply in a later iteration.
 
 ### Consequences
 
@@ -282,9 +288,9 @@ Spike questions, in order:
 
 1. Does OpenCode accept an arbitrary OpenAI-compatible base URL with no API key?
 2. Does its `--format json` envelope survive intact against a custom provider — the envelope being orbit's only success signal (`internal/agents/opencode/agent.go:413`)?
-3. Does that envelope carry token usage against a custom provider? The answer determines whether requirement [5.2](requirements.md#5.2) or [5.3](requirements.md#5.3) applies.
-4. What verbatim error output appears for: server down, server up but model still loading, unknown model name, model too large for available memory? These strings are what make requirements [3.1](requirements.md#3.1) and [3.2](requirements.md#3.2) implementable.
-5. Does `opencode run --format json` write stdout progressively while working, or emit a single JSON document at process exit? Does anything useful reach stderr during the run? Requirement [6.1](requirements.md#6.1) and the idle-timeout deferral in Decision 7 both assume progressive output; nobody has verified it.
+3. Does that envelope carry token usage against a custom provider? The answer determines whether requirement [5.2](requirements-superseded.md#5.2) or [5.3](requirements-superseded.md#5.3) applies.
+4. What verbatim error output appears for: server down, server up but model still loading, unknown model name, model too large for available memory? These strings are what make requirements [3.1](requirements-superseded.md#3.1) and [3.2](requirements-superseded.md#3.2) implementable.
+5. Does `opencode run --format json` write stdout progressively while working, or emit a single JSON document at process exit? Does anything useful reach stderr during the run? Requirement [6.1](requirements-superseded.md#6.1) and the idle-timeout deferral in Decision 7 both assume progressive output; nobody has verified it.
 
 ### Rationale
 
@@ -295,14 +301,14 @@ Questions 1 and 2 are genuine kill criteria — a negative answer to either mean
 Decision 5 stated only that a negative result would "reshape the design", which assumed the feature proceeds. Explicitly:
 
 - **Question 1 or 2 negative**: the feature is blocked on this driver. Reopen Decision 1 and reconsider the rejected alternatives.
-- **Question 3 negative**: requirement 5 downgrades to [5.3](requirements.md#5.3); no token reporting is built.
-- **Question 4 yields no distinguishable strings**: requirements [3.1](requirements.md#3.1) and [3.2](requirements.md#3.2) narrow to whatever is distinguishable, and the remainder classify as unknown. Recorded as a limitation rather than worked around.
-- **Question 5 negative** (output does not stream): requirement [6.1](requirements.md#6.1) reduces to capture-at-exit, [6.3](requirements.md#6.3) becomes the only liveness signal during a phase, and the idle-based timeout named in Decision 7 stays unavailable — building it on non-streaming output would kill every healthy run.
+- **Question 3 negative**: requirement 5 downgrades to [5.3](requirements-superseded.md#5.3); no token reporting is built.
+- **Question 4 yields no distinguishable strings**: requirements [3.1](requirements-superseded.md#3.1) and [3.2](requirements-superseded.md#3.2) narrow to whatever is distinguishable, and the remainder classify as unknown. Recorded as a limitation rather than worked around.
+- **Question 5 negative** (output does not stream): requirement [6.1](requirements-superseded.md#6.1) reduces to capture-at-exit, [6.3](requirements-superseded.md#6.3) becomes the only liveness signal during a phase, and the idle-based timeout named in Decision 7 stays unavailable — building it on non-streaming output would kill every healthy run.
 
 ### Alternatives Considered
 
 - **Widen the spike to model capability**: Measure tool-call reliability over turns, context-limit behaviour, and unattended completion of a real phase - Rejected because model quality is outside this feature's control and improves on its own; gating a design on it measures the model, not the integration.
-- **No spike; let implementation discover it**: Proceed straight to design - Rejected because requirements [3.1](requirements.md#3.1) and [3.2](requirements.md#3.2) cannot be written without the verbatim error strings, and questions 1 and 2 are cheap to answer but expensive to discover late.
+- **No spike; let implementation discover it**: Proceed straight to design - Rejected because requirements [3.1](requirements-superseded.md#3.1) and [3.2](requirements-superseded.md#3.2) cannot be written without the verbatim error strings, and questions 1 and 2 are cheap to answer but expensive to discover late.
 
 ### Consequences
 
@@ -337,10 +343,10 @@ One change resolves both defects. The type is already an observable field in `.o
 **Correction (2026-08-02):** this rationale originally claimed classifier lookup keys on the configured agent type at three call sites, and that no registry change was needed. Review established both claims are wrong, and the second defect is load-bearing:
 
 - Only `internal/orbit/orbit.go:241` resolves the classifier from the config type. `internal/orbit/variants.go:879,981` and `internal/consolidation/consolidator.go:547` resolve it from `agent.Name()`, which is the hardcoded literal `"opencode"` (`internal/agents/opencode/agent.go:52`).
-- Consequently, if the local type simply reuses `opencode.New`, then **in variant mode it resolves the OpenCode classifier**, whose connection handling is retryable (`internal/agents/opencode/errors.go:65-67`). That would violate requirement [3.3](requirements.md#3.3) in precisely the mode requirement [1.3](requirements.md#1.3) targets — a down server burning five backoffs instead of failing fast.
+- Consequently, if the local type simply reuses `opencode.New`, then **in variant mode it resolves the OpenCode classifier**, whose connection handling is retryable (`internal/agents/opencode/errors.go:65-67`). That would violate requirement [3.3](requirements-superseded.md#3.3) in precisely the mode requirement [1.3](requirements-superseded.md#1.3) targets — a down server burning five backoffs instead of failing fast.
 - A new registration is required (see the correction on Decision 1).
 
-Requirement [3.3](requirements.md#3.3) now states the single-run and variant modes explicitly so this cannot be satisfied in one mode only. How the local agent reports its name, and whether the local classifier is a copy, a delegating wrapper, or a shared implementation parameterised on locality, are design questions this decision deliberately leaves open.
+Requirement [3.3](requirements-superseded.md#3.3) now states the single-run and variant modes explicitly so this cannot be satisfied in one mode only. How the local agent reports its name, and whether the local classifier is a copy, a delegating wrapper, or a shared implementation parameterised on locality, are design questions this decision deliberately leaves open.
 
 ### Alternatives Considered
 
@@ -378,8 +384,8 @@ A phase that completes without error and leaves the set of pending task identifi
 **Correction (2026-08-02):** the original wording said "pending task list unchanged" with no comparison predicate and no scope, which review showed was both untestable and a regression risk:
 
 - *Predicate.* An agent that completes one task and appends a follow-up leaves the count identical but the identifier set different. The criterion now compares the **set of pending task identifiers**, not the count.
-- *Blast radius.* `Command` is user-overridable via `--command` and `ORBIT_COMMAND`. Any command that is not the task-advancing one — a review pass, a docs pass — never mutates the pending list, so every phase would read as no progress and abort the run after two. That would have been a regression for existing hosted users, introduced by a spec about local compute. Requirement [4.4](requirements.md#4.4) now scopes detection to the local agent type and the default command.
-- *Variant mode.* The variant phase loop (`internal/orbit/variants.go:616-720`) calls only `GetNextPhase()` and never `ListPending`, so the chosen signal was wired in the single-run path alone — the opposite of where it matters, since variants are where local phases run for hours and `--parallel` multiplies the waste. Requirement [4.3](requirements.md#4.3) now requires both modes.
+- *Blast radius.* `Command` is user-overridable via `--command` and `ORBIT_COMMAND`. Any command that is not the task-advancing one — a review pass, a docs pass — never mutates the pending list, so every phase would read as no progress and abort the run after two. That would have been a regression for existing hosted users, introduced by a spec about local compute. Requirement [4.4](requirements-superseded.md#4.4) now scopes detection to the local agent type and the default command.
+- *Variant mode.* The variant phase loop (`internal/orbit/variants.go:616-720`) calls only `GetNextPhase()` and never `ListPending`, so the chosen signal was wired in the single-run path alone — the opposite of where it matters, since variants are where local phases run for hours and `--parallel` multiplies the waste. Requirement [4.3](requirements-superseded.md#4.3) now requires both modes.
 
 ### Rationale
 
@@ -453,7 +459,7 @@ An earlier draft of this decision asserted that both always use the configured d
 
 ### Decision
 
-Neither path changes. The split is documented as it actually behaves, in requirement [7.6](requirements.md#7.6).
+Neither path changes. The split is documented as it actually behaves, in requirement [7.6](requirements-superseded.md#7.6).
 
 ### Rationale
 
@@ -482,7 +488,7 @@ The in-run path already does the privacy-preserving thing, so no change is neede
 
 **ID**: 13
 **Date**: 2026-10-25
-**Status**: accepted
+**Status**: accepted; iteration default superseded by Decision 19
 
 ### Context
 
@@ -728,3 +734,101 @@ acceptance, and comparable live evidence through Orbit's existing logs.
 Negative: leaf execution adds session setup overhead, cannot repair poorly
 specified tasks, and remains sequential. Prompt guidance cannot force a model
 to obey bounded reads or validation semantics.
+
+---
+
+## Decision 18: Allow an explicit worker instruction file
+
+**ID**: 18
+**Date**: 2026-10-29
+**Status**: accepted
+
+### Context
+
+M5 Pro trials use a PATH wrapper to pass a shorter Codex base instruction file.
+Observed requests use roughly 5–6K input tokens with that file, versus about
+10K with the default instructions. Task selection, provider routing and sandbox
+flags remain Orbit's. The operator asked for working local execution rather
+than stopping at plans.
+
+### Decision
+
+Expose an optional `--instructions-file` in `orbit local`, validating its path
+and text before logs and passing the absolute path through Codex's supported
+configuration override. Retain existing defaults and the selected-task contract.
+
+### Rationale
+
+The instruction envelope is a measurable source of context overhead. Explicit
+selection makes the experiment repeatable without replacing an installed CLI.
+This is separate from the model template's reasoning-effort default.
+
+### Alternatives Considered
+
+- Keep a PATH wrapper: rejected for normal use because it obscures the invoked
+  configuration and requires a separate executable per experiment.
+- Replace all default instructions: rejected because it changes established
+  hosted/local guidance before the smaller envelope is validated broadly.
+
+### Consequences
+
+Positive: reproducible compact worker configuration and unchanged default
+behaviour, model routing and sandbox permissions.
+
+Negative: operators must maintain suitable instruction content; reduced input
+size alone does not prove faster or more correct execution.
+
+---
+
+## Decision 19: Bound ledger subprocesses and derive the default session budget
+
+**ID**: 19
+**Date**: 2026-10-30
+**Status**: accepted
+
+### Context
+
+The owner requested arbitrary rune-formatted task files to run locally and
+identified hangs and noncompletion as unacceptable. The local worker already
+has a deadline, but rune list and phase-summary subprocesses can wait outside
+that deadline. Decision 13 also inherited a twenty-session cap, which stops a
+productive ledger containing more selected units. The existing graph guard
+forbids adding tasks, and every accepted iteration must complete selected work.
+No `.agentic.json` decision mode is configured, so supersession applies.
+
+### Decision
+
+Give rune queries finite deadlines and the runner's cancellation context.
+Treat malformed or unsuccessful list output as failure. Probe Codex startup
+with a five-second deadline before creating local logs or invoking inference.
+Make the default
+`--max-iterations 0` derive a finite budget from the initial incomplete task
+count, including descendants, while retaining explicit positive caps. Supersede
+only Decision 13's fixed default iteration limit. Verify arbitrary ledger paths
+and real code execution with both available local models, retaining independent
+checks and failed attempts.
+
+### Rationale
+
+The initial incomplete count bounds the number of productive iterations without
+making the loop unlimited. Subprocess deadlines cover the intervals between
+workers as well as work selection. Independent host checks establish whether
+the generated code passes acceptance; a model's success statement cannot.
+
+### Alternatives Considered
+
+- Raise the fixed cap: rejected because any chosen number still truncates a
+  valid larger ledger and provides no progress-based justification.
+- Remove the iteration bound entirely: rejected because the immutable graph
+  already supplies a useful finite bound and explicit limits remain valuable.
+- Increase worker timeouts alone: rejected because a hung rune subprocess is
+  outside the worker deadline and cannot be repaired by extending it.
+
+### Consequences
+
+Positive: longer productive ledgers can complete with the ordinary command,
+stalled queries terminate, and cancellation applies between worker sessions.
+
+Negative: a slow rune query can now fail after its deadline; genuine task,
+dependency or model failures still require inspecting retained partial work.
+Real-model smoke tests establish observed execution, not universal code quality.
