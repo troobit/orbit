@@ -3,6 +3,7 @@ package agents
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -188,6 +189,44 @@ func NewRateLimitError(agentName, combinedLower string) *ClassifiedError {
 		Message:    "API rate limit exceeded",
 		Agent:      agentName,
 	}
+}
+
+// NewRateLimitWaitError creates a ClassifiedError for usage limits that
+// require waiting until a specific reset time. Unlike ErrorClassRetryable,
+// rate-limit waits reset the retry counter after the wait completes.
+func NewRateLimitWaitError(agentName string, retryAfter time.Duration) *ClassifiedError {
+	return &ClassifiedError{
+		Original:   errors.New("usage limit reached"),
+		Class:      ErrorClassRateLimitWait,
+		RetryAfter: retryAfter,
+		Message:    fmt.Sprintf("Usage limit reached, waiting %s until reset", FormatWaitDuration(retryAfter)),
+		Agent:      agentName,
+	}
+}
+
+// FormatWaitDuration formats a duration in a human-readable way for
+// rate-limit wait messages.
+func FormatWaitDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%d seconds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		mins := int(d.Minutes())
+		return fmt.Sprintf("%d minute%s", mins, pluralS(mins))
+	}
+	hours := int(d.Hours())
+	mins := int(d.Minutes()) % 60
+	if mins == 0 {
+		return fmt.Sprintf("%d hour%s", hours, pluralS(hours))
+	}
+	return fmt.Sprintf("%d hour%s %d minute%s", hours, pluralS(hours), mins, pluralS(mins))
+}
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }
 
 // NewAuthError creates a ClassifiedError for authentication failures.

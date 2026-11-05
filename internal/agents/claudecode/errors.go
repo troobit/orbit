@@ -1,8 +1,6 @@
 package claudecode
 
 import (
-	"errors"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -38,13 +36,7 @@ func (c *Classifier) Classify(exitCode int, stderr, stdout string, errMsgs []str
 		strings.Contains(combinedLower, "hit your session limit") {
 		waitDuration := parseUsageLimitReset(combined)
 		if waitDuration > 0 {
-			return &agents.ClassifiedError{
-				Original:   errors.New("usage limit reached"),
-				Class:      agents.ErrorClassRateLimitWait,
-				RetryAfter: waitDuration,
-				Message:    fmt.Sprintf("Usage limit reached, waiting %s until reset", formatDuration(waitDuration)),
-				Agent:      "claude-code",
-			}
+			return agents.NewRateLimitWaitError("claude-code", waitDuration)
 		}
 	}
 
@@ -185,28 +177,4 @@ func parseTimezoneAbbrev(abbrev string) *time.Location {
 		}
 	}
 	return nil
-}
-
-// formatDuration formats a duration in a human-readable way.
-func formatDuration(d time.Duration) string {
-	if d < time.Minute {
-		return fmt.Sprintf("%d seconds", int(d.Seconds()))
-	}
-	if d < time.Hour {
-		mins := int(d.Minutes())
-		return fmt.Sprintf("%d minute%s", mins, pluralS(mins))
-	}
-	hours := int(d.Hours())
-	mins := int(d.Minutes()) % 60
-	if mins == 0 {
-		return fmt.Sprintf("%d hour%s", hours, pluralS(hours))
-	}
-	return fmt.Sprintf("%d hour%s %d minute%s", hours, pluralS(hours), mins, pluralS(mins))
-}
-
-func pluralS(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
 }
