@@ -1,0 +1,447 @@
+---
+references:
+    - specs/apsis-shared-json/requirements.md
+    - specs/apsis-shared-json/design.md
+    - specs/apsis-shared-json/decision_log.md
+---
+# Apsis shared JSON, listing and Codex exec streams
+
+## PR 1: Shared JSON sessions and Codex provider
+
+- [x] 1. Assert follower shutdown errors so baseline lint is clean <!-- id:9kwhro4 -->
+  - internal/transcript/follow_test.go: assert the two remaining cancellation-channel errors without changing production behaviour. Preserve the earlier receive assertions and codex-gpt-6 ownership; assistance by another authorised agent does not transfer the claim.
+  - Test-only repair: make lint is the failing check, so no production red/green pair is required. Complete only after make lint and make test pass; record any unchanged rerun of the known apsisweb shutdown flake accurately.
+  - PR 1 baseline; the canonical snapshot and original scope mapping are retained in drafts/tasks/tasks.canonical-before-merge-r1.md and drafts/tasks/merge-map.codex-gpt-6.1-sol.md.
+  - Stream: 1
+  - Owner: codex-gpt-6
+  - Requirements: [5.1](requirements.md#5.1)
+  - References: internal/transcript/follow_test.go, .golangci.yml
+
+- [x] 2. Record session metadata and the Codex provider in parse results <!-- id:9kwhro5 -->
+  - internal/transcript parser metadata and existing assistant headers only; retain current Claude-model/Kiro-provider omission and default header-only Codex errors.
+  - Blocked-by: 9kwhro4 (Assert follower shutdown errors so baseline lint is clean)
+  - Stream: 1
+  - Owner: codex-gpt-6.1-sol
+  - Requirements: [1.1](requirements.md#1.1), [1.6](requirements.md#1.6), [3.1](requirements.md#3.1), [5.1](requirements.md#5.1)
+  - [x] 2.1. Write failing tests for parsed formats, first-known summaries and the provider label <!-- id:9kwhrok -->
+    - `ParseResult.Format` is set for each existing fixture (Claude, Codex, Copilot, Kiro CLI, Kiro IDE) and is `FormatUnknown` when `Parse` falls back to the Claude parser
+    - Metadata per the design source table: Codex session_meta uses the outer CodexEntry.Timestamp (never payload.timestamp), cwd, model and provider, including header-only and user-only rollouts; Claude first parseable timestamp/first cwd; Copilot first entry timestamp; Kiro CLI first entry timestamp/model; Kiro IDE metadata.startTime/modelId. Include different outer/payload timestamps and a missing outer timestamp: no payload fallback.
+    - First-known summaries (Decision 24) stay fixed through later Copilot/Codex model/provider changes. Later natural entries carry the active recorded values. Identical repeated Codex headers preserve adjacent assistant consolidation and timestamps. For a model-only change inside one assistant run, the default preserves legacy consolidation; ParseOptions.PreserveModelChanges splits only the changed run for shared-json while retaining first-known summary and all content (Decision 28).
+    - Kiro IDE warnings identify their true one-based source index: chat-conversion unknown-role warnings use Unit chat-message; execution-detail unknown-action warnings use Unit execution-action. Physical-line parsers keep Unit empty. Preserve numeric Line and existing stderr messages/labels; test both Kiro warning paths.
+    - Assistant headers show `model (provider)`, or `(provider)` without a model, in Markdown, standalone HTML and the fragment (Q40); Read/Edit group, user and tool-result headers are unchanged (Decision 16)
+    - Existing Markdown/HTML golden output stays byte-identical for rollouts without `model_provider` and for every other source
+    - Retain current Claude-model and Kiro-IDE-provider omission under approved 3.1/5.1. U1/U2 remain unanswered scope-expansion questions, not prerequisites or answered human choices.
+    - Header-only Codex parsing keeps the legacy no-valid-entries error by default; with ParseOptions.AllowEmptyCodex it returns empty Entries plus source metadata. Test file/stdin/ID shared-json success later in task 4 and unchanged no-option errors here; user-only input keeps its existing acceptance/rendered outcome.
+    - Provider transitions start new assistant metadata-bearing entries under 3.1, including when the model is unchanged; identical metadata never splits. Test both parser option modes and an interleaved tool call/result across the transition so all linking identifiers/content survive.
+    - Blocked-by: 9kwhro4 (Assert follower shutdown errors so baseline lint is clean)
+    - Stream: 1
+    - Owner: codex-gpt-6.1-sol
+    - Requirements: [1.1](requirements.md#1.1), [1.6](requirements.md#1.6), [3.1](requirements.md#3.1), [5.1](requirements.md#5.1)
+    - References: internal/transcript/parser_test.go, internal/transcript/codex_parser_test.go, internal/transcript/copilot_parser_test.go, internal/transcript/kiro_parser_test.go, internal/transcript/kiro_ide_parser_test.go, internal/transcript/markdown_metadata_test.go, internal/transcript/html_test.go
+  - [x] 2.2. Implement parse-result metadata, provider propagation and modelLabel <!-- id:9kwhrol -->
+    - types.go: `Entry.Provider` with `json:"-"`; parser.go: `ParseResult.Format`, `ParseResultMetadata` gains `StartedAt`, `Project`, `FirstModel`, `FirstProvider`; `ParseWarning` gains `Code` and `Unit`
+    - `Parse` and `ParseJSONLWithFormat` set `Format` on every path, including the Claude fallback
+    - Metadata can now be non-nil with a nil `TotalCost`; confirm every `Metadata != nil` caller still guards `TotalCost`
+    - codex_types.go reads `model_provider`; codex_parser.go keeps provider state beside model state and `ensureAssistantEntry` sets both
+    - metadata.go: `modelLabel(model, provider)` used only where assistant headers pass `entry.Model` (`formatAssistantMessage`, `formatAssistantMessageHTML`)
+    - Extend ParseOptions with AllowEmptyCodex and PreserveModelChanges; forward both through backward-compatible variadic Parse/ParseJSONLWithFormat/ParseCodexJSONL options. Defaults preserve the current empty-Codex error and provider-less model-only consolidation; shared-json alone enables both flags (Decision 28).
+    - Set Kiro warning Unit at each creation site, distinguishing chat-message from execution-action; leave Line and warning text unchanged. Capture Codex StartedAt from the outer session_meta envelope timestamp only, consistent with listing provenance.
+    - ensureAssistantEntry retains identical-metadata consolidation; at the next content item it starts a new entry for a recorded provider transition, or for a model transition when PreserveModelChanges is true. Natural boundaries still take active metadata. Do not eagerly finalize on an identical session_meta or retroactively relabel earlier content; preserve default provider-less grouping.
+    - Blocked-by: 9kwhrok (Write failing tests for parsed formats, first-known summaries and the provider label)
+    - Stream: 1
+    - Owner: codex-gpt-6.1-sol
+    - Requirements: [1.1](requirements.md#1.1), [1.6](requirements.md#1.6), [3.1](requirements.md#3.1), [5.1](requirements.md#5.1)
+    - References: internal/transcript/types.go, internal/transcript/parser.go, internal/transcript/codex_types.go, internal/transcript/codex_parser.go, internal/transcript/copilot_parser.go, internal/transcript/kiro_parser.go, internal/transcript/kiro_ide_parser.go, internal/transcript/metadata.go, internal/transcript/markdown.go, internal/transcript/html.go
+
+- [-] 3. Publish the version 1 session schema and the shared JSON session projection <!-- id:9kwhro6 -->
+  - internal/sharedjson plus docs/schemas/apsis-shared-json.v1.schema.json; publish the full known v1 schema before later producers and keep the validator test-only.
+  - Blocked-by: 9kwhro5 (Record session metadata and the Codex provider in parse results)
+  - Stream: 1
+  - Owner: codex-gpt-6.1-sol
+  - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [1.6](requirements.md#1.6)
+  - [-] 3.1. Write failing schema and session projection tests <!-- id:9kwhrom -->
+    - Load docs/schemas/apsis-shared-json.v1.schema.json from disk with github.com/santhosh-tekuri/jsonschema/v6, network loading disabled and imports only in _test.go files. U3-A is a reversible technical admission, not a human answer (Decision 25).
+    - Validate every document twice: against the published schema and against a test copy that adds `additionalProperties: false` to apsis-owned structural objects only (document root, session metadata, entry, each block type, warning); `input` stays open
+    - The published schema accepts unknown fields at root/session/block level, an arbitrary large integer and an unknown future block type; it rejects wrong known-field types, schema_version other than 1 and unknown document kind. A consumer skips unsupported block types; unknown parsed source kinds still project as other.
+    - Golden session documents for one fixture per existing source; root arrays are `[]`, never `null`; unavailable metadata is omitted, not empty
+    - A tool result longer than 3,000 runes survives byte-for-byte (1.5, Q29)
+    - Document `model`/`provider` use `FirstModel`/`FirstProvider`, then the first nonempty entry value; a header-only Codex rollout keeps both (Decision 24)
+    - Resolver metadata fills only missing fields and never turns a filesystem-flagged time into `created_at`; `session.source` falls back to `ParseResult.Format` and is omitted for the Claude fallback
+    - Warnings emit the correct one-based source position: line for physical lines, chat_message for Unit chat-message, execution_action for Unit execution-action (Q75 supersedes Q39). Test both Kiro IDE paths against the published/initial/closed schema and reject mistyped known positions. Cost appears only when TotalCost is set; unknown parsed kinds map to other with source_type/text.
+    - `Write` uses a two-space indent, no HTML escaping and a trailing newline
+    - Publish and test the complete known v1 contract in PR 1: both session/listing kinds; every metadata/listing field; text/thinking/tool_use/tool_result/plan/error/event/usage/other blocks; thread_id, turn, item_id, status, incomplete and exit_code. Validate handwritten synthetic documents for later producers without adding unused production Go fields.
+    - Retain a byte-exact initial schema fixture in the tests; later listing and exec documents validate against that first-published schema as well as the current file. The unknown-type branch excludes every known discriminator so malformed known blocks cannot escape known-field validation. The closed test copy closes only apsis-owned known structures; extension objects, input, payload and counters stay open.
+    - Blocked-by: 9kwhro5 (Record session metadata and the Codex provider in parse results)
+    - Stream: 1
+    - Owner: codex-gpt-6.1-sol
+    - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [1.6](requirements.md#1.6)
+    - References: internal/sharedjson/, docs/schemas/apsis-shared-json.v1.schema.json
+  - [ ] 3.2. Implement internal/sharedjson and the session schema <!-- id:9kwhron -->
+    - New package internal/sharedjson (Q35): `SchemaVersion = 1`, `SessionContext`, `Session`, `Write` and document types with their own JSON tags; it imports `transcript` and `sessions`, and neither imports it
+    - `sessions.SessionMetadata` gains `TimeFromFilesystem`, `Project` and `Path` as fields only; task 4 makes the resolver fill them
+    - Schema: draft 2020-12, upstream raw $id and const schema_version 1; publish both document kinds and the complete known v1 definitions from task 3.1 immediately. Known blocks use mutually exclusive discriminator branches; an open extension branch accepts only other type strings (Decision 25).
+    - Later tasks add producers/projection branches against this existing full schema; they do not widen a previously closed discriminator enum. Do not add unused representation types or runtime options before their first consumer.
+    - The projection reads parsed data only and never calls renderer helpers
+    - go.mod/go.sum gain the validator, used only by tests
+    - Own go.mod/go.sum changes for the test-only validator. Task 15.2 waits for this task before promoting x/sys, so module writes never overlap.
+    - The initial warning definition includes execution_action beside line/chat_message; project each known Unit to its matching position key, never label an action index as a chat-message index. Existing stderr output remains unchanged.
+    - Blocked-by: 9kwhrom (Write failing schema and session projection tests)
+    - Stream: 1
+    - Owner: codex-gpt-6.1-sol
+    - Requirements: [1.1](requirements.md#1.1), [1.2](requirements.md#1.2), [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [1.5](requirements.md#1.5), [1.6](requirements.md#1.6)
+    - References: internal/sharedjson/, internal/sessions/types.go, docs/schemas/apsis-shared-json.v1.schema.json, go.mod
+
+- [ ] 4. Emit shared JSON session documents from the apsis CLI <!-- id:9kwhro7 -->
+  - cmd/apsis and resolver metadata complete PR 1; only shared-json opts into empty Codex metadata, preserving legacy parser outcomes.
+  - Blocked-by: 9kwhro6 (Publish the version 1 session schema and the shared JSON session projection)
+  - Stream: 1
+  - Requirements: [1.1](requirements.md#1.1), [1.4](requirements.md#1.4), [5.1](requirements.md#5.1), [5.3](requirements.md#5.3)
+  - [ ] 4.1. Write failing CLI tests for -f shared-json conversion <!-- id:9kwhroo -->
+    - File, stdin and `latest` inputs plus identifier lookups under `t.Setenv("HOME", ...)` with synthetic fixtures for every existing source
+    - Copilot by identifier carries `project` from workspace.yaml `git_root`, else `cwd`; Kiro CLI by identifier carries the database key that matched; the same Copilot file opened by path has no project
+    - A resolver modification-time fallback never appears as `created_at`
+    - An empty session emits a document with `entries: []` and exits 0, while Markdown and HTML still print `Session contains no entries`
+    - `-F -f shared-json` fails with `follow mode does not support -f shared-json`; the unsupported-format error lists `shared-json`; raw `-f json` output is unchanged for every existing source
+    - Parse warnings still print on stderr as `Warning: line N: ...`
+    - Header-only Codex file/stdin/ID with -f shared-json returns metadata and entries: []; the same inputs without the new format retain their existing no-valid-entries error, and user-only legacy output remains unchanged.
+    - With adjacent assistant content separated by a model-only session_meta change, shared-json emits both metadata-bearing runs while default provider-less Markdown/HTML retains legacy grouping; repeated identical headers stay consolidated in both modes.
+    - Blocked-by: 9kwhro6 (Publish the version 1 session schema and the shared JSON session projection)
+    - Stream: 1
+    - Requirements: [1.1](requirements.md#1.1), [1.4](requirements.md#1.4), [5.1](requirements.md#5.1), [5.3](requirements.md#5.3)
+    - References: cmd/apsis/main_test.go, internal/sessions/resolver_test.go
+  - [ ] 4.2. Implement the input context, shared JSON dispatch and resolver metadata <!-- id:9kwhrop -->
+    - `resolveInput` returns an input context (reader, source, identifier, canonical path, cost path, resolver metadata); `convert` builds `sharedjson.SessionContext` from it and dispatches `shared-json` before the empty-entries return
+    - The resolver fills `Project` (Copilot workspace.yaml; Kiro CLI matched key), `Path`, and `TimeFromFilesystem` wherever it falls back to the modification time
+    - Kiro CLI project scope: `logs.(*DB).GetSession` tries the normalised then the resolved key; report which one matched so the resolver can return it (the design specifies the key only for all-projects lookups)
+    - `validateFollowMode`, the `-f` flag help and `printUsage` name `shared-json`
+    - CHANGELOG `[Unreleased]` Added: `-f shared-json`, the schema file and the Codex provider in headers; README apsis section documents the format and links the schema
+    - Verify this PR slice with make test, make lint and make build-apsis; update its README and CHANGELOG [Unreleased] entry in this implementation task. No commits, pushes or publication are authorised by local completion.
+    - Pass AllowEmptyCodex and PreserveModelChanges only for -f shared-json through auto-detected and forced parsing. Existing Markdown/HTML/web callers retain default empty-session acceptance and provider-less model-only consolidation; sharedjson never reparses raw source.
+    - Keep both caller-selected parse flags when task 14 consolidates resolved parsing. Explicit -a remains the higher-priority forced-format branch; shared-json alone enables AllowEmptyCodex and PreserveModelChanges independently of source/cost-path selection.
+    - Blocked-by: 9kwhroo (Write failing CLI tests for -f shared-json conversion)
+    - Stream: 1
+    - Requirements: [1.1](requirements.md#1.1), [1.4](requirements.md#1.4), [5.1](requirements.md#5.1), [5.3](requirements.md#5.3)
+    - References: cmd/apsis/main.go, internal/sessions/resolver.go, internal/agents/kiro/logs/session.go, CHANGELOG.md, README.md
+
+## PR 2: Listing across projects
+
+- [ ] 5. Add project, model, provider, time-source and extended ordering to listing rows <!-- id:9kwhro8 -->
+  - internal/sessions listing reads preserve existing timestamp/cwd scan bounds and no-flag ordering; runtime options arrive with their first consumer.
+  - Blocked-by: 9kwhro7 (Emit shared JSON session documents from the apsis CLI)
+  - Stream: 2
+  - Requirements: [4.1](requirements.md#4.1), [4.3](requirements.md#4.3), [4.4](requirements.md#4.4), [5.1](requirements.md#5.1)
+  - [ ] 5.1. Write failing listing metadata and ordering tests <!-- id:9kwhroq -->
+    - `SessionInfo.Project`: Claude first `cwd` within 50 lines/1 MiB (new and bounded), Codex `session_meta.cwd`, Copilot `git_root` else `cwd`, Kiro CLI database key, Kiro IDE omitted
+    - Codex rows carry `Model`/`Provider` from the same `session_meta` scan, which keeps `codexMetaScanLimit` and the 10 MiB line limit (Q57)
+    - `TimeFromFilesystem` is set exactly where an existing timestamp-to-mtime fallback is taken
+    - No-flag listings: a Claude first timestamp beyond 50 lines/1 MiB and a long Codex metadata line keep today's times; equal-time fixtures keep the legacy order and `latest` winner (Q60)
+    - Property test (`rapid`) of extended ordering: total; `CreatedAt` ascending with unknown times first; ties by source priority (claude, copilot, codex, kiro-cli, kiro-ide, codex-exec) then identifier; `latest` is the last element
+    - `ListWarning.Code`: per-source failures map to `source_failed`, Copilot workspace.yaml warnings to `path_unreadable`
+    - `NewLister` and `NewResolver` apply the same `Option` functions to a shared `Options` value (Q61)
+    - Blocked-by: 9kwhro7 (Emit shared JSON session documents from the apsis CLI)
+    - Stream: 2
+    - Requirements: [4.1](requirements.md#4.1), [4.3](requirements.md#4.3), [4.4](requirements.md#4.4), [5.1](requirements.md#5.1)
+    - References: internal/sessions/lister_test.go, internal/sessions/types_test.go
+  - [ ] 5.2. Implement listing metadata, shared options and extended ordering <!-- id:9kwhror -->
+    - types.go: `SessionInfo` gains `TimeFromFilesystem`, `Project`, `Model`, `Provider`; `ListWarning` gains `Code`
+    - `Options`, `Option`, `WithExtendedOrdering`; update every `NewLister`/`NewResolver` caller in cmd/apsis, internal/apsisweb and tests
+    - The legacy `sortSessionsByTimestamp` remains the default; the extended comparator runs only when enabled
+    - One Codex head scan returns id, timestamp, cwd, model and provider in place of the separate `getCodexSessionTimestamp`/`getCodexSessionCwd` reads, keeping their limits and error semantics
+    - Blocked-by: 9kwhroq (Write failing listing metadata and ordering tests)
+    - Stream: 2
+    - Requirements: [4.1](requirements.md#4.1), [4.3](requirements.md#4.3), [4.4](requirements.md#4.4), [5.1](requirements.md#5.1)
+    - References: internal/sessions/types.go, internal/sessions/lister.go, internal/sessions/resolver.go, cmd/apsis/main.go, internal/apsisweb/server.go
+
+- [ ] 6. Emit shared JSON listing documents <!-- id:9kwhro9 -->
+  - internal/sharedjson listing projection and cmd/apsis output use the schema already published in PR 1; no JSON HTTP endpoint.
+  - Blocked-by: 9kwhro8 (Add project, model, provider, time-source and extended ordering to listing rows)
+  - Stream: 2
+  - Requirements: [1.2](requirements.md#1.2), [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [4.3](requirements.md#4.3)
+  - [ ] 6.1. Write failing listing-document tests <!-- id:9kwhros -->
+    - `sharedjson.Listing` for an empty list; rows with and without project, model and provider; a recorded `created_at`, a `file_modified_at` fallback and neither; warnings with `source`, `code` and `message`
+    - `scope` is `{"project": ...}` or `{"all_projects": true}`; rows keep CLI listing order (oldest first)
+    - Every listing document validates against the published schema and the structurally closed test copy; rows reuse the session-metadata `$defs` plus `size_bytes` and `file_modified_at` (Q36, Q37)
+    - `apsis --list -f shared-json` writes the listing document with extended ordering; `apsis --list` without the format is unchanged
+    - Blocked-by: 9kwhro8 (Add project, model, provider, time-source and extended ordering to listing rows)
+    - Stream: 2
+    - Requirements: [1.2](requirements.md#1.2), [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [4.3](requirements.md#4.3)
+    - References: internal/sharedjson/, cmd/apsis/main_test.go
+  - [ ] 6.2. Implement the listing projection against the published v1 schema <!-- id:9kwhrot -->
+    - sharedjson.Listing and Scope use the listing branch and shared metadata definitions already published in PR 1; no schema branch is first introduced here.
+    - `listSessions` dispatches on the format and enables `WithExtendedOrdering` for shared JSON
+    - Blocked-by: 9kwhros (Write failing listing-document tests)
+    - Stream: 2
+    - Requirements: [1.2](requirements.md#1.2), [1.3](requirements.md#1.3), [1.4](requirements.md#1.4), [4.3](requirements.md#4.3)
+    - References: internal/sharedjson/, docs/schemas/apsis-shared-json.v1.schema.json, cmd/apsis/main.go
+
+- [ ] 7. Resolve every source across projects with the listing's candidate rules <!-- id:9kwhroa -->
+  - internal/sessions and Kiro DB candidate helpers share selected winners; global suppression/all-project row dedup never replace legacy project-row enumeration.
+  - Blocked-by: 9kwhro8 (Add project, model, provider, time-source and extended ordering to listing rows)
+  - Stream: 2
+  - Requirements: [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [5.1](requirements.md#5.1), [5.8](requirements.md#5.8)
+  - [ ] 7.1. Write failing all-projects resolution and de-duplication tests <!-- id:9kwhrou -->
+    - `NewResolver("")` opens every source without turning `""` into the working directory: Claude keeps its all-projects search; Codex uses `selectCodexCandidate`, preserving the first filename match in walk order; Copilot is unchanged; Kiro CLI uses `GetSessionByID` ordered `updated_at DESC, key ASC` and returns the key as project; Kiro IDE scans every workspace with the shared candidate rule (most chat entries, newest mtime, lexically smallest path) and takes `CostPath` from the winning workspace
+    - A Kiro CLI test database holding one conversation under two keys, including equal `updated_at`: `DiscoverAll` and `GetSessionByID` pick the same row (Q51)
+    - All-projects `ListAll("")` lists each `(source, id)` once, keeping the candidate the resolver opens, with a `duplicate_session` warning: a Claude identifier in two project directories, a Codex filename UUID in two directories, a Kiro IDE execution ID in two workspaces (Q49)
+    - An invalid selected Codex candidate is omitted from all-projects rows with a warning, and a later valid duplicate is not promoted (Decision 22)
+    - Project-scope Codex rows keep per-file enumeration and cwd filtering even when the global winner sits in another project (Q62); project-scope listings and lookups are otherwise unchanged
+    - Blocked-by: 9kwhro8 (Add project, model, provider, time-source and extended ordering to listing rows)
+    - Stream: 2
+    - Requirements: [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [5.1](requirements.md#5.1), [5.8](requirements.md#5.8)
+    - References: internal/sessions/resolver_test.go, internal/sessions/lister_test.go, internal/agents/kiro/logs/session_test.go, internal/agents/kiro/logs/discover_test.go
+  - [ ] 7.2. Implement all-projects resolver branches and shared candidate selection <!-- id:9kwhrov -->
+    - `selectCodexCandidate` extracted from `findCodexSession` and shared by resolution and all-projects de-duplication; task 13 reuses it for suppression
+    - `bestKiroIDECandidate` shared by `listKiroIDEWorkspace` and `findKiroIDEPath`; the resolver's current loop lacks the lexical-path tiebreak the lister applies
+    - `logs.(*DB).GetSessionByID(ctx, id)` and a `key ASC` secondary order in `DiscoverAll`, whose de-duplication today keeps whichever equal-`updated_at` row arrives first
+    - All-projects `ListAll` de-duplicates after collection and before sorting
+    - Blocked-by: 9kwhrou (Write failing all-projects resolution and de-duplication tests)
+    - Stream: 2
+    - Requirements: [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [5.1](requirements.md#5.1), [5.8](requirements.md#5.8)
+    - References: internal/sessions/resolver.go, internal/sessions/lister.go, internal/agents/kiro/logs/session.go, internal/agents/kiro/logs/discover.go
+
+- [ ] 8. Expose all-projects scope and source selection in apsis and apsis serve <!-- id:9kwhrob -->
+  - CLI/web scope wiring completes PR 2; source selection applies only to identifier opening, never latest/list/stdin filtering.
+  - Blocked-by: 9kwhro9 (Emit shared JSON listing documents), 9kwhroa (Resolve every source across projects with the listing's candidate rules)
+  - Stream: 2
+  - Requirements: [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [4.4](requirements.md#4.4), [5.1](requirements.md#5.1), [5.8](requirements.md#5.8)
+  - [ ] 8.1. Write failing CLI and web tests for --all-projects and --source <!-- id:9kwhrow -->
+    - `--all-projects` with `--list` adds a fifth tab-separated project column (or `-`) and scopes `latest` and identifier lookups; with `-p`/`--project` it is a usage error, for `apsis` and `apsis serve` (Q31)
+    - `-s`/`--source <source>` treats the argument as an identifier of that source with no file-path detection; usage errors without an argument, with an unknown source, with stdin, `--list` or `latest` (Q32)
+    - Identical identifiers in two sources open the requested one; bare identifiers keep the existing source order
+    - Round trip (5.8): with `t.Setenv("HOME", ...)` (plus XDG_DATA_HOME on Linux) and synthetic fixtures for every existing source, including Kiro CLI rows and Kiro IDE execution details, list through the CLI and `httptest`, then open each row from an unrelated working directory with `--all-projects -s <source> <id>` and through `/sessions/{source}/{id}`
+    - `latest` under `--all-projects` uses extended ordering; without the flag listings, `latest` and the serve page are unchanged
+    - `apsis serve --all-projects` shows each row's project
+    - Blocked-by: 9kwhro9 (Emit shared JSON listing documents), 9kwhroa (Resolve every source across projects with the listing's candidate rules)
+    - Stream: 2
+    - Requirements: [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [4.4](requirements.md#4.4), [5.1](requirements.md#5.1), [5.8](requirements.md#5.8)
+    - References: cmd/apsis/main_test.go, internal/apsisweb/handlers_test.go, internal/apsisweb/integration_test.go
+  - [ ] 8.2. Implement the flags, scope wiring and web project display <!-- id:9kwhrox -->
+    - cmd/apsis: long-only `--all-projects` with no environment variable, and `-s`/`--source`; all-projects scope passes `""` to the Lister and Resolver and enables `WithExtendedOrdering`
+    - apsisweb: `Config.AllProjects`, `SessionView.Project` (all-projects scope only) and the template column
+    - CHANGELOG `[Unreleased]` and README: `--all-projects`, `--source` and shared JSON listings
+    - Verify this PR slice with make test, make lint and make build-apsis; update its README and CHANGELOG [Unreleased] entry in this implementation task. No commits, pushes or publication are authorised by local completion.
+    - Blocked-by: 9kwhrow (Write failing CLI and web tests for --all-projects and --source)
+    - Stream: 2
+    - Requirements: [4.1](requirements.md#4.1), [4.2](requirements.md#4.2), [4.4](requirements.md#4.4), [5.1](requirements.md#5.1), [5.8](requirements.md#5.8)
+    - References: cmd/apsis/main.go, internal/apsisweb/server.go, internal/apsisweb/handlers.go, internal/apsisweb/templates/sessions.html, CHANGELOG.md, README.md
+
+## PR 3: Codex exec streams
+
+- [-] 9. Parse Codex exec event streams into the shared representation <!-- id:9kwhroc -->
+  - internal/transcript exec types/parser and synthetic provenance; retain final turn-qualified lifecycle state and every reported total usage field without summing.
+  - Blocked-by: 9kwhro5 (Record session metadata and the Codex provider in parse results)
+  - Stream: 1
+  - Owner: codex-gpt-6.1-sol
+  - Requirements: [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.4](requirements.md#2.4), [2.9](requirements.md#2.9), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [5.2](requirements.md#5.2), [5.6](requirements.md#5.6), [5.7](requirements.md#5.7)
+  - [-] 9.1. Write failing exec parser tests and synthetic fixtures <!-- id:9kwhroy -->
+    - Fixtures in internal/transcript/testdata/codex_exec/ hold synthetic content; PROVENANCE.md cites the pinned Codex 0.166.0 exec_events.rs for each specialised shape and labels sanitised structural observations as such (5.6, Q22)
+    - One fixture per item type: `agent_message`, `reasoning`, `command_execution` (exit 0, nonzero, `failed`, `declined`), `file_change`, `mcp_tool_call` (result and error), `web_search` serialised with two `id` keys (design assumption 5), `todo_list`, `error`, and `collab_tool_call` as a generic event
+    - Multiple turns, interleaved tool items, `item.updated`, and EOF without completion marking the item and its `tool_result` incomplete; two turns reusing `item_0` yield tool IDs `t1:item_0` and `t2:item_0` (Q42)
+    - `turn.failed` and top-level `error` become error blocks keeping the original JSON as payload; unknown event and item types become `event` blocks with their type and compact payload
+    - Usage keeps every counter in source key order as raw JSON, including an unknown counter and an integer beyond float64 precision, with basis `thread_total_at_turn_completion` and no summing (2.9, Q41)
+    - Missing, empty or non-string item IDs and invalid typed fields become distinct `event` blocks with `item_decode_failed` and create no tool links (Q55)
+    - A malformed middle line gives `malformed_line` with the physical one-based line and syntax-error offset and no source text; a line over 10 MiB gives `oversized_line`; parsing continues; a reader error is fatal (Q45, Q48)
+    - A repeated `thread.started` with the same ID is dropped without resetting turn numbering; a different ID becomes an event plus `thread_mismatch` (Q44)
+    - A forced parse of a stream that fails before `thread.started` yields its events and no thread ID; an empty stream yields zero entries; entries carry no timestamp, model or provider
+    - Property test (`rapid`): random lifecycle sequences give one record per `(turn, id)` in first-appearance order with the last payload, incomplete exactly when never completed
+    - Blocked-by: 9kwhro5 (Record session metadata and the Codex provider in parse results)
+    - Stream: 1
+    - Owner: codex-gpt-6.1-sol
+    - Requirements: [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.4](requirements.md#2.4), [2.9](requirements.md#2.9), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [5.2](requirements.md#5.2), [5.6](requirements.md#5.6), [5.7](requirements.md#5.7)
+    - References: internal/transcript/codex_exec_parser_test.go, internal/transcript/testdata/codex_exec/
+  - [ ] 9.2. Implement ParseCodexExec, the new content fields and FormatCodexExec <!-- id:9kwhroz -->
+    - types.go: `Entry.Turn`; `ContentItem` gains `ItemID`, `Status`, `Incomplete`, `ExitCode`, `Plan`, `EventType`, `Payload`, `Usage`, all `json:"-"` so Claude unmarshalling is unchanged; `PlanItem`, `Usage`, `UsageCounter`; `ParseResultMetadata.ThreadID`
+    - New codex_exec_types.go and codex_exec_parser.go; decode with `UseNumber` or keep `json.RawMessage` so numbers keep their precision
+    - `ParseJSONLWithFormat` dispatches `FormatCodexExec`; automatic detection is task 11
+    - Blocked-by: 9kwhroy (Write failing exec parser tests and synthetic fixtures)
+    - Stream: 1
+    - Owner: codex-gpt-6.1-sol
+    - Requirements: [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.4](requirements.md#2.4), [2.9](requirements.md#2.9), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [5.2](requirements.md#5.2), [5.6](requirements.md#5.6), [5.7](requirements.md#5.7)
+    - References: internal/transcript/types.go, internal/transcript/parser.go, internal/transcript/codex_exec_types.go, internal/transcript/codex_exec_parser.go
+
+- [ ] 10. Show exec content in Markdown, HTML and shared JSON <!-- id:9kwhrod -->
+  - Both HTML passes and Markdown expose new blocks; internal/sharedjson projects them against the initial v1 schema without a staged discriminator widening.
+  - Blocked-by: 9kwhro6 (Publish the version 1 session schema and the shared JSON session projection), 9kwhro9 (Emit shared JSON listing documents), 9kwhroc (Parse Codex exec event streams into the shared representation)
+  - Stream: 1
+  - Requirements: [1.1](requirements.md#1.1), [1.4](requirements.md#1.4), [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.4](requirements.md#2.4), [2.9](requirements.md#2.9), [5.7](requirements.md#5.7)
+  - [ ] 10.1. Write failing rendering and projection tests for the new content kinds <!-- id:9kwhrp0 -->
+    - Markdown, standalone HTML and fragment goldens for the exec fixtures: `command_execution` rendered like `Bash`; `file_change` as a `kind path` list; MCP and web-search inputs; `**Result (exit code N):**` including 0; the incomplete marker and `(incomplete)`; plans like `TodoWrite`; `**Error:**` blocks; a collapsed `Event: type` block with escaped JSON (a payload containing `<script>` stays escaped); the usage line labelled thread totals at turn completion; `turn N` in the assistant meta
+    - An entry holding only new kinds renders in HTML (the `hasContent` check and the render pass)
+    - Two turns reusing `item_0` show each result beside its own command in all three outputs
+    - The header shows `Thread ID` from content and `Session ID` when one is supplied
+    - Exec session documents validate against the published schema and the closed test copy, with `turn`, `item_id`, `status`, `incomplete`, `exit_code` (present for 0, absent when unrecorded), `plan`, `error`, `event` and `usage` blocks and `session.thread_id`; `payload` and `counters` stay open in the closed copy
+    - Existing goldens are unchanged
+    - Blocked-by: 9kwhro6 (Publish the version 1 session schema and the shared JSON session projection), 9kwhro9 (Emit shared JSON listing documents), 9kwhroc (Parse Codex exec event streams into the shared representation)
+    - Stream: 1
+    - Requirements: [1.1](requirements.md#1.1), [1.4](requirements.md#1.4), [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.4](requirements.md#2.4), [2.9](requirements.md#2.9), [5.7](requirements.md#5.7)
+    - References: internal/transcript/markdown_test.go, internal/transcript/html_test.go, internal/sharedjson/
+  - [ ] 10.2. Implement rendering and projection for the new kinds <!-- id:9kwhrp1 -->
+    - markdown.go: `formatAssistantMessage`, `formatToolInput`, `formatToolResult`; html.go: the HTML counterparts including the `hasContent` pass; `RenderOptions.ThreadID`; one `usage` rule in transcript.css
+    - Add sharedjson projection branches for the new content against the v1 definitions already published by task 3.2; parser-produced exec documents must also pass the retained initial schema.
+    - Blocked-by: 9kwhrp0 (Write failing rendering and projection tests for the new content kinds)
+    - Stream: 1
+    - Requirements: [1.1](requirements.md#1.1), [1.4](requirements.md#1.4), [2.2](requirements.md#2.2), [2.3](requirements.md#2.3), [2.4](requirements.md#2.4), [2.9](requirements.md#2.9), [5.7](requirements.md#5.7)
+    - References: internal/transcript/markdown.go, internal/transcript/html.go, internal/transcript/metadata.go, internal/transcript/types.go, internal/transcript/transcript.css, internal/sharedjson/, docs/schemas/apsis-shared-json.v1.schema.json
+
+- [ ] 11. Detect exec streams with a complete-line probe <!-- id:9kwhroe -->
+  - internal/transcript complete-line probing precedes substring-only Kiro fallback while replaying consumed bytes and preserving other legacy outcomes.
+  - Blocked-by: 9kwhroc (Parse Codex exec event streams into the shared representation)
+  - Stream: 1
+  - Requirements: [2.1](requirements.md#2.1), [5.1](requirements.md#5.1)
+  - [ ] 11.1. Write failing exec detection tests <!-- id:9kwhrp2 -->
+    - `ProbeExecStream` outcomes `exec`, `exec-without-thread` and `other` for a leading BOM, blank lines, malformed lines, missing/empty/non-string `thread_id`, other first events, and skipped lines over 10 MiB
+    - `DetectFormat` returns `FormatCodexExec` only for `exec`; a malformed prefix longer than 64 KiB containing every Kiro heuristic key followed by `thread.started`, and a first exec object split beyond 64 KiB containing those keys, both detect as exec (Decision 21)
+    - Every existing testdata file and a large structurally valid Kiro CLI and Kiro IDE file keep their current result; `exec-without-thread` and `other` keep the legacy result (Q56)
+    - `Parse` replays every consumed byte, so parsing after an extended probe equals a forced parse of the same input
+    - Blocked-by: 9kwhroc (Parse Codex exec event streams into the shared representation)
+    - Stream: 1
+    - Requirements: [2.1](requirements.md#2.1), [5.1](requirements.md#5.1)
+    - References: internal/transcript/parser_test.go, internal/transcript/codex_exec_parser_test.go
+  - [ ] 11.2. Implement ProbeExecStream and wire it into DetectFormat <!-- id:9kwhrp3 -->
+    - The probe reads whole lines until the first JSON object, skipping blank, malformed and over-10-MiB lines
+    - `DetectFormat` strips the BOM, keeps structurally validated Kiro recognition, continues the probe past a substring-only Kiro match, recombines split lines and returns every consumed byte for replay; it never promotes a format the legacy detector rejected
+    - Blocked-by: 9kwhrp2 (Write failing exec detection tests)
+    - Stream: 1
+    - Requirements: [2.1](requirements.md#2.1), [5.1](requirements.md#5.1)
+    - References: internal/transcript/parser.go, internal/transcript/codex_exec_parser.go
+
+- [ ] 12. Convert exec stream files and stdin from the CLI <!-- id:9kwhrof -->
+  - Direct CLI file/stdin conversion stays independent of configured roots; file identity/project comes from canonical path/content and stdin receives no filesystem facts.
+  - Blocked-by: 9kwhrob (Expose all-projects scope and source selection in apsis and apsis serve), 9kwhrod (Show exec content in Markdown, HTML and shared JSON), 9kwhroe (Detect exec streams with a complete-line probe)
+  - Stream: 2
+  - Requirements: [2.1](requirements.md#2.1), [2.6](requirements.md#2.6), [2.8](requirements.md#2.8), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3)
+  - [ ] 12.1. Write failing exec identity and direct-conversion tests <!-- id:9kwhrp4 -->
+    - Identifier = sanitised thread ID truncated to 191 bytes, `-`, then the full SHA-256 hex of the canonical path (Decision 14); property test (`rapid`): matches `^[A-Za-z0-9_-]{1,256}$`, is deterministic and is unchanged by appends
+    - Canonical paths resolve symlinks and take on-disk spelling component by component (an exact entry wins, else a unique case-insensitive match); the case-alias case runs only where the temp volume is case-insensitive
+    - Repository root: nearest ancestor holding a `.git` directory or a `.git` file starting with `gitdir:`; a worktree inside a parent repository maps to the worktree; no `git` executable (Q52)
+    - CLI: an exec file auto-detects; `-a codex-exec` forces parsing of a pre-thread failure; Markdown/HTML headers show `Thread ID` from content and the derived `Session ID`, never the filename stem; stdin gets no identifier, project or time
+    - `-f shared-json` on an exec file: source `codex-exec`, derived `id`, `thread_id`, `project` from the containing repository and no `created_at`; without a thread there is no `id`
+    - A malformed middle line appears on stderr and in `warnings[]`
+    - `-F` with `-a codex-exec` or an exec file fails with `follow mode does not support Codex exec streams`; files are probed before following
+    - Raw `-f json` on a BOM-prefixed exec stream keeps `thread.started` (Q48); raw output for other sources is unchanged
+    - Blocked-by: 9kwhrob (Expose all-projects scope and source selection in apsis and apsis serve), 9kwhrod (Show exec content in Markdown, HTML and shared JSON), 9kwhroe (Detect exec streams with a complete-line probe)
+    - Stream: 2
+    - Requirements: [2.1](requirements.md#2.1), [2.6](requirements.md#2.6), [2.8](requirements.md#2.8), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3)
+    - References: internal/sessions/codexexec_test.go, cmd/apsis/main_test.go
+  - [ ] 12.2. Implement exec identity helpers and direct conversion <!-- id:9kwhrp5 -->
+    - internal/sessions/codexexec.go: canonical path, identifier and repository-root helpers that discovery reuses in task 13
+    - `agentToFormat` and the `-a` help gain `codex-exec`; the input context carries the derived identifier, thread ID and project
+    - `convertToJSON` strips a leading BOM for exec input only; `resolveFollowInput` rejects exec files
+    - Blocked-by: 9kwhrp4 (Write failing exec identity and direct-conversion tests)
+    - Stream: 2
+    - Requirements: [2.1](requirements.md#2.1), [2.6](requirements.md#2.6), [2.8](requirements.md#2.8), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3)
+    - References: internal/sessions/codexexec.go, cmd/apsis/main.go
+
+- [ ] 13. Discover exec streams under configured roots <!-- id:9kwhrog -->
+  - internal/sessions root walk/settings/suppression; use digest injection to test conflicts, and retain Q62 legacy project rows.
+  - Blocked-by: 9kwhroa (Resolve every source across projects with the listing's candidate rules), 9kwhrof (Convert exec stream files and stdin from the CLI)
+  - Stream: 2
+  - Requirements: [2.5](requirements.md#2.5), [2.6](requirements.md#2.6), [2.7](requirements.md#2.7), [2.8](requirements.md#2.8), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [4.1](requirements.md#4.1), [4.3](requirements.md#4.3), [5.1](requirements.md#5.1), [5.4](requirements.md#5.4), [5.5](requirements.md#5.5), [5.9](requirements.md#5.9)
+  - [ ] 13.1. Write failing discovery, settings and suppression tests <!-- id:9kwhrp6 -->
+    - Settings for `apsis` and `apsis serve`: repeatable `--codex-exec-dir` replaces `APSIS_CODEX_EXEC_DIRS`; the variable splits with `filepath.SplitList`; unset or empty means no roots; one empty flag value means no roots; mixed empty and nonempty values are a usage error; relative roots resolve against the working directory (Q33)
+    - Temp trees: overlapping roots and root permutations list each canonical file once with unchanged identifiers; `.git`, `node_modules` and `testdata` are skipped below a root but scanned as a root, including a root nested inside another root's skipped directory (Q27); a `.jsonl` symlink is kept only when its target is a regular file inside a canonical root; directory symlinks and a symlink cycle are never descended; a root symlink is canonicalised
+    - Qualification: `exec` lists; `exec-without-thread` is omitted with `missing_thread`; `other` is ignored silently (Q43); unreadable roots, subdirectories and files give `root_unreadable`/`path_unreadable` while other results remain; two paths with one identifier are both omitted with `identifier_conflict`
+    - Project scope keeps a stream only when its normalised repository root equals the project; streams outside repositories list only across projects
+    - Suppression (Decision 22): a stream whose thread ID equals the selected rollout's verified recorded ID is dropped in both scopes before project filtering, including when rollout and stream sit in different projects; an invalid first duplicate rollout followed by a valid one suppresses nothing; a failed rollout scan never suppresses
+    - Rows carry `ThreadID`, `TimeFromFilesystem` and size; shared JSON listings emit `thread_id` and `file_modified_at`; text listings print ` (file modified)` after the time; configured roots enable extended ordering
+    - With no roots configured, listings, `latest` and the serve page are unchanged
+    - Add a benchmark of `ListAll` over a synthetic 10,000-file tree (design risk 1); record the warm-pass time in this task's notes for task 16
+    - Inject only the path-digest helper in tests to force two distinct canonical paths to one digest. With identical thread prefixes both paths are omitted with identifier_conflict, regardless of root order. Production continues using full SHA-256; do not try to generate a cryptographic collision.
+    - For the 10,000-file benchmark record file/source counts, sizes, nesting/skip distribution, platform/filesystem, cold versus warm state and measurements. A 1.5 s local investigation budget may prompt comparison of the documented directory-entry cache fallback, but is not a portable pass/fail limit; zero unchanged body bytes remains a hard task-16 assertion.
+    - Blocked-by: 9kwhroa (Resolve every source across projects with the listing's candidate rules), 9kwhrof (Convert exec stream files and stdin from the CLI)
+    - Stream: 2
+    - Requirements: [2.5](requirements.md#2.5), [2.6](requirements.md#2.6), [2.7](requirements.md#2.7), [2.8](requirements.md#2.8), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [4.1](requirements.md#4.1), [4.3](requirements.md#4.3), [5.1](requirements.md#5.1), [5.4](requirements.md#5.4), [5.5](requirements.md#5.5), [5.9](requirements.md#5.9)
+    - References: internal/sessions/codexexec_test.go, internal/sessions/lister_test.go, cmd/apsis/main_test.go
+  - [ ] 13.2. Implement roots, the walk, qualification, project assignment and suppression <!-- id:9kwhrp7 -->
+    - codexexec.go: roots made absolute, passed through `filepath.EvalSymlinks`, rewritten to on-disk spelling and de-duplicated; `filepath.WalkDir` with skip names; candidate canonicalisation and de-duplication; probe-based qualification; identifier conflicts; repository roots memoised per directory within one pass
+    - `listCodexExec` runs after `listCodex`, which supplies the suppression index from `selectCodexCandidate` winners only
+    - SourceCodexExec joins source names/display names; Lister.Sources omits it without roots; SessionInfo.ThreadID feeds the schema listing thread_id field already defined in task 3.2.
+    - Settings resolution in cmd/apsis for both commands; the text listing suffix
+    - Blocked-by: 9kwhrp6 (Write failing discovery, settings and suppression tests)
+    - Stream: 2
+    - Requirements: [2.5](requirements.md#2.5), [2.6](requirements.md#2.6), [2.7](requirements.md#2.7), [2.8](requirements.md#2.8), [2.10](requirements.md#2.10), [2.11](requirements.md#2.11), [4.1](requirements.md#4.1), [4.3](requirements.md#4.3), [5.1](requirements.md#5.1), [5.4](requirements.md#5.4), [5.5](requirements.md#5.5), [5.9](requirements.md#5.9)
+    - References: internal/sessions/codexexec.go, internal/sessions/lister.go, internal/sessions/types.go, cmd/apsis/main.go, docs/schemas/apsis-shared-json.v1.schema.json
+
+- [ ] 14. Open listed exec streams from the CLI and apsis serve <!-- id:9kwhroh -->
+  - Resolver and apsisweb source routes complete PR 3; exec-only parse warnings and the polled listing warning fragment preserve other web outputs.
+  - Blocked-by: 9kwhrog (Discover exec streams under configured roots)
+  - Stream: 2
+  - Requirements: [2.7](requirements.md#2.7), [2.10](requirements.md#2.10), [4.2](requirements.md#4.2), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3), [5.5](requirements.md#5.5), [5.8](requirements.md#5.8), [5.9](requirements.md#5.9)
+  - [ ] 14.1. Write failing exec opening and web tests <!-- id:9kwhrp8 -->
+    - Resolver `codex-exec` in both scopes: match the 64-hex suffix against canonical-path digests from a metadata-only walk, probe only the matching file, require its sanitised thread prefix and recheck root containment; a stale identifier gives `session not found`; suppressed streams still open by file and by `codex-exec` identifier (2.7)
+    - Bare identifiers try `codex-exec` last and only when roots are configured
+    - `-F` with `--source codex-exec <id>` or a `latest` that resolves to codex-exec fails with the named error; `apsis latest` adds ` (file modified)` to its `Using ... from ...` line
+    - sessions.ParseResolved(rs, opts ...transcript.ParseOptions) forces source-specific Kiro IDE/exec formats only when the CLI has no explicit -a; auto-detects other sources. Copy caller options and overlay the resolved Kiro cost path without dropping AllowEmptyCodex or PreserveModelChanges. CLI sets both flags only for shared-json; web passes default options.
+    - Web: the `codex-exec` pill appears only with roots (Q46); `.source-codex-exec` badge in light and dark with `CSSVersion` raised; `file modified` beside exec times; the warning banner renders once, inside the polled `sessions_list` fragment, and follows each refresh (Q54); exec transcript views show parse warnings, thread ID and modification time, other sources' views are unchanged (Q47)
+    - Round trip (5.8) with roots: duplicate and resumed streams, differing rollout and stream projects, overlapping roots, escaping symlinks and a directory cycle; every listed exec row opens from an unrelated directory through the CLI and `/sessions/codex-exec/{id}`
+    - Regression: the same header-only Codex session through --source codex <id> and through latest emits metadata plus entries: [] with -f shared-json; default Markdown/HTML and the web source route preserve their previous parse error. Include the helper replacement so task 4 behaviour cannot regress.
+    - Forced-format precedence regression: explicit -a still chooses the requested parser rather than the resolved source; forwarding preserves both Codex flags and the Kiro IDE execution-detail cost association only when that parser is selected. Web parsing retains default empty acceptance and provider-less grouping.
+    - Regression after helper replacement: a model-changing Codex session selected by explicit-source ID/latest yields separate runs in shared-json, while provider-less Markdown/HTML/web keeps legacy consolidation; repeated identical headers stay consolidated. This proves PreserveModelChanges survives helper forwarding alongside AllowEmptyCodex.
+    - Blocked-by: 9kwhrog (Discover exec streams under configured roots)
+    - Stream: 2
+    - Requirements: [2.7](requirements.md#2.7), [2.10](requirements.md#2.10), [4.2](requirements.md#4.2), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3), [5.5](requirements.md#5.5), [5.8](requirements.md#5.8), [5.9](requirements.md#5.9)
+    - References: internal/sessions/resolver_test.go, cmd/apsis/main_test.go, internal/apsisweb/handlers_test.go, internal/apsisweb/integration_test.go
+  - [ ] 14.2. Implement exec resolution, the shared parse helper and the web changes <!-- id:9kwhrp9 -->
+    - Resolver branch; `ResolvePath` returns the stream path and follow callers reject it
+    - New internal/sessions/parse.go: ParseResolved(rs *ResolvedSession, opts ...transcript.ParseOptions) copies caller options and overlays the resolved Kiro IDE cost path, preserving both Codex flags. CLI keeps explicit -a dispatch outside the helper with the same options; otherwise CLI uses the helper with shared-json-only AllowEmptyCodex/PreserveModelChanges, while apsisweb uses defaults. Source-specific forced Kiro IDE/exec selection and cost-file association stay intact.
+    - apsisweb: `Config.CodexExecRoots`, `SessionView.FileTime`, `TranscriptViewData.Warnings`, templates and style.css
+    - CHANGELOG `[Unreleased]` and README: exec streams, `--codex-exec-dir`, `APSIS_CODEX_EXEC_DIRS` and `-a codex-exec`
+    - Verify this PR slice with make test, make lint and make build-apsis; update its README and CHANGELOG [Unreleased] entry in this implementation task. No commits, pushes or publication are authorised by local completion.
+    - Blocked-by: 9kwhrp8 (Write failing exec opening and web tests)
+    - Stream: 2
+    - Requirements: [2.7](requirements.md#2.7), [2.10](requirements.md#2.10), [4.2](requirements.md#4.2), [5.2](requirements.md#5.2), [5.3](requirements.md#5.3), [5.5](requirements.md#5.5), [5.8](requirements.md#5.8), [5.9](requirements.md#5.9)
+    - References: internal/sessions/resolver.go, internal/sessions/parse.go, cmd/apsis/main.go, internal/apsisweb/, CHANGELOG.md, README.md
+
+## PR 4: Unchanged-refresh cache
+
+- [ ] 15. Verify metadata-only file fingerprints on Unix and Windows before caching <!-- id:9kwhroi -->
+  - internal/fileidentity owns isolated platform metadata adapters; native Windows is required only for this green completion and cache consumers, with module writes after task 3.2.
+  - Stream: 3
+  - Requirements: [5.9](requirements.md#5.9)
+  - [ ] 15.1. Write failing fingerprint and WAL-change tests <!-- id:9kwhrpa -->
+    - No blockers: start the adapter tests early in internal/fileidentity, admitted in Decision 26. This package owns only metadata fingerprinting, so stream 3 does not edit internal/sessions while stream 2 works there.
+    - Unix: an untouched file keeps its fingerprint; an equal-size replacement renamed over the file with its old mtime restored, and an equal-size in-place rewrite with mtime restored, both change it; a present and an absent companion differ
+    - Windows (`//go:build windows`): the same cases on a metadata-only handle; adapter logic also runs on every platform through an injected fake
+    - Unsupported or failing metadata returns an error, never a size/mtime-only key (Decision 23)
+    - Design risk 2: two writes through a WAL-mode `modernc.org/sqlite` connection each change the combined fingerprint of `data.sqlite3`, `-wal` and `-journal`
+    - Stream: 3
+    - Requirements: [5.9](requirements.md#5.9)
+    - References: internal/fileidentity/
+  - [ ] 15.2. Implement the fingerprint adapters and run the Windows tests natively <!-- id:9kwhrpb -->
+    - Unix: size, mtime, ctime, inode and device from `golang.org/x/sys/unix` `Stat_t`, whose `Ctim` field has the same name on Linux and macOS (the `syscall` field names differ)
+    - Windows: `GetFileInformationByHandleEx` with the `FileIdInfo` and `FileBasicInfo` classes on a handle opened with `FILE_READ_ATTRIBUTES`; x/sys/windows has the call and class constants but no `FILE_ID_INFO`/`FILE_BASIC_INFO` structs, so define them locally
+    - `golang.org/x/sys` moves from an indirect to a direct requirement
+    - Run GOOS=windows go vet ./internal/fileidentity/... and GOOS=windows go test -c ./internal/fileidentity; then obtain the native Windows run in prerequisites.md. No native Windows host is available or claimed verified. Keep this green task and task 16 incomplete until evidence passes; PRs 1-3 remain eligible. No CI change or weakened 5.9 fallback is authorised.
+    - If the WAL test fails, record the fallback for task 16: run the Kiro discover query on every refresh and count its page reads against 5.9
+    - Module-file ownership follows task 3.2: only after that validator change is complete may this task promote x/sys and update go.mod/go.sum. Coordinate any unexpected module mutation through the same single-owner handoff.
+    - Blocked-by: 9kwhrpa (Write failing fingerprint and WAL-change tests), 9kwhron (Implement internal/sharedjson and the session schema)
+    - Stream: 3
+    - Requirements: [5.9](requirements.md#5.9)
+    - References: internal/fileidentity/, go.mod, go.sum
+
+- [ ] 16. Cache listing metadata across apsis serve refreshes <!-- id:9kwhroj -->
+  - internal/sessions cache and long-lived web Lister; complete only after native capability evidence and hard zero-unchanged-body-read assertions for every source.
+  - Blocked-by: 9kwhroh (Open listed exec streams from the CLI and apsis serve), 9kwhroi (Verify metadata-only file fingerprints on Unix and Windows before caching)
+  - Stream: 2
+  - Requirements: [5.1](requirements.md#5.1), [5.9](requirements.md#5.9)
+  - [ ] 16.1. Write failing zero-read refresh tests <!-- id:9kwhrpc -->
+    - A counting opener injected into the Lister: a second `ListAll` over unchanged inputs reads zero transcript-body bytes for Claude, Codex, Copilot, Kiro IDE and codex-exec; a counting Kiro discover function is not called while the database fingerprints are unchanged (all-projects listing today calls `logs.DiscoverAll` directly, so it needs the same injection point as the project-scope discover)
+    - The next pass reflects a content edit, an equal-size preserved-mtime replacement, an added and a removed file, a companion-only change (workspace.yaml, `-wal`) and a newly created nearer repository; unaffected exec identifiers stay the same
+    - A changed file whose extraction fails is omitted with a warning, not served from stale metadata; a fingerprint error is a warning, never a hit; a key that changes during extraction is used for that pass and not cached
+    - Reversing a returned slice, as the web handler does, does not change the next pass; concurrent `ListAll` calls are serialised (run under `-race`)
+    - Benchmark a cold multi-source listing with generated Kiro IDE `.chat` fixtures (design risk 4)
+    - Benchmark evidence includes generated fixture source counts, chat/message counts, sizes, platform/filesystem, cold and warm state, command and measurements. Investigate a local 1.5 s budget only as recorded evidence; choose the narrow Kiro IDE streaming decoder only when measured improvement justifies it. No host-sensitive timing acceptance assertion.
+    - Blocked-by: 9kwhroh (Open listed exec streams from the CLI and apsis serve), 9kwhroi (Verify metadata-only file fingerprints on Unix and Windows before caching)
+    - Stream: 2
+    - Requirements: [5.1](requirements.md#5.1), [5.9](requirements.md#5.9)
+    - References: internal/sessions/lister_test.go, internal/sessions/cache_test.go
+  - [ ] 16.2. Implement the fingerprint-keyed cache in the Lister <!-- id:9kwhrpd -->
+    - internal/sessions/cache.go: one mutex held for the whole pass; enumerate and fingerprint without opening bodies; entries keyed by path with companion fingerprints including absence; restat after extraction; sweep unseen entries; return fresh slices
+    - The long-lived Lister in apsis serve carries the cache; CLI commands keep a per-command Lister
+    - Apply the recorded fallbacks if the task 13 or task 16 benchmarks or the task 15 WAL test require them
+    - CHANGELOG `[Unreleased]`: unchanged serve refreshes no longer re-read transcripts
+    - Do not mark this task complete or claim 5.9 until task 15.2 has actual native Windows evidence. If the WAL assumption fails, audit metadata-only discover queries/page reads and preserve the zero transcript-body-byte assertion; any relaxation requires a requirements decision. Run make test, make lint and make build; use -race for the concurrent cache test.
+    - Blocked-by: 9kwhrpc (Write failing zero-read refresh tests)
+    - Stream: 2
+    - Requirements: [5.1](requirements.md#5.1), [5.9](requirements.md#5.9)
+    - References: internal/sessions/cache.go, internal/sessions/lister.go, internal/apsisweb/server.go, CHANGELOG.md

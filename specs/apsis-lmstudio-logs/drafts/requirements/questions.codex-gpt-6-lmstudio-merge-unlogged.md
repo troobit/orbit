@@ -1,0 +1,24 @@
+# LM Studio Requirements: User-Owned Questions
+
+These are unanswered choices, not approvals. The merged requirements use the conservative recommendation while review and independent work continue; changing a choice requires updating its requirements and ADR. The human's direction to use one shared representation and renderer parity is already preserved and is not reopened here.
+
+| ID | Choice | Recommendation in the merge | Alternatives and consequence | Requirements / ADR |
+|----|--------|-----------------------------|------------------------------|--------------------|
+| U1 | Should all-projects mode discover the standard LM Studio directory automatically? | Yes; only all-projects mode reads it, an empty setting disables it, and help/network warnings disclose other clients' traffic. | Require an explicit LM Studio directory opt-in, reducing unexpected discovery but adding setup. | [1.2](../../requirements.md#1.2), [7.1](../../requirements.md#7.1), [7.5](../../requirements.md#7.5); Decision 5 |
+| U2 | How should requests without a supported explicit thread ID be grouped? | One request per logical session. | Add uniquely logged response-chain grouping after evidence establishes the links; or approve visibly heuristic prefix grouping, which can merge unrelated clients or truncated text. Neither is included now. | [3.1](../../requirements.md#3.1)–[3.2](../../requirements.md#3.2); Decision 1 |
+| U3 | Where should unattributed responses and diagnostics be visible? | Full bodies only in a direct log view; logical-session views show counts and source references, including the next discovered file for rotation context. References do not imply likely ownership. | Copy clearly labelled log-level bodies into every session touching the file; this can expose unrelated clients' content and greatly repeat output. | [4.2](../../requirements.md#4.2)–[4.3](../../requirements.md#4.3); Decision 3 |
+| U4 | Is evidence-only request attribution the desired tradeoff? | Require an explicit unique recorded link; the reported grammar will leave most responses and notices unattributed. | Offer separately labelled inferred attribution from adjacency or apparent serial execution; it can be wrong under concurrency and would require a separate proposal and tests. No inferred attribution is included now. | [4.1](../../requirements.md#4.1); Decision 3 |
+| U5 | How should repeated request history read? | Show exact logged-prefix references with request boundaries and discontinuity markers, while JSON retains complete parsed snapshots. | Show every complete request snapshot in Markdown and HTML as well, increasing repetition but making each request self-contained. | [3.5](../../requirements.md#3.5)–[3.6](../../requirements.md#3.6); Decision 2 |
+| U6 | Should matching client thread identifiers create automatic harness links or project assignment? | Keep correlation metadata only, separate listings and unknown LM Studio projects; infer no project from prompt content. | Add explicit-match web links while keeping projects unknown, with rules for multiple matches. Borrowing a linked transcript's project is a further attribution change and is not included. | [3.7](../../requirements.md#3.7), [7.2](../../requirements.md#7.2); Decision 6 |
+| U7 | Should direct input prioritise physical log order or grouped conversation sections? | One source-ordered log transcript with logical-session identifiers and log-level events. | Group sections within the same common session-document structure, retaining source-order metadata; this is more conversational but changes direct-view ordering. An object/array shape switch is excluded by the shared contract. | [1.4](../../requirements.md#1.4); Decision 7 |
+| U8 | May an unset time zone fall back to the host zone? | Use the process zone (`TZ`, otherwise host local) and label it as assumed; omit absolute times that are ambiguous or nonexistent. | Require an explicit zone before interpreting times. Neither choice recovers an offset absent from the log, and file order remains authoritative. | [5.1](../../requirements.md#5.1)–[5.4](../../requirements.md#5.4); Decision 4 |
+
+## Technical Choices for Design
+
+These are agent-owned implementation questions, not requests for human approval:
+
+- Specify exact CLI/environment names, identifier derivation and direct-input identity scope.
+- Set and document the record-size limit; keep it distinct from the existing 50 MiB web transcript limit and the 65,536-byte detection probe.
+- Define the additive schema fields for request boundaries, context provenance, direct-log session membership, unattributed-event references and assumed wall time.
+- Define cache identity/invalidation and the deletion/replacement path before implementation; no persistent index or cold-time service-level target is admitted.
+- Establish synthetic fixture provenance for each named response marker; unsupported or unverified payload shapes must stay generic with warnings.
