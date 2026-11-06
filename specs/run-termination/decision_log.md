@@ -352,3 +352,52 @@ change needed for the immediate repair.
 termination/accounting defects remain and need their own acceptance checks.
 
 ---
+
+## Decision 7: Defer the Halt Sentinel and Retire the Blocked State
+
+**ID**: 7
+**Date**: 2026-11-06
+**Status**: accepted
+
+### Context
+
+Decision 6 gated this ledger for replanning. The variant guard has not landed
+(local-run-comparison task 2). `orbit local` already reads
+`<WorkingDir>/.orbit/halt`; variant and single-run loops do not. The replan is
+in [replan.md](replan.md). Tasks 8-10 of the earlier ledger (sentinel path,
+check, optionality) were the sentinel work, and Decision 2 planned a distinct
+blocked status.
+
+### Decision
+
+Remove the halt sentinel tasks from this ledger and add no blocked status. A
+stalled run ends as failed with "stalled" in its error. Remaining work: the
+single-run stall guard reusing the variant helper, the iteration ceiling,
+Claude credit-exhaustion classification, diagnostic text, run finalization
+and observability.
+
+### Rationale
+
+Progress detection stops every stall, including a halted session, so a
+sentinel only supplies a reason string (local-run-comparison Decision 2). The
+existing failed state keeps the variant lifecycle unchanged.
+
+### Alternatives Considered
+
+- **Keep the sentinel tasks**: a reader in the variant and single-run loops
+  - Rejected because it duplicates what the guard already stops and adds a
+  convention specific to this fork.
+- **Keep the blocked status**: distinguishes "needs a human" from failure -
+  Rejected to avoid changing the variant status enum before there is evidence
+  the "stalled" error text is insufficient.
+
+### Consequences
+
+**Positive:**
+- Smaller ledger, one guard, no persisted state change.
+
+**Negative:**
+- A stalled run reads as failed; only the error text distinguishes it.
+- Requirements 3.x are unimplemented outside `orbit local`.
+
+---

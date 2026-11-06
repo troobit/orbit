@@ -52,8 +52,6 @@ references:
   - Uses the existing mock-agent framework; no real CLI invocation
   - Requirements: [1.2](specs/run-termination/requirements.md#1.2), [1.3](specs/run-termination/requirements.md#1.3), [2.2](specs/run-termination/requirements.md#2.2)
 
-## Phase 2: Halt Sentinel
-
 ## Phase 3: Error Classification
 
 - [ ] 8. Parse the agent's structured error fields
