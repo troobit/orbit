@@ -108,7 +108,8 @@ func localCommand(args []string) error {
 		Agent: "local", Local: local, DryRun: *dryRun,
 		AgentConfig: agents.AgentConfig{
 			Type: "codex", Timeout: *timeout, Options: map[string]string{"model": *model},
-			ExtraArgs: []string{"--oss", "--local-provider", "lmstudio", "--ignore-user-config",
+			// Codex 0.167 exec ignores --local-provider and fails with a provider mismatch unless model_provider is set.
+			ExtraArgs: []string{"--oss", "--local-provider", "lmstudio", "-c", `model_provider="lmstudio"`, "--ignore-user-config",
 				"--ephemeral", "--json", "--sandbox", "workspace-write", "-c", `approval_policy="never"`,
 				// OSS mode retains Codex defaults for tools LM Studio does not support.
 				"-c", `web_search="disabled"`, "-c", "features.multi_agent=false",

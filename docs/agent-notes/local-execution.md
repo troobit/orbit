@@ -195,3 +195,7 @@
   cost more than bundling tiny tasks; the live efficacy report in
   `specs/local-compute-agent/verification.md` records supervised fixture runs,
   limitations and retained artifacts under the target's `.orbit/local/evaluations`.
+
+## Codex 0.167 provider mismatch
+
+Codex 0.167 `exec` ignores `--local-provider lmstudio` and fails with `modelProviderMismatch` (current provider openai). The preset also passes `-c model_provider="lmstudio"`. Reproduce with `codex exec --oss --local-provider lmstudio -m 8-bit ...` outside Orbit.

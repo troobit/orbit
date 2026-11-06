@@ -62,8 +62,8 @@ the prototype's widening of a selected top-level task to its whole phase.
 Phase mode permits dependencies that earlier tasks in the same selection can
 satisfy. STOP gates and unmet dependencies outside the selection halt preflight.
 
-Codex runs with `--oss --local-provider lmstudio --ignore-user-config
---ephemeral --json --sandbox workspace-write -c approval_policy="never"`.
+Codex runs with `--oss --local-provider lmstudio -c model_provider="lmstudio"
+--ignore-user-config --ephemeral --json --sandbox workspace-write -c approval_policy="never"`.
 The preset also passes `-c web_search="disabled"`,
 `-c features.multi_agent=false`, `-c features.apps=false` and
 `-c model_reasoning_summary="none"` on

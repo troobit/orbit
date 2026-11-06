@@ -90,7 +90,7 @@ func TestLocalCommandDispatch(t *testing.T) {
 			}
 			require.Len(t, calls, want)
 			for _, args := range calls {
-				for _, flag := range []string{"--oss", "--local-provider", "lmstudio", "--ignore-user-config", "--ephemeral", "--json", "workspace-write"} {
+				for _, flag := range []string{"--oss", "--local-provider", "lmstudio", `model_provider="lmstudio"`, "--ignore-user-config", "--ephemeral", "--json", "workspace-write"} {
 					require.Contains(t, args, flag)
 				}
 				// Codex's OSS defaults still advertise tools LM Studio drops.
