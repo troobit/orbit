@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An `8-bit` implementation quick guide, local-runner runbook, and recorded live-model verification document setup, execution, diagnostics, and recovery.
 - `orbit finalize` now displays the variant's agent (alias, type, model) in its preamble, falling back to "Agent: unknown" when none of the fields are populated.
 - `orbit finalize` now reads the spec's `consolidation-log.json` and prints a warning before the confirmation prompt when the requested `--variant` differs from the most recent consolidation entry. The warning fires under `--force` as well so it remains visible in CI output.
+- `apsis -f shared-json` outputs a session as versioned JSON with the same layout for every agent: source, identifier, recorded creation time, project, model, provider, origin and cost, followed by entries with their recorded identifiers and structured warnings. The layout is published as a JSON Schema in `docs/schemas/apsis-shared-json.v1.schema.json`.
+- Apsis Markdown and HTML assistant headers show the model provider recorded by Codex rollouts and Kiro IDE chats beside the model.
+- `apsis --list -f shared-json` outputs a versioned listing document: each session's source, identifier, size, recorded creation time or file modification time, project, model, provider and origin where recorded, plus listing warnings with a code.
+- `apsis --all-projects` lists, opens and picks the latest session from every project; text listings gain a project column. `apsis serve --all-projects` shows sessions from every project with their project.
+- `apsis -s`/`--source <source>` opens the argument as a session ID of that source, so identical IDs in different agents can be told apart.
+- Apsis reads event streams saved from Codex CLI `codex exec --json`: a stream file or stdin is detected from its `thread.started` event, and `-a codex-exec` forces parsing of a stream that failed before its thread started. Markdown, HTML and shared JSON show each turn's messages, reasoning, commands with exit codes, file changes, MCP and web-search calls, plans, errors, unrecognised events and token usage (reported thread totals at turn completion), and mark items that never completed.
+- `apsis --codex-exec-dir <dir>` (repeatable) and `APSIS_CODEX_EXEC_DIRS` (separated like `PATH`) list exec streams under the given directories as source `codex-exec`, for `apsis --list`, `apsis latest` and `apsis serve`. Each stream belongs to its containing git repository or worktree, is ordered by its file modification time (marked `file modified`), and is hidden when a Codex rollout records the same thread. Nothing is searched by default.
+
+### Changed
+
+- The `apsis serve` listing warning banner now refreshes with the session list.
 
 ### Fixed
 
@@ -27,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Local Codex runs disable unsupported web search and delegation tools and unused reasoning summaries; setup guidance explains the remaining LM Studio protocol warnings.
 - Local completion checks include in-progress tasks so interrupted work is dispatched again when resuming.
 - Codex JSONL execution detects failed turns even when the CLI exits successfully and retains the stream in Orbit's standard session artifacts.
+- The apsisweb end-to-end test no longer times out on shutdown when the HTTP client holds an unused keep-alive connection.
 - Claude Code session-limit messages using the new `"You've hit your session limit"` wording now wait until the reported reset time while retaining support for the older message.
 - Codex usage-limit messages (`"You've hit your usage limit. ... try again at 4:18 PM"`, including the dated `"try again at Sep 5th, 2026 1:39 AM"` form) are now classified as rate-limit waits that sleep until the reported retry time, instead of failing the phase after generic retries.
 

@@ -15,6 +15,7 @@ const (
 	FormatKiro
 	FormatCopilot
 	FormatKiroIDE
+	FormatCodexExec // Codex CLI `codex exec --json` event stream
 )
 
 // Entry represents a single line in the Claude session JSONL.
@@ -23,6 +24,10 @@ type Entry struct {
 	Message         *Message       `json:"message,omitempty"`
 	Timestamp       string         `json:"timestamp,omitempty"`
 	Model           string         `json:"-"` // Not serialized; populated by parsers
+	Provider        string         `json:"-"` // Recorded provider (Codex rollouts, Kiro IDE); not part of the source wire format
+	RecordID        string         `json:"-"` // Identifier of the single source record this entry is built from (Decision 32)
+	Origin          string         `json:"-"` // Claude Code entrypoint, decoded by UnmarshalJSON; feeds ParseResultMetadata.Origin
+	Turn            int            `json:"-"` // 1-based Codex exec turn; 0 = no turn
 	SessionID       string         `json:"sessionId,omitempty"`
 	Cwd             string         `json:"cwd,omitempty"`             // Working directory for this entry
 	IsMeta          bool           `json:"isMeta,omitempty"`          // Meta entries are internal Claude markers
@@ -53,6 +58,7 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 		ParentUUID      string          `json:"parentUuid,omitempty"`
 		SourceToolUseID string          `json:"sourceToolUseID,omitempty"`
 		ToolUseResult   json.RawMessage `json:"toolUseResult,omitempty"`
+		Entrypoint      string          `json:"entrypoint,omitempty"`
 	}
 
 	var alias entryAlias
@@ -69,6 +75,7 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 	e.UUID = alias.UUID
 	e.ParentUUID = alias.ParentUUID
 	e.SourceToolUseID = alias.SourceToolUseID
+	e.Origin = alias.Entrypoint
 
 	// Handle toolUseResult which can be string or object
 	if len(alias.ToolUseResult) > 0 {
@@ -142,6 +149,41 @@ type ContentItem struct {
 	IsError   bool   `json:"is_error,omitempty"`
 	ID        string `json:"id,omitempty"`          // tool_use ID for linking to tool_result
 	ToolUseID string `json:"tool_use_id,omitempty"` // links tool_result to tool_use
+
+	// Fields below are set by the Codex exec parser and are not part of any
+	// source wire format, so Claude unmarshalling is unaffected. Type "error"
+	// uses Text for its message.
+	ItemID     string          `json:"-"` // source item identifier
+	Status     string          `json:"-"` // source item status as recorded
+	Incomplete bool            `json:"-"` // the item started but never completed
+	ExitCode   *int            `json:"-"` // command exit code; nil when unrecorded
+	Plan       []PlanItem      `json:"-"` // Type "plan"
+	EventType  string          `json:"-"` // Type "event": the source event or item type
+	Payload    json.RawMessage `json:"-"` // Type "event" and "error": the source JSON, compact
+	Usage      *Usage          `json:"-"` // Type "usage"
+}
+
+// PlanItem is one step of a plan, such as a Codex exec to-do list.
+type PlanItem struct {
+	Text      string
+	Completed bool
+}
+
+// UsageBasisThreadTotal labels Codex 0.166.0 `turn.completed` usage: reported
+// thread totals at the turn's completion, not per-turn deltas.
+const UsageBasisThreadTotal = "thread_total_at_turn_completion"
+
+// Usage is token usage as a source reports it.
+type Usage struct {
+	Basis    string         // what the counters measure, such as UsageBasisThreadTotal
+	Counters []UsageCounter // source key order; unknown counters kept
+}
+
+// UsageCounter is one usage counter. Value is the raw JSON number, so
+// precision and unknown value kinds survive.
+type UsageCounter struct {
+	Name  string
+	Value json.RawMessage
 }
 
 // UnmarshalJSON handles polymorphic content field (string or array).
@@ -205,6 +247,7 @@ type NavigationContext struct {
 type RenderOptions struct {
 	Title      string             // Document title (e.g., "Session Transcript" or "Phase 1 Session Transcript")
 	SessionID  string             // Session ID to display in header
+	ThreadID   string             // Codex exec thread ID to display in header
 	ProjectDir string             // Project directory to strip from file paths (e.g., "/Users/foo/project")
 	Navigation *NavigationContext // Optional navigation context for prev/next/back links
 	TotalCost  *float64           // nil = don't display, pointer = display if > 0.005

@@ -1,0 +1,748 @@
+# Decision Log: Apsis — Shared JSON Output, Codex Exec Streams and Cross-Project Listing
+
+## Quick Decisions
+
+| ID | Date | Decision | Rationale |
+|----|------|----------|-----------|
+| Q1 | 2026-11-04 | Name the feature `apsis-codex-exec-lmstudio` | superseded by Q10 |
+| Q2 | 2026-11-04 | Use the full spec lane | The feature adds a CLI output format and a versioned JSON schema that other tools depend on, which is expensive to reverse |
+| Q3 | 2026-11-04 | Provider and locality come only from what a source records; otherwise they are omitted | Matches the message-metadata convention of omitting unavailable fields; guessing from model names would mislabel sessions |
+| Q4 | 2026-11-04 | LM Studio sessions appear only in all-project listings | moved to `apsis-lmstudio-logs` per Decision 5 |
+| Q5 | 2026-11-04 | Correlating LM Studio log entries with the Codex or Claude Code session they served is left to consumers | moved to `apsis-lmstudio-logs` per Decision 5 |
+| Q6 | 2026-11-04 | JSON output is not cut to the renderer's 2000/3000-character tool limits | superseded by Q29 |
+| Q7 | 2026-11-04 | Fixtures are anonymised captures from the inspected versions; documented types never seen in captures get fixtures built from the documented shape, labelled as such | superseded by Q22 |
+| Q8 | 2026-11-04 | Default local providers are `lmstudio` and `ollama` | superseded by Decision 6 |
+| Q9 | 2026-11-04 | Each new setting is an environment variable and a command-line option, the option winning | apsis has no config file; options suit one-off runs and tests, environment variables suit `apsis serve` and tools that call apsis |
+| Q10 | 2026-11-05 | Rename the feature to `apsis-shared-json` | Chosen by the user after LM Studio moved out; it names the main outcome, one JSON format across all harnesses |
+| Q11 | 2026-11-05 | Unknown exec event and item types render as generic events, unlike the Codex rollout parser, which warns and skips | The exec format changes between Codex versions; JSON consumers should still see every event |
+| Q12 | 2026-11-05 | An exec stream belongs to the git repository or worktree that contains it; outside any repository it appears only across projects | Worktrees list as their own projects elsewhere in apsis; plain path containment would credit worktree streams to the parent |
+| Q13 | 2026-11-05 | The schema version is one integer, raised only when a field is removed or changes meaning; consumers ignore fields they do not know | Additive changes stay compatible without a version bump, so one number is enough |
+| Q14 | 2026-11-05 | Follow mode rejects the new format value and exec streams with an error | Follow mode parses lines as Claude entries and supports Markdown only; live JSON output has no consumer yet |
+| Q15 | 2026-11-05 | A `codex exec` run that also wrote a rollout is listed once, under `codex` | The rollout records the model and provider the stream lacks; rollout IDs equal the stream's `thread_id` |
+| Q16 | 2026-11-05 | Exec-stream identifiers derive from `thread_id`, kept unique when several files share one | Copies of one stream exist in practice (a tool copying a run into an evaluation folder); identifiers must be safe in `apsis <id>` and URLs |
+| Q17 | 2026-11-05 | Correct the aggregate log-volume evidence through Decision 7 and the handoff's stale metadata claims | Checked size aggregates cover nine months; current Copilot and Kiro converters preserve available timestamps/models |
+| Q18 | 2026-11-05 | Exec resume can reuse a thread identifier | The pinned 0.166.0 resume path sends that identifier and the JSONL emitter emits it; distinct files need distinct artifact identifiers |
+| Q19 | 2026-11-05 | Keep completion usage as reported totals without summing snapshots or deriving turn deltas | The pinned JSONL emitter copies `ThreadTokenUsage.total`, despite per-turn comments on the event type |
+| Q20 | 2026-11-05 | Resolve lifecycle state per turn/item and retain first-appearance ordering | Interleaved tools and incomplete items need deterministic relationships without displaying every update |
+| Q21 | 2026-11-05 | Use explicit source selection distinct from forced format while preserving legacy bare IDs | Source lookup and input parsing are separate operations; identical IDs can occur in different sources |
+| Q22 | 2026-11-05 | Use synthetic fixtures with pinned authoritative shape provenance; unverified types remain generic | Supersedes Q7's capture requirement; the short public guide alone does not define every payload |
+| Q23 | 2026-11-05 | Force parsing for failures before thread creation; list only streams with a valid thread ID | Available errors remain convertible without inventing a discoverable identity |
+| Q24 | 2026-11-05 | Keep raw exec JSON as source events, expose JSON listings through CLI shared format, and preserve settings defaults | Matches existing JSONL output and avoids changing serve's HTML fragment endpoint |
+| Q25 | 2026-11-05 | Human approved global rollout preference with the rollout's recorded project; direct stream-file conversion remains available | Q1 answer: a copied stream must not change the canonical source or project between listing scopes; confirms requirements 2.7 and Decision 9's scope policy |
+| Q26 | 2026-11-05 | Human approved labelled file modification time for sorting and latest, with source creation time and message timestamps absent when unrecorded | Q2 answer: retain useful ordering while distinguishing filesystem metadata from source evidence; confirms requirements 2.10, 4.3-4.4 and Decision 10's fallback policy |
+| Q27 | 2026-11-05 | Human approved skipping .git, node_modules and testdata during recursive descent while explicitly configured roots remain scanned | Q3 answer: avoid internals, dependencies and parser fixtures without preventing an explicitly selected root or direct file conversion; confirms requirement 2.5 and Decision 11's skip policy |
+| Q28 | 2026-11-05 | Human approved requirements revision 3 after answering Q1-Q3; Decisions 8-11 are accepted | Explicit whole-document approval advances the feature to independent design drafts |
+| Q29 | 2026-11-05 | Shared JSON emits tool content exactly as parsed, with no length limit | Replaces Q6's rationale: `MaxToolInputRunes`, `MaxToolResultRunes` and `truncateString` are defined in `markdown.go` but only tests call them, so no production renderer truncates today; the projection must not add a limit either (1.5) |
+| Q30 | 2026-11-05 | The new format value is `-f shared-json` | Names the outcome and the spec; sits beside raw `-f json` without implying a harness |
+| Q31 | 2026-11-05 | `--all-projects` is a long-only flag on `apsis` and `apsis serve`, with no environment variable, and is a usage error with `-p`/`--project` | It selects a scope per invocation like serve's `--project`, which also has no variable; Q9's flag-plus-environment rule covers settings such as exec roots |
+| Q32 | 2026-11-05 | Source selection is `-s`/`--source <source>` using source names (`claude`, `codex`, `codex-exec`, `copilot`, `kiro-cli`, `kiro-ide`); it is a usage error with stdin, `--list` or `latest` | Distinct from `-a`, which forces a parser and uses different names (Q21); rejecting other combinations avoids an implicit filter meaning; `-s` is unused |
+| Q33 | 2026-11-05 | Repeatable `--codex-exec-dir` replaces `APSIS_CODEX_EXEC_DIRS` entirely; the variable is split with `filepath.SplitList`; one empty flag value means no roots; mixing empty and nonempty values is a usage error | Repeated flags need no escaping; the OS path-list separator is the platform convention (5.4); an empty flag lets one run override a set variable |
+| Q34 | 2026-11-05 | The schema lives at `docs/schemas/apsis-shared-json.v1.schema.json` with `$id` set to its raw URL on upstream `main` | `docs/` already holds published project documents; the version in the name lets a future version 2 file sit beside it |
+| Q35 | 2026-11-05 | Document types and projection live in a new `internal/sharedjson` package | Listing projection needs `sessions` types and `sessions` imports `transcript`, so the projection cannot live in `transcript` without a cycle |
+| Q36 | 2026-11-05 | Session metadata sits in a `session` object whose schema definition listing rows reuse, with `project` and `size_bytes` names | One `$defs` entry serves both documents (1.2, 4.3); the unit in `size_bytes` avoids ambiguity |
+| Q37 | 2026-11-05 | Shared JSON uses `created_at` only for recorded times and `file_modified_at` for the filesystem fallback, for every source; text and web listings label the fallback only on `codex-exec` rows | Q26 requires a marked fallback; every existing fallback is a modification time, so one named field is enough; 5.1 forbids changing existing sources' text and web output |
+| Q38 | 2026-11-05 | Version-1 entries carry `role`, `timestamp`, `model`, `provider`, `turn` and `content`; Claude wire fields (`uuid`, `parent_uuid`, `isMeta`, `toolUseResult`) stay out | 1.1 needs none of them; Q13 lets them be added later without a version change |
+| Q39 | 2026-11-05 | Warning objects carry `code`, `message`, and `line` (physical line) or `chat_message` (Kiro IDE chat index); listing warnings add `source` | Stable codes let consumers act on warnings; Kiro IDE stores a chat index in `ParseWarning.Line`, which must not be labelled a line |
+| Q40 | 2026-11-05 | The provider renders as `model (provider)`, or `(provider)` without a model, inside the existing assistant meta | Binds the provider to the model it served without adding a meta part to existing headers |
+| Q41 | 2026-11-05 | Usage blocks use basis `thread_total_at_turn_completion` and keep counters as raw JSON values in source key order | Labels the 0.166.0 total-counter semantics (2.9, Q19) and keeps unknown or non-integer counters representable |
+| Q42 | 2026-11-05 | Exec tool names are the item types; every exec tool item emits a `tool_result`; tool IDs are `t<turn>:<item id>` with the original kept as `item_id` | Matches the rollout parser's use of source names; non-Task tools render only with their result; the 0.166.0 emitter restarts `item_N` numbering per process, so appended resumed output reuses IDs that transcript-wide tool maps would conflate |
+| Q43 | 2026-11-05 | Under exec roots, `.jsonl` files whose first parseable object is not an exec event are ignored silently; exec-looking files without a valid `thread_id` are omitted with a warning | Roots can hold other JSONL; warning on every unrelated file would bury real problems (2.11) |
+| Q44 | 2026-11-05 | A later `thread.started` with the same ID is dropped; one with a different ID becomes a generic event plus a `thread_mismatch` warning | Resumed output appended to one file reuses the ID (Q18); nothing recorded is lost and the file's identity does not change |
+| Q45 | 2026-11-05 | Malformed-line warnings use fixed text plus the JSON syntax error's byte offset | 5.2 forbids copying the line; `encoding/json` error messages can quote source characters |
+| Q46 | 2026-11-05 | The web `codex-exec` filter pill appears only when exec roots are configured | Keeps the unconfigured web page unchanged (5.1) |
+| Q47 | 2026-11-05 | The web transcript view shows parse warnings for `codex-exec` sessions only | 5.2 requires them for exec streams; 5.1 keeps other sources' web output unchanged; widening this needs a requirements change |
+| Q48 | 2026-11-05 | The exec parser discards lines over 10 MiB with an `oversized_line` warning; raw `-f json` keeps its existing line handling apart from stripping a leading BOM for exec input | Existing scanners stop at 10 MiB; changing the shared raw path for other sources would alter existing output (5.1), while a BOM-prefixed exec stream would otherwise lose `thread.started` (5.3) |
+| Q49 | 2026-11-05 | In all-projects scope a `(source, id)` pair lists once, keeping the resolver's candidate, with a `duplicate_session` warning; project-scope listings keep current behaviour | Cross-directory duplicates appear in all-projects scope, where a second row would open the first row's content (4.2); project scope stays unchanged (5.1) |
+| Q50 | 2026-11-05 | Equal times break by the existing source priority with `codex-exec` last, then by identifier | Keeps current cross-source order and makes same-source ties deterministic (4.4) |
+| Q51 | 2026-11-05 | Kiro CLI all-projects opening uses a new `GetSessionByID` ordered by `updated_at DESC, key ASC`; `DiscoverAll` gains the same secondary order | `GetSession` re-normalises its directory, so a stored key that no longer normalises to itself misses; one shared order makes listing and opening pick the same row |
+| Q52 | 2026-11-05 | Repository roots are found from `.git` directories or `gitdir:` files without invoking `git` | Apsis has no external CLI dependency today |
+| Q53 | 2026-11-05 | Listing `model`/`provider` come only from the bounded extraction reads; the session document is authoritative | Listing stays cheap; 4.3 asks for these values where known |
+| Q54 | 2026-11-05 | The web listing warning banner moves into the polled `sessions_list` fragment | Warnings from roots and files must follow each refresh (5.9); the page includes the fragment, so the banner is not duplicated |
+
+---
+
+## Decision 1: Emit the Shared Representation Through a New Format Value
+
+**Date**: 2026-11-04
+**Status**: accepted
+
+### Context
+
+`-f json` currently emits raw session data, and existing users may depend on that. Tools that want one view across harnesses have no way to obtain apsis's shared representation, so they re-parse each harness format.
+
+### Decision
+
+Add a new `-f` value for the shared representation, with a schema version and a JSON Schema file in the repository. Leave `-f json` unchanged.
+
+### Rationale
+
+A new value adds capability without breaking anyone. A published, versioned schema lets consumers detect incompatible changes, and validating every format's fixtures against it keeps the parsers honest about what they produce.
+
+### Alternatives Considered
+
+- **Change `-f json` to the shared representation**: One JSON mode - Rejected: breaks existing users of the raw output.
+- **A Go package API only**: Consumers import `internal/transcript` - Rejected: `internal` packages cannot be imported from outside the module, and non-Go tools need a CLI contract.
+- **Unversioned JSON**: Simpler output - Rejected: consumers could not tell an incompatible change from an additive one.
+
+### Consequences
+
+**Positive:**
+- Any tool can read every supported harness through one documented schema.
+- Existing `-f json` users are unaffected.
+
+**Negative:**
+- The shared representation becomes a public contract; changing it now needs a version decision.
+- Two JSON modes need clear help text to avoid confusion.
+
+---
+
+## Decision 2: Codex Exec Streams as a Separate Source
+
+**Date**: 2026-11-04
+**Status**: superseded by Decision 3
+
+### Context
+
+`codex exec --json` writes an event stream (`thread.started`, `turn.*`, `item.*`) that differs from the rollout files Codex keeps in `~/.codex/sessions/`. Runs started with `--ephemeral`, as `orbit local` and `local-next-task` do, leave no rollout file, so the stream is the only record. The stream carries no user prompt and no `session_meta`.
+
+### Decision
+
+Parse exec streams as their own format and list them under the source label `codex-exec`. Render orbit's recorded prompt file as the first user message when present.
+
+### Rationale
+
+The formats differ in structure and in what they record, so a separate label tells the reader what they are looking at, including that some fields, such as the prompt, may be absent. Parsing the stream itself, rather than an orbit-specific wrapper, makes the parser useful for any `codex exec --json` output.
+
+### Alternatives Considered
+
+- **Fold exec streams into the `codex` source**: One Codex label - Rejected: hides a different format with different gaps behind the same label.
+- **Read orbit's local-run files only, as orbit data**: Smaller scope - Rejected: ties the parser to orbit when the format comes from Codex.
+
+### Consequences
+
+**Positive:**
+- Non-interactive Codex runs become reviewable wherever their output was saved.
+- Orbit's local runs appear alongside other sessions.
+
+**Negative:**
+- Listing needs to know where streams are kept; only orbit's locations are discoverable automatically.
+- Codex may change the event format between versions; unknown events render generically rather than failing.
+
+---
+
+## Decision 3: Exec Streams Integrate Through Generic Conventions, Not Orbit's Files
+
+**Date**: 2026-11-04
+**Status**: superseded by Decision 4
+
+### Context
+
+Decision 2 rendered orbit's recorded prompt file and listed the streams orbit records. Only the unmerged `orbit local` and `local-next-task` work writes those files (`.orbit/local/` and `.orbit/local-next-task/`, with `<base>.stdout.jsonl` and `<base>.prompt.txt`). Upstream orbit runs `codex exec` without `--json`, so on upstream main there are no orbit exec streams to find. This feature must merge upstream on its own, and the local-execution work must be able to build on it later without being a prerequisite.
+
+### Decision
+
+Keep exec streams as their own format under the source label `codex-exec`. List streams only from configured directories, searched at any depth, assigning a stream to a project when its path lies inside the project directory. Render `<base>.prompt.txt` beside `<base>.jsonl` or `<base>.stdout.jsonl` as the first user message.
+
+### Rationale
+
+Configured directories and a prompt-file convention work for any tool that saves `codex exec --json` output, so the feature stands on upstream main. Orbit's local runs already follow the convention, so pointing the directory setting at a parent of those projects lists them with no apsis code tied to orbit. Assigning projects by path containment needs no metadata the stream lacks.
+
+### Alternatives Considered
+
+- **Discover orbit's `.orbit/local*` directories**: Built-in knowledge of orbit's layout - Rejected: those files exist only with the unmerged local-execution work, which would become a prerequisite.
+- **Render exec streams only when given a path**: No listing - Rejected: `apsis serve` and tools that call `apsis --list` could not find them.
+- **Scan every project tree for exec streams**: No setting needed - Rejected: unbounded file reads per listing, and cross-project listing has no list of projects to scan.
+- **Use orbit's run registry (`~/.orbit/runs`)**: Orbit already tracks runs - Rejected: ties apsis listing to orbit, and it is not known whether the registry records local runs.
+
+### Consequences
+
+**Positive:**
+- The feature merges upstream without the local-execution work.
+- Exec streams saved by any tool, including orbit's local runs, list and render the same way.
+
+**Negative:**
+- Exec streams are not listed until a directory is configured.
+- A configured directory with many files makes listing read the first line of each candidate file.
+
+---
+
+## Decision 4: Exec Streams Come From Configured Directories, With No Prompt File
+
+**Date**: 2026-11-05
+**Status**: accepted
+
+### Context
+
+Decision 3 listed exec streams from configured directories and rendered a `<base>.prompt.txt` file beside a stream. Nothing on upstream main writes that file; only unmerged local-execution work in a fork does. Reviews also found that path containment credits worktree streams to the parent repository, that file names collide across directories, and that a run without `--ephemeral` also leaves a rollout.
+
+### Decision
+
+List exec streams from configured directories only. Assign each stream to the git repository or worktree that contains it. Identify it by its `thread_id`. List a run once, under `codex`, when a rollout with the same ID exists. Do not read prompt files; the work that writes them can add that on top.
+
+### Rationale
+
+Every rule uses only what the stream records or where it sits, so the feature stands on upstream main and any tool that saves `codex exec --json` output benefits. Leaving the prompt file out keeps apsis from defining a convention with no upstream writer, and adding it later is purely additive.
+
+### Alternatives Considered
+
+- **Keep the prompt-file convention in apsis**: Orbit's local runs would show their prompt on merge - Rejected: upstream maintainers would be asked to own a file name nothing upstream writes.
+- **Assign streams by path containment**: Simpler rule - Rejected: worktree streams would list under the parent project.
+- **Identify streams by file path**: Always unique - Rejected: paths are unsafe in `apsis <id>` and URLs, and change when files move.
+
+### Consequences
+
+**Positive:**
+- No apsis code depends on orbit's file layout.
+- A run recorded both ways appears once, with the richer record.
+
+**Negative:**
+- Exec streams render without the prompt that started them.
+- Exec streams are not listed until a directory is configured.
+
+---
+
+## Decision 5: LM Studio Server Logs Move to Their Own Spec
+
+**Date**: 2026-11-05
+**Status**: superseded by Decision 7
+
+### Context
+
+The LM Studio part of this feature carries most of the review findings: an undocumented free-text format, timestamps in local time without a zone, grouping across parallel requests, about 130 MB of logs a month, and full prompts in the logs. It shares only the JSON layout and the all-projects listing with the rest.
+
+### Decision
+
+Move LM Studio server logs to `specs/apsis-lmstudio-logs/`, which builds on this spec and extends the JSON layout additively.
+
+### Rationale
+
+This spec's JSON output, exec streams and listing can be designed, reviewed and merged as small upstream PRs without waiting on LM Studio's open questions. Codex requests in the logs carry `client_metadata.thread_id`, which the sibling spec can use to group requests and link them to exec streams and rollouts listed here.
+
+### Alternatives Considered
+
+- **Keep LM Studio here as the last PR**: One spec - Rejected: approval of everything would wait on the LM Studio questions.
+- **Drop LM Studio support**: Smaller scope - Rejected: it is the only record of local-model traffic from clients that keep no transcript.
+
+### Consequences
+
+**Positive:**
+- This spec is smaller and can be approved sooner.
+- LM Studio gets its own review of its format and privacy questions.
+
+**Negative:**
+- Two specs must keep the shared JSON layout consistent.
+- The consumer that needs LM Studio data waits for the second spec.
+
+---
+
+## Decision 6: Report the Provider Only, Without a Local Flag
+
+**Date**: 2026-11-05
+**Status**: accepted
+
+### Context
+
+The requirements marked a session local when its provider was in a configurable list (Q8). No source records whether a server is local: Codex provider IDs are user-defined, `lmstudio` can point at another host, and Ollama serves cloud models.
+
+### Decision
+
+Record and display the provider exactly as the source records it. Do not mark sessions local or cloud, and add no provider-list setting.
+
+### Rationale
+
+Q3 already limits apsis to what sources record. A local flag would be a guess that the JSON contract then commits to; consumers can apply their own rule to the provider.
+
+### Alternatives Considered
+
+- **Local flag from a configurable provider list**: Ready-made for consumers - Rejected: wrong whenever a provider name does not match where it runs.
+- **Infer locality from the base URL**: More accurate - Rejected: Codex rollouts and exec streams do not record the base URL.
+
+### Consequences
+
+**Positive:**
+- Every field apsis emits is something a source recorded.
+- One fewer setting.
+
+**Negative:**
+- Each consumer decides what counts as local.
+
+---
+
+## Decision 7: Retain the Separate LM Studio Spec
+
+**Date**: 2026-11-05
+**Status**: accepted
+
+### Context
+
+Decision 5's log-volume evidence described aggregate disk usage as a monthly rate. Aggregate file-size checks establish that the sample spans nine months. The parser still has separate grouping, concurrency, timestamp and exposure questions.
+
+### Decision
+
+Keep the human-approved split: LM Studio server logs belong to `apsis-lmstudio-logs`, depending on this feature's shared JSON and all-projects listing. This supersedes Decision 5 solely to correct its supporting evidence.
+
+### Rationale
+
+The split does not depend on a claimed monthly log volume and keeps upstream delivery independent of the server-log parser.
+
+### Alternatives Considered
+
+- **Recombine the specs:** rejected because unresolved server-log policy would delay shared JSON and exec-stream support.
+- **Remove LM Studio work:** rejected because the user requested that input and approved a separate spec.
+
+### Consequences
+
+**Positive:**
+- The human's scope decision remains unchanged.
+- Active evidence no longer asserts a monthly rate.
+
+**Negative:**
+- Both specs must maintain the additive shared contract.
+- Consumers needing server logs must wait for the second spec.
+
+---
+
+## Decision 8: Preserve Parsed Evidence and Relationships
+
+**Date**: 2026-11-05
+**Status**: accepted
+
+### Context
+
+The common entry model already carries tool linking identifiers, per-entry metadata and some session cost data. A JSON field list omitting these, incomplete states or parse warnings would lose information or hide partial translation.
+
+### Decision
+
+Publish those parsed fields, generic payloads and structured warnings in shared JSON. Preserve turn/item relationships and last known state; retain first-appearance ordering. Summarise model/provider using the first known value while retaining entry-level changes.
+
+### Rationale
+
+Consumers need to distinguish missing evidence from complete output and associate concurrent tool activity. This extends translation without extracting unrelated new token-usage data.
+
+### Alternatives Considered
+
+- **Serialize existing wire-shaped entries unchanged:** rejected because ignored model fields and source-specific tags are not the shared contract.
+- **Publish only rendered text and event labels:** rejected because relationships, unknown payloads and completeness information disappear.
+
+### Consequences
+
+**Positive:**
+- Consumers can recognise partial parses and recover tool relationships.
+- Existing cost information and model changes remain available.
+
+**Negative:**
+- The schema and renderers must represent more states.
+- Payload retention can increase output size.
+
+---
+
+## Decision 9: Keep Stream Identity Stable Across Listings
+
+**Date**: 2026-11-05
+**Status**: accepted
+
+### Context
+
+Copied files and resumed runs can share a thread ID. A rollout records its original project while a copied stream belongs to its containing repository, so filtering before de-duplication can change which source a run appears under.
+
+### Decision
+
+Give each canonical stream file a stable bounded identifier derived from the thread ID, retaining the original thread ID separately. Add explicit CLI source selection. Propose global rollout preference and the rollout's recorded project before project filtering; direct stream conversion remains available.
+
+### Rationale
+
+Adding a file, overlapping roots or changing traversal order must not rename existing artifacts. Global rollout preference makes the richer representation canonical consistently; the scope consequence is Q1 in the approval questions.
+
+### Alternatives Considered
+
+- **Thread ID alone:** rejected because copied and resumed files collide.
+- **Traversal-order suffixes:** rejected because adding another file can rename sessions.
+- **Content hashes alone:** rejected because appending events changes identifiers.
+- **Scope-local rollout preference:** retained as the human's Q1 alternative because it preserves copied-project visibility but changes canonical source between views.
+
+### Consequences
+
+**Positive:**
+- Listed source/identifier pairs open unambiguously.
+- Duplicate discovery roots do not create extra listings.
+
+**Negative:**
+- Moving a stream can change its artifact identifier.
+- Under the proposed global policy, a copied project's listing can omit a run owned by a rollout elsewhere.
+
+---
+
+## Decision 10: Separate Source Time From Listing Time
+
+**Date**: 2026-11-05
+**Status**: accepted
+
+### Context
+
+Exec events record no timestamps. Existing listers use modification time as a fallback, but copies and appends change that value without establishing session creation time.
+
+### Decision
+
+Omit unknown source creation and entry times. Propose an explicitly marked filesystem modification-time fallback solely for listing order and `latest`; order unknown times first and use source/identifier ties. Stdin has no filesystem fallback.
+
+### Rationale
+
+The fallback remains useful without presenting filesystem evidence as a recorded event time. Q2 asks the human whether this ordering policy is acceptable.
+
+### Alternatives Considered
+
+- **Label modification time as creation:** rejected because it asserts an unsupported source fact.
+- **Omit any fallback:** retained as Q2's alternative; undated streams then cannot outrank dated sessions.
+- **Use the current clock:** rejected because repeated conversion would invent different times.
+
+### Consequences
+
+**Positive:**
+- Missing source metadata remains distinguishable.
+- Ordering and latest selection are reproducible for unchanged files.
+
+**Negative:**
+- Copies and appends can change fallback ordering.
+- Listings need to distinguish source time from filesystem time.
+
+---
+
+## Decision 11: Constrain Discovery and Reuse Unchanged Results
+
+**Date**: 2026-11-05
+**Status**: accepted
+
+### Context
+
+Configured roots can overlap or contain links, dependencies and parser fixtures. Web listings refresh every 15 seconds; reading every unchanged transcript body on each refresh is unnecessary.
+
+### Decision
+
+Check resolved-root containment before candidate reads, ignore directory-symlink descent and list canonical files once. Propose skipping `.git`, `node_modules` and `testdata` subdirectories, while scanning explicitly configured roots themselves. Require zero transcript-body reads on unchanged in-process refreshes and updates after inputs change.
+
+### Rationale
+
+These are testable boundaries and caching outcomes without a machine-specific cold-time threshold. Q3 leaves the directory-skip tradeoff to the human; concrete cache mechanics and setting names belong to design.
+
+### Alternatives Considered
+
+- **Follow all directory links:** rejected because escaping roots and cycles complicate safe discovery.
+- **Read every transcript on every refresh:** rejected because it repeats work on unchanged input.
+- **Skip only `.git`:** retained as Q3's alternative for users storing logs under dependency/fixture directories.
+
+### Consequences
+
+**Positive:**
+- Opening and discovery enforce the same file boundary.
+- Unchanged web refreshes avoid transcript-body reads.
+
+**Negative:**
+- Cache invalidation must include source-specific backing files.
+- Skipped subdirectories require explicit roots when they intentionally hold logs.
+
+---
+
+## Decision 12: Extend the Shared Entry and Project It to JSON Separately
+
+**Date**: 2026-11-05
+**Status**: proposed
+
+### Context
+
+Every parser produces `[]transcript.Entry` and every renderer consumes it. `Entry` carries Claude's wire-format JSON tags, used to unmarshal Claude lines, and excludes `Model` from JSON, so it cannot double as the published layout. Exec streams need content the type cannot express today: plans, errors, generic events, usage, exit codes, incomplete state, turns and a provider.
+
+### Decision
+
+Keep `Entry`/`ContentItem` as the single shared representation and add the new fields and content kinds with `json:"-"`. Project the parse result into separate, tagged document types in `internal/sharedjson`.
+
+### Rationale
+
+The user's framing is harness formats in, one representation out, rendered three ways. Extending the existing type gives Markdown and HTML the new content in the same change, and a separate projection keeps the public contract independent of Claude's wire tags. Both independent design drafts reached this decision.
+
+### Alternatives Considered
+
+- **Serialise `Entry` with new tags**: Least code - Rejected: its tags are Claude's input format; changing them breaks Claude parsing, and keeping them publishes one harness's wire format (1.2).
+- **A new intermediate representation replacing `Entry`**: Cleaner long term - Rejected: rewrites five parsers and three renderers for no requirement.
+- **A separate JSON parsing path**: Isolated - Rejected: JSON could disagree with Markdown and HTML for the same input.
+
+### Consequences
+
+**Positive:**
+- New content renders in Markdown, standalone HTML and the web view through existing functions.
+- The JSON contract changes only through `internal/sharedjson` and the schema.
+
+**Negative:**
+- `ContentItem` grows fields that only exec streams use today.
+- The projection must change whenever a parser starts filling a new field.
+
+---
+
+## Decision 13: Long-Lived Lister Cache and All-Projects Resolver Branches
+
+**Date**: 2026-11-05
+**Status**: proposed
+
+### Context
+
+Listed sessions must open from any directory (4.2), and unchanged serve refreshes must read zero transcript-body bytes (5.9). The CLI lists and opens in separate processes. Kiro CLI and Kiro IDE resolution turn an empty project into the current directory, and Claude, Codex rollout and Kiro IDE identifiers can repeat across directories.
+
+### Decision
+
+Keep `Lister` and `Resolver` as the two entry points. Give the `Lister` a mutex-guarded cache keyed by stat data (size, mtime, ctime, inode and device where available) and by companion files, including their absence; `apsis serve` holds one `Lister` for its lifetime. Give the `Resolver` explicit all-projects branches that call the same candidate-selection functions as the listing. Return fresh slices from every pass.
+
+### Rationale
+
+Opening by identifier in a new CLI process then reads only that session, rather than rebuilding a listing of every source first. Stat-keyed caching meets the zero-read rule directly and can be tested with a counting opener. Sharing selection functions makes listing and opening agree without storing locators. The mutex suits a 15-second poll.
+
+### Alternatives Considered
+
+- **A catalogue publishing immutable snapshots with private locators**: Exact storage locations for opening - Rejected: the CLI would build a cold snapshot of every source to open one session, and snapshot publication and stale-locator retries add lifecycle code that the shared selection rule makes unnecessary.
+- **Filesystem watchers**: Push updates - Rejected: new dependency, recursive-watch limits on macOS and Linux, and a missed event leaves stale state.
+- **Time-based expiry**: Simple - Rejected: re-reads unchanged bodies on expiry, failing 5.9.
+
+### Consequences
+
+**Positive:**
+- CLI opening stays as cheap as today.
+- Adds, removals, edits and companion changes show on the next pass.
+
+**Negative:**
+- Listings are serialised by the mutex.
+- Change detection relies on stat fidelity; on platforms without ctime or inode, a same-size rewrite that preserves mtime is missed.
+- Opening Kiro IDE sessions in all-projects scope reads every workspace's `.chat` headers.
+
+---
+
+## Decision 14: Exec Identifier From a Thread Prefix and a Full Path Digest
+
+**Date**: 2026-11-05
+**Status**: proposed
+
+### Context
+
+Requirement 2.8 needs a bounded, route-safe identifier derived from the thread ID, unique within `codex-exec`, and unchanged by appends, added copies, overlapping roots or root order. Copies and resumed runs share thread IDs (Q18). The web route rejects identifiers over 256 characters. On case-insensitive volumes, two root spellings can reach one file.
+
+### Decision
+
+Identifier = `sanitise(thread_id)` truncated to 191 bytes, `-`, then the full 64-character hex SHA-256 of the canonical path. Canonical paths resolve symlinks and use on-disk spelling for roots and symlink targets. If two distinct canonical paths produce the same identifier, both are omitted with a warning.
+
+### Rationale
+
+The identifier depends only on facts about the stream itself, so no other file can rename it. The readable thread prefix lets people correlate streams by eye, and hashing only the path lets the resolver find the file from a metadata-only walk. A full digest makes a collision impractical, and omitting both sides keeps availability independent of which copy appeared first.
+
+### Alternatives Considered
+
+- **`exec-` plus a digest of thread ID and path**: Opaque and collision-resistant - Rejected: opening would need every candidate's thread ID, so every stream head would be read.
+- **Thread prefix plus a 16-hex path digest, omitting the later path on collision**: Shorter - Rejected: which file survives a collision would depend on what else exists.
+- **Bare thread ID with a suffix only on collision**: Friendlier when unique - Rejected: adding a copy renames whichever file gains the suffix.
+- **Content hash**: Path-independent - Rejected: appends change it.
+
+### Consequences
+
+**Positive:**
+- Identifiers stay stable under every change 2.8 lists, including case aliases.
+- Opening by identifier reads one stream head.
+
+**Negative:**
+- Moving or renaming a stream changes its identifier (accepted in Decision 9).
+- Identifiers are long; the web list already truncates display IDs.
+
+---
+
+## Decision 15: Resolve the Exec Lifecycle per Turn and Item at End of Stream
+
+**Date**: 2026-11-05
+**Status**: proposed
+
+### Context
+
+The pinned 0.166.0 emitter numbers items `item_N` from zero per process, so appended resumed output can reuse `item_0`. Items interleave, receive updates and may never complete. Requirement 2.3 needs one final state per item within its turn, in first-appearance order, without rendering lifecycle updates. Renderer maps (`BuildToolMeta`, `preprocessEntries`) key tool links by ID across the whole transcript.
+
+### Decision
+
+Key records by `(turn ordinal, item id)`, with turn 0 before the first `turn.started`; keep first-appearance order; replace stored item JSON on each event; translate final states at EOF. Turn-level and stream-level events become their own ordered records. Tool IDs are `t<turn>:<item id>`, with the original kept as `item_id`.
+
+### Rationale
+
+Per-turn keys survive ID reuse in the parser, and turn-qualified tool IDs carry that separation through every renderer without changing the renderers' maps. Translating once at EOF keeps lifecycle handling out of the item translators.
+
+### Alternatives Considered
+
+- **Key by item ID alone**: Simpler - Rejected: collides when resumed output is appended to one file.
+- **Turn-scoped keys but bare item IDs as tool IDs**: Readable IDs - Rejected: two turns reusing `item_0` would show the second command beside the first result.
+- **Emit content as events arrive**: Streaming - Rejected: needs in-place replacement of multi-block items and cannot know completion before EOF.
+
+### Consequences
+
+**Positive:**
+- Interleaved tools keep their links and order in JSON and in every renderer.
+- Incomplete items are known exactly.
+
+**Negative:**
+- The whole stream is held in memory before output.
+- Shared-JSON tool IDs differ from the source's item IDs; consumers use `item_id` for the original.
+
+---
+
+## Decision 16: Show the Provider Wherever the Model Is Shown
+
+**Date**: 2026-11-05
+**Status**: proposed
+
+### Context
+
+Requirement 3.1 displays the Codex provider beside the model following the existing metadata pattern, and 5.1 allows no other output change. Read/Edit group headers, user headers and deferred tool-result sections pass an empty model today, and `preprocessEntries` groups across model changes. The two design cross-reviews disagreed on whether groups and deferred results should carry the provider.
+
+### Decision
+
+Add the provider to the assistant header meta through `modelLabel`, the only place the model renders. Leave group, user and tool-result headers and the grouping rules unchanged. Exec turns never form Read/Edit groups.
+
+### Rationale
+
+Showing the provider exactly where the model appears is the existing pattern, keeps every rollout without a provider byte-identical, and keeps rollouts with one unchanged apart from the header label. Adding provider-aware group boundaries would change grouping for existing Copilot, Kiro and Codex output.
+
+### Alternatives Considered
+
+- **Carry model and provider into group and deferred-result headers, and split groups at provider changes**: More places show the provider - Rejected: changes existing grouping and header output against 5.1, and shows a provider where its model is still hidden.
+- **Provider as a separate ` · ` meta part**: Simple - Rejected: detaches the provider from the model it served (Q40).
+
+### Consequences
+
+**Positive:**
+- Existing output changes only in Codex assistant headers that record a provider.
+
+**Negative:**
+- Tool-only Codex entries absorbed into Read/Edit groups show neither model nor provider, as today.
+
+---
+
+## Decision 17: Suppress Exec Streams by Rollouts Whose Recorded ID Matches Their Filename
+
+**Date**: 2026-11-05
+**Status**: proposed
+
+### Context
+
+Requirement 2.7 suppresses an exec stream when a resolvable rollout with the same thread ID exists. `findCodexSession` opens rollouts by the UUID in their filename, while the thread ID a rollout records is `session_meta.payload.id`. A filename-only index can include malformed or unreadable rollouts, and a recorded-ID-only index can name a rollout that `codex/<id>` cannot open.
+
+### Decision
+
+Build the index from rollout heads in every scope, before project filtering: a rollout contributes its recorded `session_meta.payload.id` when that ID equals, ignoring case, the UUID in its filename. If rollout listing fails, keep streams.
+
+### Rationale
+
+Each indexed rollout is both openable by `codex/<id>` and verified to record the same thread, which is the plain reading of "resolvable rollout with the same thread ID". The listing already reads each rollout's `session_meta`, so the check costs no extra reads.
+
+### Alternatives Considered
+
+- **Filename UUIDs only**: Matches what the resolver opens - Rejected: a malformed or unrelated file with a matching name would hide a stream.
+- **Recorded IDs only**: Matches the thread - Rejected: a renamed rollout would hide a stream that `codex/<id>` cannot open.
+
+### Consequences
+
+**Positive:**
+- A stream is hidden only when the run is reachable under `codex`.
+
+**Negative:**
+- A rollout renamed so its filename UUID differs from its recorded ID no longer suppresses its streams, so the run lists twice.
+
+---
+
+## Decision 18: Validate Against the Open Schema and a Structurally Closed Test Copy
+
+**Date**: 2026-11-05
+**Status**: proposed
+
+### Context
+
+Requirement 1.3 keeps additive fields compatible with consumers that ignore unknown fields; 1.4 requires fixtures to conform to the published schema. An open schema cannot catch fields the code emits but the schema omits. Closing every object would forbid arbitrary event payloads, tool inputs and usage counters, which must stay open. The module has no JSON Schema engine, and the handoff asks for no heavy dependency.
+
+### Decision
+
+Publish the schema without `additionalProperties: false`. Tests validate every fixture document against the published schema and against a copy that adds `additionalProperties: false` to apsis-owned structural objects only (document roots, session metadata, scope, entry, each block type, warning, plan item), leaving `input`, `payload` and `counters` open. Validation uses `github.com/santhosh-tekuri/jsonschema/v6`, imported only from `_test.go` files, with the schema loaded from disk and no network loading.
+
+### Rationale
+
+The published schema matches the compatibility rule, and the closed copy makes CI fail when code emits an undeclared structural field. A maintained validator avoids hand-written keyword semantics. Its only non-test dependency, `golang.org/x/text`, is already in the module graph. Both independent design drafts chose this library.
+
+### Alternatives Considered
+
+- **Hand-written validator for the keywords used**: No new module - Rejected: validator bugs would pass bad output, and it needs its own tests (offered as question U3).
+- **Generate the schema from Go types**: One source - Rejected: needs a generator dependency and does not check emitted values such as `oneOf` discriminators.
+- **Golden JSON only**: No schema tooling - Rejected: does not show conformance to the published schema (1.4).
+
+### Consequences
+
+**Positive:**
+- Undeclared structural fields and type drift fail tests, while arbitrary payload keys stay valid.
+- Binaries gain no dependency.
+
+**Negative:**
+- `go.mod` gains a requirement used only by tests.
+- The list of closed objects must grow with the schema.
+
+---
+
+## Decision 19: Session Metadata Comes From the Transcript First
+
+**Date**: 2026-11-05
+**Status**: proposed
+
+### Context
+
+A session document needs creation time, project, model and provider for file input, stdin and resolved sessions. Some sources record these inside the transcript (Codex `session_meta`, Kiro IDE `startTime`, Claude `cwd`); others only beside it (Copilot `workspace.yaml`, the Kiro CLI database key). Resolvers sometimes substitute file times. `ParseResultMetadata` holds only cost today.
+
+### Decision
+
+Derive document metadata from parsed content first, using the per-source table in the design. Resolver metadata fills only fields still missing, and never supplies a filesystem-flagged time as `created_at`. Exec streams take their project from the containing repository of the input path.
+
+### Rationale
+
+The same file gives the same document whether opened by path or by identifier, wherever the transcript records the fact. Resolver data adds what only the listing knows without presenting file times as source times (Q26).
+
+### Alternatives Considered
+
+- **Resolver metadata first**: Matches listings exactly - Rejected: file and stdin input would produce different documents for the same content.
+- **Parsed content only**: Simplest - Rejected: Copilot and Kiro CLI documents would lose a project the listing shows.
+
+### Consequences
+
+**Positive:**
+- Documents agree across input modes for transcript-recorded facts.
+
+**Negative:**
+- For Copilot and Kiro CLI, listing and session `created_at` can differ slightly, because they come from different records.
+
+---
+
+## Decision 20: One Streaming Probe Decides Exec Detection and Discovery
+
+**Date**: 2026-11-05
+**Status**: proposed
+
+### Context
+
+Requirement 2.1 detects an exec stream by its first parseable, non-empty JSON event. `DetectFormat` reads 64 KiB, and the listing's head readers stop at 50 lines and 1 MiB, so a long malformed prefix could make detection and discovery disagree with each other and with the requirement.
+
+### Decision
+
+`ProbeExecStream` reads whole lines until the first one that parses as a JSON object, skipping lines over 10 MiB, and classifies the stream. Discovery uses it directly, with its result cached by stat key. `DetectFormat` applies the same test inside its chunk, before Kiro detection (whose truncated Kiro IDE check matches bare substrings), and, only when the chunk holds no parseable object and is not Kiro, keeps reading for the probe and returns the consumed bytes for replay; that path decides only between exec and the existing result.
+
+### Rationale
+
+One rule gives the same answer for direct conversion and discovery at any prefix length. Restricting the extended read to the exec decision leaves detection of every existing format unchanged (5.1). The cache bounds the cost to one read per file change.
+
+### Alternatives Considered
+
+- **Exec check inside the existing 64 KiB chunk only**: No new reader - Rejected: misses `thread.started` after a long malformed prefix.
+- **Extend detection for every format**: More files detected correctly - Rejected: changes existing detection results, against 5.1.
+
+### Consequences
+
+**Positive:**
+- Detection and discovery agree on every stream.
+
+**Negative:**
+- A JSONL file under a root with no parseable line is read in full once per change.
+
+---

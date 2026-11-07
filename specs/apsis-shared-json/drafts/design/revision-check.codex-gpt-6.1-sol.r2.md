@@ -1,0 +1,9 @@
+# Revision Check Follow-Up: Shared JSON Design
+
+**Same non-author reviewer follow-up** to the sole residual major finding in [the original review](revision-check.codex-gpt-6.1-sol.md), after the logged 18:42Z revision. This is neither another fresh-context review nor independent-model evidence or human approval. The original review remains unchanged.
+
+**Disposition: resolved.** [Design §4](../../design.md#4-listing-scope-and-cache-sessions) now restricts shared winner-based row deduplication to all-projects listings and explicitly retains project-scope per-file enumeration/cwd filtering when another project holds the global winner. [Design §5](../../design.md#5-exec-discovery-identity-project-and-suppression) applies the selected global winner to the suppression index in every scope, while explicitly excluding legacy project-row enumeration from that selection rule. Validation of the actual winner remains required; a later valid duplicate cannot justify suppression behind an invalid winner.
+
+Q62 in [the decision log](../../decision_log.md) clarifies Decision 22 consistently with Q49 and requirement 5.1. The questions resolution table records the same boundary. The [testing table](../../design.md#testing-strategy) now includes the cross-project later-duplicate case retaining its legacy project row while suppression follows the global winner; §4 explicitly preserves no-flag project behavior. This closes the previously ambiguous no-flag duplicate regression contract without changing accepted global stream precedence.
+
+**The design-contract checkpoint is clear within the reviewed scope.** This follow-up verifies only that residual's documented disposition and planned regression coverage. It does not re-review the other six dispositions, establish implemented behavior, execute tests or verify native Windows capability. Human U1–U3 remain unanswered, native Windows verification remains gated, and source code plus canonical tasks remain frozen.

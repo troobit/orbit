@@ -40,6 +40,8 @@
 | [Local Compute Agent](#local-compute-agent) | 2026-08-13 | Done | Run approved rune tasks, phases or leaves through the local Codex/LM Studio preset with bounded dispatch and progress checks. |
 | [Local Run Comparison](#local-run-comparison) | Uncommitted | Planned | Repair OpenCode parsing and variant progress checks, then verify local harnesses with a disposable fixture before a gated Sanarte comparison. |
 | [Local Task Preparation](#local-task-preparation) | Uncommitted | Planned | Prepare approved source work as bounded local-worker packets, with rune lineage, host-verified acceptance and consistent local/variant dispatch. |
+| [Apsis Shared JSON](#apsis-shared-json) | 2026-11-06 | In Progress | Versioned JSON output with one layout for every Apsis source, plus Codex exec streams, recorded providers and listing across projects. |
+| [Apsis LM Studio Logs](#apsis-lm-studio-logs) | 2026-11-06 | No Tasks | Translate LM Studio server logs into Apsis's shared representation, showing missing content and uncertain attribution. |
 
 ---
 
@@ -396,3 +398,23 @@ Prepare approved source work as bounded local-worker packets, with rune lineage,
 - [requirements.md](local-task-preparation/requirements.md)
 - [review.md](local-task-preparation/review.md)
 - [tasks.md](local-task-preparation/tasks.md)
+
+## Apsis Shared JSON
+
+Versioned JSON output with one layout for every Apsis source, plus Codex exec streams, recorded providers and listing across projects.
+
+- [decision_log.md](apsis-shared-json/decision_log.md)
+- [design.md](apsis-shared-json/design.md)
+- [handoff.md](apsis-shared-json/handoff.md)
+- [prerequisites.md](apsis-shared-json/prerequisites.md)
+- [requirements.md](apsis-shared-json/requirements.md)
+- [tasks-cache.md](apsis-shared-json/tasks-cache.md)
+- [tasks.md](apsis-shared-json/tasks.md)
+
+## Apsis LM Studio Logs
+
+Translate LM Studio server logs into Apsis's shared representation, showing missing content and uncertain attribution.
+
+- [decision_log.md](apsis-lmstudio-logs/decision_log.md)
+- [handoff.md](apsis-lmstudio-logs/handoff.md)
+- [requirements.md](apsis-lmstudio-logs/requirements.md)
