@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The `apsis serve` listing warning banner now refreshes with the session list.
+- The LM Studio log support spec clarifies truncated thread identifiers, discovery identifier scope, and unsupported POST path handling, and consolidates its decision log.
 
 ### Fixed
 
