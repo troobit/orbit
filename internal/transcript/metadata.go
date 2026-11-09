@@ -7,6 +7,17 @@ import (
 	"time"
 )
 
+// modelLabel adds a recorded provider only where an assistant model already renders.
+func modelLabel(model, provider string) string {
+	if provider == "" {
+		return model
+	}
+	if model == "" {
+		return "(" + provider + ")"
+	}
+	return model + " (" + provider + ")"
+}
+
 // parseTimestamp parses an RFC3339 or RFC3339Nano timestamp string.
 func parseTimestamp(ts string) (time.Time, bool) {
 	if ts == "" {
@@ -57,14 +68,17 @@ func FormatTimestampHTML(ts string) string {
 
 // FormatMessageMetaMarkdown builds the metadata suffix for a Markdown header.
 // Example: " · 2026-03-12T14:32:05+11:00 · claude-opus"
+// Extra parts, such as an exec turn, follow the model.
 // Returns empty string if no metadata is available.
-func FormatMessageMetaMarkdown(timestamp, model string) string {
+func FormatMessageMetaMarkdown(timestamp, model string, extra ...string) string {
 	var parts []string
 	if formatted := FormatTimestampMarkdown(timestamp); formatted != "" {
 		parts = append(parts, formatted)
 	}
-	if model != "" {
-		parts = append(parts, model)
+	for _, part := range append([]string{model}, extra...) {
+		if part != "" {
+			parts = append(parts, part)
+		}
 	}
 	if len(parts) == 0 {
 		return ""
@@ -73,17 +87,28 @@ func FormatMessageMetaMarkdown(timestamp, model string) string {
 }
 
 // FormatMessageMetaHTML builds the metadata span for an HTML header.
+// Extra parts, such as an exec turn, follow the model.
 // Returns empty string if no metadata is available.
-func FormatMessageMetaHTML(timestamp, model string) string {
+func FormatMessageMetaHTML(timestamp, model string, extra ...string) string {
 	var parts []string
 	if formatted := FormatTimestampHTML(timestamp); formatted != "" {
 		parts = append(parts, formatted)
 	}
-	if model != "" {
-		parts = append(parts, fmt.Sprintf("<span>%s</span>", html.EscapeString(model)))
+	for _, part := range append([]string{model}, extra...) {
+		if part != "" {
+			parts = append(parts, fmt.Sprintf("<span>%s</span>", html.EscapeString(part)))
+		}
 	}
 	if len(parts) == 0 {
 		return ""
 	}
 	return `<span class="message-meta">` + strings.Join(parts, `<span class="meta-separator">·</span>`) + `</span>`
+}
+
+// turnLabel names a Codex exec turn for the assistant header; empty without a turn.
+func turnLabel(entry *Entry) string {
+	if entry.Turn <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("turn %d", entry.Turn)
 }

@@ -2,14 +2,36 @@
 
 ## How `apsis -l` works
 
-Entry point: `cmd/apsis/main.go`, function `listAllSessions(projectPath)`.
+Entry point: `cmd/apsis/main.go`, function `listSessions(w, projectPath, format)`, which constructs `sessions.NewLister(opts...)` and calls `Lister.ListAll(projectPath)`. An empty `projectPath` is all-projects scope (`--all-projects`); the text listing then adds a fifth tab-separated project column (`-` when unrecorded). `-f shared-json` writes a `sharedjson.Listing` document instead. Listings always go to stdout and ignore `-o` (Q104).
 
-Calls agent-specific list functions in parallel, then merges and sorts results:
-- `listClaudeSessions(projectPath)` - filters via encoded project path in directory name
-- `listCopilotSessions(projectPath)` - filters via `workspace.yaml` metadata
-- `listCodexSessions(homeDir, projectPath)` - filters via `cwd` field in `session_meta`
-- `listKiroSessions(projectPath)` - filters via SQLite directory discovery
-- `listKiroIDESessions(projectPath)` - filters via workspace directory lookup
+`parseFlags` uses the standard `flag` package, which stops at the first positional argument: in `apsis latest --all-projects` the flag is silently ignored. Options must come first (`apsis --all-projects latest`); write documentation examples that way. The older `apsis latest -F` and `apsis latest -f html` examples in the help text and README have the same problem.
+
+`internal/sessions/lister.go` calls these collectors sequentially. Each returns `(rows, warnings, error)`; a collector error becomes a `source_failed` warning. Results are merged and sorted:
+
+- `listClaude(projectPath)` - filters via encoded project path in directory name
+- `listCopilot(projectPath)` - filters via `workspace.yaml` metadata
+- `listCodex(projectPath)` - filters via `cwd` in `session_meta`
+- `listKiro(projectPath)` - filters via SQLite directory discovery
+- `listKiroIDE(projectPath)` - filters via workspace directory lookup
+- `listCodexExec(projectPath, rolloutThreads)` - only with exec roots; see [codex-exec-streams.md](codex-exec-streams.md)
+
+`listCodex` (through `listCodexIndexed`) also returns the lower-case recorded IDs of the rollouts `selectCodexCandidate` would open whose heads pass `codexHeadWarning`, in both scopes; `ListAll` hands them to `listCodexExec` to suppress streams with those thread IDs. A failed walk returns no index. `Lister.Sources()` omits `codex-exec` without roots, and `WithCodexExecRoots` with roots also turns on extended ordering (Q114).
+
+## Options and ordering
+
+`NewLister` and `NewResolver` take the same `Option` functions (`WithExtendedOrdering`) applied to a shared `Options` value (Q61). Without extended ordering, `ListAll` keeps the legacy `sortSessionsByTimestamp` (time, then source priority; `sort.Slice` keeps collection order for small equal groups). Extended ordering (`compareSessionsExtended`, stable sort) puts unknown times first, then time, source priority, source name and ID, so it is total and `latest` is the last element. The CLI enables it for `-f shared-json` listings and for `--all-projects` listings/`latest`; `apsis latest` in project scope keeps the legacy order whatever the format (Q83). The web enables it for `apsis serve --all-projects`.
+
+## Listing row metadata
+
+`SessionInfo` carries `TimeFromFilesystem` (set exactly where a timestamp-to-mtime fallback happens), `Project`, `Model`, `Provider` and `Origin`:
+
+- Claude: timestamp from `ParseFirstTimestamp` (unchanged); then `readClaudeHead` re-reads the first 50 lines/1 MiB for the first `cwd` and `entrypoint`. Values beyond that bound are absent from the row only; the session document is authoritative.
+- Codex: one `readCodexHead` scan (see below).
+- Copilot: project is `workspace.yaml` `git_root`, else `cwd`.
+- Kiro CLI: project is the database `key`.
+- Kiro IDE: model and provider from `.chat` `metadata`; no project (the workspace hash is one-way).
+
+Warning codes: `source_failed`, `path_unreadable` (Copilot `workspace.yaml`, unreadable Codex winner), `duplicate_session` and `invalid_record` (all-projects scope only).
 
 ## Path normalization
 
@@ -40,20 +62,38 @@ Callers must distinguish "missing metadata" from "invalid session". A session wi
 
 ## Codex session structure
 
-Sessions stored in `~/.codex/sessions/YYYY/MM/DD/session-{uuid}.jsonl`.
+Sessions are JSONL files below `~/.codex/sessions/`, normally in date directories. Listing extracts a UUID substring from the filename when present; otherwise it uses the basename without `.jsonl`.
 
-First line is always `session_meta` type with payload containing `id`, `timestamp`, and `cwd`.
-The `cwd` field contains the working directory where the session was started.
+The `session_meta` header records the session ID and starting working directory; its top-level timestamp supplies the recorded listing time. `readCodexHead(path)` searches up to `codexMetaScanLimit` (50) physical lines with a 10 MiB per-line limit, rather than assuming that the first line is usable. It replaced the separate timestamp and cwd helpers and keeps their semantics: id, cwd, `model_provider`, `originator` and the fallback model come from the first `session_meta` whose payload decodes; the timestamp from the first `session_meta` whose timestamp parses; the model from the first `turn_context` (Decision 29). It stops once all are found. Values found before a scan error are kept.
 
-Two functions read from session_meta:
-- `getCodexSessionTimestamp(path)` - reads top-level `timestamp` field
-- `getCodexSessionCwd(path)` - reads `payload.cwd` field
+Gotcha: the old timestamp helper returned the modification time *without an error* when no `session_meta` was found, so the resolver reported it as recorded. `readCodexHead` returns a zero timestamp instead and both the lister and resolver flag the fallback (Q105).
+
+## Existing timestamp scan contracts
+
+- Claude listing uses `transcript.ParseFirstTimestamp`: it scans until a timestamp is found, with a 10 MiB per-line limit and no 50-line or 1-MiB total cap. An invalid nonempty timestamp returns an error; listing then falls back to modification time.
+- `readCodexHead` retains the 50-line, 10-MiB-per-line scan behaviour. Timestamp extraction failures fall back to modification time.
+- A metadata cache must preserve those outcomes. Applying a new global head limit to existing timestamps can change listing order and `latest` even without a feature flag.
 
 ## Session resolution by ID
 
-`resolveInput()` and `resolveFollowInput()` use `findCodexSession()` to locate a session by UUID. This scans all codex sessions without project filtering (intentional — user explicitly asked for a specific session).
+`resolveInput()` and `resolveFollowInput()` delegate to `sessions.Resolver`; with `-s`/`--source` they try only that source and skip file-path detection. Codex branches use `selectCodexCandidate()`. It searches globally without project filtering, matches a filename UUID or a full non-UUID basename case-insensitively, and keeps the first walk-order match before validating its content/readability. It walks through `walkCodexRollouts`, the same walk `listCodex` uses, so the listing's first row per ID is the resolver's choice. (A followed directory symlink used to let a later match overwrite the first; Q107.)
 
-## OpenCode session structure
+Duplicate filename IDs can therefore shadow a later valid file. Any derived index that claims an ID is openable must validate the actual selected candidate, rather than any matching copy.
+
+## All-projects scope
+
+`NewResolver("")` opens every source without turning `""` into the working directory: Claude searches project directories in sorted order; Codex and Copilot are global anyway; Kiro CLI uses `logs.GetSessionByID` (`updated_at DESC, key ASC`, the same order `DiscoverAll` now de-duplicates with); Kiro IDE scans every workspace under `KiroIDEBasePath` and takes `CostPath` from the winning workspace.
+
+`ListAll("")` lists each `(source, id)` once, choosing the copy the resolver opens, with a `duplicate_session` warning per skipped copy. Each collector does this beside its own rule (Q106): Claude keeps the first project directory; Codex keeps the first walk match and lists it only if `codexHeadWarning` passes (readable, `session_meta` present, recorded id equals the filename UUID), otherwise omits the ID without promoting a later copy (Decision 22, Decision 33); Kiro IDE uses `bestKiroIDECandidate` across workspaces. Project-scope Codex rows keep per-file cwd filtering, even when the global winner is elsewhere (Q62).
+
+`resolveInput()` returns the reader plus an `inputContext` (source, ID, Kiro IDE cost path, resolver metadata); file and stdin input have no source or resolver metadata. Resolver `SessionMetadata` now also carries:
+
+- `Path`: the opened file (Claude, Codex, Copilot, Kiro IDE); empty for Kiro CLI.
+- `TimeFromFilesystem`: set wherever `CreatedAt` falls back to the file modification time. Shared JSON never reports such a time as `created_at`.
+- `Project`: Copilot `workspace.yaml` `git_root`, else `cwd`; for Kiro CLI the database key that actually matched (`logs.GetSessionRecord` tries the normalised then the symlink-resolved directory).
+- `DatabaseCreatedAt`: the Kiro CLI database `created_at`. Kiro CLI `CreatedAt` deliberately stays zero because the web transcript view prints `CreatedAt` whenever it is set (Q103, open question U6).
+
+## OpenCode agent session structure (not an Apsis source)
 
 Sessions stored in `~/.local/share/opencode/storage/message/<sessionID>/`.
 
@@ -67,7 +107,7 @@ The `parseCreatedTime` function handles multiple timestamp formats: RFC3339, RFC
 
 ## Kiro IDE path resolution
 
-`resolveKiroIDE` and `ResolvePath(SourceKiroIDE)` both delegate to `findKiroIDEPath(workspaceDir, sessionID)` for scanning `.chat` files. The `IsPathWithinDir` check is inside the scan loop (not after it) so that symlinked files pointing outside the workspace are skipped without shadowing legitimate files. This is important because the scan selects the file with the most chat messages -- a symlink with more messages must not prevent a valid file from being returned.
+`internal/sessions/kiro_ide.go` holds the candidate rule the lister and resolver share: `kiroIDEWorkspaceCandidates` scans one workspace and `bestKiroIDECandidate` picks most chat messages, then newest mtime, then lexically smallest path. `resolveKiroIDE` and `ResolvePath(SourceKiroIDE)` go through `locateKiroIDE`. Symlinks resolving outside the workspace are skipped inside the scan loop (not after it), so a symlink with more messages cannot shadow a legitimate file.
 
 Note: `ResolvePath` for Codex and Copilot does not include `IsPathWithinDir` validation (unlike their `Resolve` counterparts). This is a pre-existing gap.
 ## Kiro IDE execution detail actions

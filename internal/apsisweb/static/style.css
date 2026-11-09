@@ -214,6 +214,11 @@ a:hover {
     color: #ca8a04;
 }
 
+.source-codex-exec {
+    background-color: rgba(13, 148, 136, 0.1);
+    color: #0d9488;
+}
+
 @media (prefers-color-scheme: dark) {
     .source-claude {
         background-color: rgba(139, 92, 246, 0.2);
@@ -238,6 +243,11 @@ a:hover {
     .source-kiro-ide {
         background-color: rgba(251, 191, 36, 0.2);
         color: #fbbf24;
+    }
+
+    .source-codex-exec {
+        background-color: rgba(45, 212, 191, 0.2);
+        color: #2dd4bf;
     }
 }
 
@@ -287,9 +297,26 @@ a:hover {
     white-space: nowrap;
 }
 
+.session-file-time {
+    font-size: 0.75rem;
+}
+
 .session-size {
     color: var(--text-secondary);
     font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+/* All-projects scope adds a project column */
+.session-list.all-projects .session-card {
+    grid-template-columns: auto 1fr minmax(0, 30ch) auto auto;
+}
+
+.session-project {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
@@ -417,7 +444,8 @@ a:hover {
 
 /* Mobile responsive - single column under 768px */
 @media (max-width: 768px) {
-    .session-card {
+    .session-card,
+    .session-list.all-projects .session-card {
         grid-template-columns: 1fr;
     }
 
