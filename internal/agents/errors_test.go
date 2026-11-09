@@ -584,3 +584,45 @@ func TestBuildUnknownMessage(t *testing.T) {
 		})
 	}
 }
+
+func TestNewRateLimitWaitError(t *testing.T) {
+	err := NewRateLimitWaitError("codex", 2*time.Hour+30*time.Minute)
+	if err.Class != ErrorClassRateLimitWait {
+		t.Errorf("Class = %v, want %v", err.Class, ErrorClassRateLimitWait)
+	}
+	if err.RetryAfter != 2*time.Hour+30*time.Minute {
+		t.Errorf("RetryAfter = %v, want %v", err.RetryAfter, 2*time.Hour+30*time.Minute)
+	}
+	if err.Agent != "codex" {
+		t.Errorf("Agent = %q, want %q", err.Agent, "codex")
+	}
+	expected := "Usage limit reached, waiting 2 hours 30 minutes until reset"
+	if err.Message != expected {
+		t.Errorf("Message = %q, want %q", err.Message, expected)
+	}
+}
+
+func TestFormatWaitDuration(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration time.Duration
+		expected string
+	}{
+		{"seconds", 30 * time.Second, "30 seconds"},
+		{"one minute", 1 * time.Minute, "1 minute"},
+		{"minutes", 5 * time.Minute, "5 minutes"},
+		{"one hour", 1 * time.Hour, "1 hour"},
+		{"hours", 3 * time.Hour, "3 hours"},
+		{"hours and minutes", 2*time.Hour + 30*time.Minute, "2 hours 30 minutes"},
+		{"one hour one minute", 1*time.Hour + 1*time.Minute, "1 hour 1 minute"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FormatWaitDuration(tt.duration)
+			if got != tt.expected {
+				t.Errorf("FormatWaitDuration(%v) = %q, want %q", tt.duration, got, tt.expected)
+			}
+		})
+	}
+}
