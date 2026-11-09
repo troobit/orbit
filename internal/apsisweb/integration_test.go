@@ -109,6 +109,7 @@ func TestIntegrationEndToEnd(t *testing.T) {
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("expected 404, got %d", resp.StatusCode)
 		}
+		readBody(t, resp)
 	})
 
 	t.Run("invalid source returns 404", func(t *testing.T) {
@@ -121,6 +122,7 @@ func TestIntegrationEndToEnd(t *testing.T) {
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("expected 404, got %d", resp.StatusCode)
 		}
+		readBody(t, resp)
 	})
 
 	t.Run("security headers present", func(t *testing.T) {
@@ -140,6 +142,7 @@ func TestIntegrationEndToEnd(t *testing.T) {
 				t.Errorf("%s = %q, want %q", header, got, want)
 			}
 		}
+		readBody(t, resp)
 	})
 
 	t.Run("HTMX fragment endpoint returns partial HTML", func(t *testing.T) {

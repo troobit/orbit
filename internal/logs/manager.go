@@ -235,6 +235,8 @@ func NewManagerWithOptions(baseDir, branchName, workingDir string, opts ManagerO
 			// Increment run number for new orchestration run
 			m.summary.RunNumber++
 			m.summary.Status = "running"
+			m.summary.CompletedAt = nil
+			m.summary.Error = ""
 			m.summary.BranchName = branchName // Update to current branch
 		}
 	} else {
@@ -553,7 +555,7 @@ func (m *Manager) SaveSession(phase int, result *agents.RunResult, startTime tim
 		NumTurns:   result.NumTurns,
 		StartedAt:  startTime,
 		EndedAt:    endTime,
-		IsError:    result.IsError,
+		IsError:    result.IsError || result.ExitCode != 0 || result.Error != nil,
 		RunNumber:  m.summary.RunNumber,
 		AgentAlias: m.agentInfo.Alias,
 		AgentType:  m.agentInfo.Type,
@@ -561,7 +563,9 @@ func (m *Manager) SaveSession(phase int, result *agents.RunResult, startTime tim
 	}
 
 	m.summary.Sessions = append(m.summary.Sessions, entry)
-	m.summary.PhasesCompleted = phase
+	if !entry.IsError {
+		m.summary.PhasesCompleted = max(m.summary.PhasesCompleted, phase)
+	}
 
 	// Update CostTotals aggregation by unit
 	if m.summary.CostTotals == nil {

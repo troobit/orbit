@@ -12,6 +12,7 @@ import (
 	"github.com/arjenschwarz/orbit/internal/display"
 	"github.com/arjenschwarz/orbit/internal/logs"
 	"github.com/arjenschwarz/orbit/internal/registry"
+	"github.com/arjenschwarz/orbit/internal/rune"
 	"github.com/google/uuid"
 )
 
@@ -101,6 +102,20 @@ func isSessionInvalidError(result *agents.RunResult) bool {
 // if the result is nil), and passes the actual exit code to the classifier.
 // When result is nil, exit code defaults to 1 since no real exit code is available.
 func (o *Orbit) classifyRunError(result *agents.RunResult, err error) *agents.ClassifiedError {
+	if o.config.Local != nil {
+		message := "local worker failed"
+		if err != nil {
+			message = err.Error()
+		}
+		if result != nil {
+			if len(result.Errors) > 0 {
+				message += ": " + strings.Join(result.Errors, "; ")
+			} else if result.Stderr != "" {
+				message += ": " + strings.TrimSpace(result.Stderr)
+			}
+		}
+		return &agents.ClassifiedError{Class: agents.ErrorClassFatal, Original: err, Message: message}
+	}
 	var stderr, output string
 	var errMsgs []string
 	exitCode := 1 // default when result is nil (no exit code available)
@@ -426,15 +441,19 @@ func (o *Orbit) runPostPromptWithRetry() error {
 // runPhaseWithRetry executes a phase with retry logic for transient errors.
 func (o *Orbit) runPhaseWithRetry(phase int) error {
 	o.currentPhaseRunCount = 0
-	o.debug.Log("Starting phase %d with up to %d retries", phase, maxRetries)
+	attempts := maxRetries
+	if o.config.Local != nil {
+		attempts = 1
+	}
+	o.debug.Log("Starting phase %d with up to %d attempts", phase, attempts)
 	phaseStart := time.Now()
 
 	_, err := agents.RunWithRetry(o.shutdownCtx, agents.RetryConfig{
-		MaxRetries: maxRetries,
+		MaxRetries: attempts,
 		Sleep:      o.sleepFunc(),
 		Execute: func(_ context.Context, attempt int) (*agents.RunResult, error) {
 			o.currentPhaseRunCount++
-			o.debug.Log("Phase %d attempt %d/%d", phase, attempt+1, maxRetries)
+			o.debug.Log("Phase %d attempt %d/%d", phase, attempt+1, attempts)
 			o.updatePhaseStatus(phase, registry.PhaseStatusRunning, o.currentPhaseRunCount)
 			return nil, o.runPhase(phase)
 		},
@@ -580,6 +599,18 @@ func (o *Orbit) runPhase(phase int) error {
 		SessionID: sessionID,
 		Timeout:   o.config.AgentConfig.Timeout,
 	}
+	if o.config.Local != nil {
+		opts.Prompt = o.localIteration.prompt
+		opts.ProcessGroup = true
+		closeOutput, err := o.localOutput(&opts, phase, sessionID)
+		if err != nil {
+			if o.spinner != nil {
+				o.spinner.Stop()
+			}
+			return err
+		}
+		defer closeOutput()
+	}
 
 	var result *agents.RunResult
 	var err error
@@ -641,6 +672,22 @@ func (o *Orbit) runPhase(phase int) error {
 		classified := o.classifyRunError(result, nil)
 		o.debug.LogError(classified.Class.String(), classified.Message, classified.Class.IsRetryable())
 		return classified
+	}
+	if o.config.Local != nil {
+		var progressErr error
+		if reason, found := workerHalt(result.FinalOutput); found {
+			progressErr = fmt.Errorf("ORBIT-HALT: %s", reason)
+		} else {
+			progressErr = o.validateLocalProgress()
+		}
+		if progressErr != nil {
+			result.IsError = true
+			result.Errors = append(result.Errors, progressErr.Error())
+			if o.logManager != nil {
+				_ = o.logManager.SaveSession(phase, result, startTime)
+			}
+			return progressErr
+		}
 	}
 
 	// Save successful session
@@ -768,6 +815,7 @@ func (o *Orbit) runSingle() error {
 		}
 	}
 
+	iterations := 0
 	for {
 		// Check for shutdown signal between phases
 		select {
@@ -776,10 +824,21 @@ func (o *Orbit) runSingle() error {
 			return o.fail(fmt.Errorf("interrupted by user"))
 		default:
 		}
+		if o.config.Local != nil {
+			if err := o.checkLocalHalt(); err != nil {
+				return o.fail(err)
+			}
+		}
 
 		// Check for remaining tasks
 		o.debug.Log("Checking for pending tasks...")
-		pending, err := o.runeClient.ListPending()
+		var pending []rune.Task
+		var err error
+		if o.config.Local != nil {
+			pending, err = o.localIncompleteTasks()
+		} else {
+			pending, err = o.runeClient.ListPending()
+		}
 		if err != nil {
 			o.debug.Log("Failed to list pending tasks: %v", err)
 			return o.fail(fmt.Errorf("failed to check pending tasks: %w", err))
@@ -793,7 +852,15 @@ func (o *Orbit) runSingle() error {
 
 		// Get the next phase info
 		o.debug.Log("Getting next phase...")
-		nextPhase, err := o.runeClient.GetNextPhase()
+		var nextPhase *rune.NextPhaseResult
+		if o.config.Local != nil {
+			if iterations >= o.config.Local.MaxIterations {
+				return o.fail(fmt.Errorf("reached iteration limit (%d); re-run to continue", o.config.Local.MaxIterations))
+			}
+			nextPhase, err = o.prepareLocalIteration()
+		} else {
+			nextPhase, err = o.runeClient.GetNextPhase()
+		}
 		if err != nil {
 			o.debug.Log("Failed to get next phase: %v", err)
 			return o.fail(fmt.Errorf("failed to get next phase: %w", err))
@@ -807,11 +874,18 @@ func (o *Orbit) runSingle() error {
 
 		// Get the actual phase number from the tasks file
 		phaseNum := o.getPhaseNumber(nextPhase.PhaseName)
+		if o.config.Local != nil {
+			// Local sessions are iteration units; one source phase can span many.
+			phaseNum = iterations + 1
+		}
 
 		if o.config.DryRun {
 			log.Printf("[DRY RUN] Would execute phase %d with %d pending tasks", phaseNum, len(pending))
 			log.Printf("[DRY RUN] Next phase: %s with %d tasks", nextPhase.PhaseName, len(nextPhase.Tasks))
 			log.Printf("[DRY RUN] Phase command: %s", o.config.Command)
+			if o.config.Local != nil {
+				fmt.Println(o.localIteration.prompt)
+			}
 			if o.config.PostPrompt != "" {
 				log.Printf("[DRY RUN] Post-command: %s", o.config.PostPrompt)
 			} else {
@@ -829,6 +903,10 @@ func (o *Orbit) runSingle() error {
 		})
 
 		// Run the phase
+		iterations++
+		if o.config.Local != nil {
+			log.Printf("Iteration %d/%d", iterations, o.config.Local.MaxIterations)
+		}
 		if err := o.runPhaseWithRetry(phaseNum); err != nil {
 			return o.fail(err)
 		}
@@ -871,4 +949,3 @@ func (o *Orbit) complete() error {
 	}
 	return nil
 }
-

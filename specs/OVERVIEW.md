@@ -36,6 +36,7 @@
 | [Shared Retry Executor](#shared-retry-executor) | 2026-02-18 | No Tasks | Consolidate four near-identical retry executors into a single shared implementation. |
 | [Message Metadata](#message-metadata) | 2026-03-12 | Done | Show timestamps and model identifiers inline in rendered Apsis transcripts. |
 | [Finalize Show Verify](#finalize-show-verify) | 2026-05-10 | Done | Show variant agent and warn on consolidation mismatch in `orbit finalize`. |
+| [Run Termination Guarantees](#run-termination-guarantees) | 2026-08-13 | Not Started | Guarantee every run ends: stop stalled phase loops, classify credit exhaustion, and always record a terminal state. |
 | [Apsis Shared JSON](#apsis-shared-json) | 2026-11-06 | In Progress | Versioned JSON output with one layout for every Apsis source, plus Codex exec streams, recorded providers and listing across projects. |
 | [Apsis LM Studio Logs](#apsis-lm-studio-logs) | 2026-11-06 | No Tasks | Translate LM Studio server logs into Apsis's shared representation, showing missing content and uncertain attribution. |
 
@@ -350,6 +351,15 @@ Show variant agent and warn on consolidation mismatch in `orbit finalize`.
 - [implementation.md](finalize-show-verify/implementation.md)
 - [smolspec.md](finalize-show-verify/smolspec.md)
 - [tasks.md](finalize-show-verify/tasks.md)
+
+## Run Termination Guarantees
+
+Guarantee every run ends: stop stalled phase loops, classify credit exhaustion, and always record a terminal state.
+
+- [decision_log.md](run-termination/decision_log.md)
+- [design.md](run-termination/design.md)
+- [requirements.md](run-termination/requirements.md)
+- [tasks.md](run-termination/tasks.md)
 
 ## Apsis Shared JSON
 

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `orbit local` accepts `--context-window`, `--compact-at`, and opt-in `--network` controls for local model budgets and sandboxed dependency downloads.
+- `orbit local <tasks.md>` implements an explicit rune task file through Codex and LM Studio, using the `8-bit` model by default with fresh sessions, task or phase selection, and configurable timeout and iteration limits.
+- Local runs retain prompts and live stdout/stderr, report elapsed time, and stop on halt signals, changed task graphs, worker failures, or lack of completed work. Unix cancellation terminates worker child processes.
+- `make install-local-next-task` installs Orbit and a compatible `local-next-task` command, replacing the known agentic-coding prototype link while preserving unrelated files.
+- An `8-bit` implementation quick guide, local-runner runbook, and recorded live-model verification document setup, execution, diagnostics, and recovery.
 - `orbit finalize` now displays the variant's agent (alias, type, model) in its preamble, falling back to "Agent: unknown" when none of the fields are populated.
 - `orbit finalize` now reads the spec's `consolidation-log.json` and prints a warning before the confirmation prompt when the requested `--variant` differs from the most recent consolidation entry. The warning fires under `--force` as well so it remains visible in CI output.
 - `apsis -f shared-json` outputs a session as versioned JSON with the same layout for every agent: source, identifier, recorded creation time, project, model, provider, origin and cost, followed by entries with their recorded identifiers and structured warnings. The layout is published as a JSON Schema in `docs/schemas/apsis-shared-json.v1.schema.json`.
@@ -26,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - The apsisweb end-to-end test no longer times out on shutdown when the HTTP client holds an unused keep-alive connection.
+- Local Codex runs exclude connected ChatGPT app namespaces that appear under normal authentication despite ignored user configuration.
+- Restarting a run in an existing log directory clears the previous error and completion timestamp while preserving session history.
+- Local Codex workers receive explicit context and compaction budgets and bounded tool-output history to reduce prompt truncation, with guidance for focused reads and dependency blockers.
+- Failed worker attempts retain diagnostics without increasing the summary's completed-phase count.
+- Local Codex runs disable unsupported web search and delegation tools and unused reasoning summaries; setup guidance explains the remaining LM Studio protocol warnings.
+- Local completion checks include in-progress tasks so interrupted work is dispatched again when resuming.
+- Codex JSONL execution detects failed turns even when the CLI exits successfully and retains the stream in Orbit's standard session artifacts.
 - Claude Code session-limit messages using the new `"You've hit your session limit"` wording now wait until the reported reset time while retaining support for the older message.
 
 ## [0.9.0] - 2026-04-11

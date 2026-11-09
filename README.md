@@ -54,6 +54,36 @@ orbit --command "Run /next-task --phase" --post-prompt "Run all tests"
 orbit --no-post-prompt
 ```
 
+## Local task execution
+
+Run an explicit rune ledger through Codex and an LM Studio model:
+
+```bash
+make install-local-next-task
+local-next-task /path/to/project/specs/feature/tasks.md --dry-run
+local-next-task /path/to/project/specs/feature/tasks.md
+# Equivalent entry point:
+orbit local /path/to/project/specs/feature/tasks.md
+```
+
+Orbit selects one task per fresh session and passes its details and references
+directly to the worker. Use `--phase` for a whole phase, `--model <identifier>`
+for another loaded model, `--timeout 1h` to allow slower sessions, or
+`--max-iterations 5` to bound a run. `--selection model` uses the installed
+next-task skill to retrieve the preflight selection.
+
+The default model is `8-bit`, with 30 minutes per session and at most 20
+iterations. Start LM Studio's API server and load the model before running.
+No Orbit config file is required. Edits remain for review; sessions stop on
+halt markers, worker failures, task-graph changes or lack of completed work.
+Logs live in `.orbit/local/` beside the task file.
+
+The install target replaces the known agentic-coding prototype symlink with
+Orbit's implementation. Start with the
+[8-bit implementation quick guide](docs/runbooks/local-implementation-quickstart.md)
+for an arbitrary task file. The [local runner runbook](docs/runbooks/local-next-task.md)
+covers migration, diagnostics and recovery.
+
 ## Options
 
 ### Core Options

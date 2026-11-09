@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repository contains two related CLI tools for working with AI coding agents:
 
-- **Orbit** - Orchestrates AI coding agent sessions to implement spec phases sequentially. Supports Claude Code, OpenAI Codex, AWS Kiro, GitHub Copilot, and OpenCode. Handles session lifecycle, error recovery, log management, and multi-variant comparison runs. Includes a web interface for viewing runs and transcripts.
+- **Orbit** - Orchestrates AI coding agent sessions to implement spec phases sequentially. Supports Claude Code, OpenAI Codex, AWS Kiro, GitHub Copilot, and OpenCode. `orbit local <tasks.md>` drives local LM Studio models through Codex, selecting work and checking progress in Orbit. Handles session lifecycle, error recovery, log management, and multi-variant comparison runs. Includes a web interface for viewing runs and transcripts.
 - **Apsis** - Converts AI coding agent session transcripts to readable Markdown or HTML. Supports Claude Code (JSONL), OpenAI Codex (JSONL), GitHub Copilot (JSONL), AWS Kiro CLI (SQLite), and Kiro IDE sessions. Includes a web interface (`apsis serve`) for browsing sessions.
 
 ## Build and Development Commands
@@ -17,11 +17,13 @@ make build-orbit    # Build orbit only
 make build-apsis    # Build apsis only
 make test           # Run all tests (~10s total)
 make test-short     # Run tests with -short flag
+make test-local     # Local dispatch, rune integration, output and cancellation tests
 make test-verbose   # Run tests with verbose output
 make test-coverage  # Run tests with coverage report
 make lint           # Run golangci-lint
 make modernize      # Update code to modern Go idioms
 make install        # Install both binaries to GOPATH/bin
+make install-local-next-task # Install Orbit and local-next-task into ~/.local/bin
 make clean          # Remove build artifacts
 
 # Run single test
