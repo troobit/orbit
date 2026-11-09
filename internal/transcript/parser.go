@@ -295,6 +295,11 @@ type ParseResult struct {
 	Warnings []ParseWarning
 	Metadata *ParseResultMetadata // May be non-nil without cost information
 	Format   Format               // FormatUnknown when Parse uses the Claude fallback
+
+	// LMStudioRequests is parallel to Entries, in source order; empty for every
+	// other format. It carries per-request boundary metadata written once rather
+	// than duplicated on every message item the request produced.
+	LMStudioRequests []LMStudioRequest
 }
 
 // ParseWarning represents a non-fatal parsing issue.

@@ -1,0 +1,30 @@
+# Orbit configuration - see documentation for all options
+#
+# Every alias pins a model so variant runs compare specific models,
+# not whatever each harness defaults to. This file merges over
+# ~/.orbit.yaml, so aliases defined only there remain available.
+
+agent: opus   # used when --agent is not given
+
+# Compare models (one variant per alias):
+#   orbit run --variants 4 --variant-agents opus,fable,sonnet,codex
+agents:
+  opus:
+    type: claude-code
+    auto-approve: true
+    model: claude-opus-5-5
+
+  fable:
+    type: claude-code
+    auto-approve: true
+    model: claude-fable-5-1
+
+  sonnet:
+    type: claude-code
+    auto-approve: true
+    model: claude-sonnet-5-5
+
+  codex:
+    type: codex
+    timeout: 1h
+    model: gpt-6.1-sol

@@ -20,8 +20,13 @@
 | Q14 | 2026-11-05 | Browser session commands include all-projects scope/source, while direct-log commands identify the file and forced format | Oversized-session instructions must not suggest a bare identifier that cannot reopen this source |
 | Q15 | 2026-11-05 | Direct-file request/membership IDs match discovery inside the configured root; outer log-document and out-of-root/stdin IDs remain input-scoped | Stable membership does not turn a containing multi-session file into one listed conversation, or require reading other log bodies |
 | Q16 | 2026-11-05 | Explain common unknown response attribution once per human transcript while keeping per-request shared-JSON state | The state is universal for this grammar; repeating an absence-sounding sentence on every request adds noise and can misdescribe existing unattributed evidence |
+| Q17 | 2026-11-09 | Blank-import `time/tzdata` for bundled IANA zone names; use `time.LoadLocationFromTZData` for an explicit absolute TZif-file override; distinguish unset from explicitly-empty `TZ` with `os.LookupEnv`, not `os.Getenv` | Decision 10 left exact API integration to design; these are the standard-library calls that satisfy its no-system-zone-database and unset-vs-empty requirements |
+| Q18 | 2026-11-09 | Logical-session and request identifiers hash the full original value (thread ID text, or file-relative path plus start line) rather than truncating it | Removes the truncation-collision surface `codex-exec`'s path-mixed identifier has, so no identifier-conflict warning code is needed for this source |
+| Q19 | 2026-11-09 | Listing's `request_count` is a new field, not a reuse of the existing byte-sized `size_bytes`/`Size` column | Requirement 7.2 calls it "size" but means a count for this source; overloading the byte-sized field would mislabel it in the shared-JSON schema and in `apsis -l`'s `FormatSize` output |
+| Q20 | 2026-11-09 | Amended requirement 7.3 to scope its zero-log-body-read guarantee to Unix and macOS; other platforms stay correct without that guarantee | Decision 6 implements the cache fingerprint on Unix only; the requirement text should say so rather than promising a platform-agnostic guarantee the design doesn't build |
+| Q21 | 2026-11-09 | The active, currently-growing log file is fully re-parsed on every refresh in which it changed; no incremental/resume parsing is built for this feature | 7.3's guarantee applies to an *unchanged* tree; the active file is expected to change on most polls, so re-parsing it fully doesn't violate 7.3, and resumption state would add real parser complexity for a file the source's own date/.N rotation keeps from growing unboundedly within one day |
 
-Decisions 1, 2, 3, 4, 5, 7, 8 and 10 are **accepted**. Decisions 6 and 9 remain **proposed**, pending design. The repository has no `.agentic.json`; superseded decisions are not kept as separate historical entries — an earlier decision's rejected or replaced approach is folded into the current decision's Alternatives Considered instead.
+Decisions 1–5, 7, 8 and 10 are **accepted**. Decisions 6 and 9 are **accepted** as of design. The repository has no `.agentic.json`; superseded decisions are not kept as separate historical entries — an earlier decision's rejected or replaced approach is folded into the current decision's Alternatives Considered instead.
 
 ---
 
@@ -209,40 +214,41 @@ Direct inspection preserves physical evidence and handles stdin without another 
 
 ---
 
-## Decision 6: Cache Unchanged Logs Within the Process
+## Decision 6: Cache Unchanged Logs Within the Process, Scoped to Unix
 
-**Date**: 2026-11-05
-**Status**: proposed
+**Date**: 2026-11-09
+**Status**: accepted
 
 ### Context
 
-Grouping needs fields inside request bodies, and the existing web list refreshes every 15 seconds. An earlier cold-time target relied on an unverified single-machine measurement and a mistaken monthly-volume claim, so it cannot serve as a portable pass/fail threshold.
+Grouping needs fields inside request bodies, and the existing web list refreshes every 15 seconds. An earlier cold-time target relied on an unverified single-machine measurement and a mistaken monthly-volume claim, so it cannot serve as a portable pass/fail threshold. `apsis-shared-json` hit the same zero-body-read problem for its own cross-source cache and spun the rigorous fix — a native file-identity fingerprint (inode/ctime on Unix, file-ID on Windows) — into its own gated PR phase, which has sat unimplemented for lack of a native Windows host to verify against.
 
 ### Decision
 
-Require zero log-body reads on unchanged in-process refreshes and reflect added, changed, replaced, truncated or removed inputs on the next successful refresh. Write no persistent index; record generated workload and environment in cold and refresh benchmarks instead of imposing an uncalibrated time limit.
+Cache a lightweight per-file summary (thread groupings, request counts, first-known model/time, warnings — never full bodies) keyed on a change fingerprint, with two build-tagged implementations: a real fingerprint (size, mtime, ctime, inode, device via `syscall.Stat_t`) on `unix`, and an always-miss stub everywhere else. Reflect added, changed, replaced, truncated or removed inputs on the next successful refresh; write no persistent index.
 
 ### Rationale
 
-The refresh outcome is measurable and directly addresses repeated work. Cache mechanics, record limits and identifiers belong to design and must be tested together before local implementation admission.
+The user chose to descope native Windows fingerprinting for this feature rather than repeat the sibling's unresolved verification blocker. The Unix fingerprint is not itself blocked — unlike Windows, Unix/macOS development hardware is available, so building and testing it carries none of the sibling's stalled risk. An always-miss cache on other platforms keeps correctness identical everywhere (no risk of a weak heuristic serving stale data); it only forgoes the performance optimisation there, which the requirement's wording ("within one apsis serve process") does not make a correctness requirement.
 
 ### Alternatives Considered
 
-- **Read every log body on each refresh:** rejected because unchanged inputs provide no new evidence.
-- **Persist an index on disk:** rejected for this feature because it introduces stored identifiers and cache-format lifecycle without demonstrated need.
-- **Require three seconds for a fixed byte volume everywhere:** rejected because hardware, record count and payload shape affect runtime and no reference environment was agreed.
+- **Size+mtime heuristic on every platform:** rejected because it reintroduces exactly the false-cache-hit risk the sibling spec's Decision 23 already rejected for the same problem, for no platform-coverage benefit over the always-miss stub.
+- **Full native fingerprint including Windows:** rejected because it repeats the sibling's unverified native-Windows blocker and the user explicitly asked to descope Windows for simplicity.
+- **Persist an index on disk:** rejected because it introduces stored identifiers and a cache-format lifecycle without demonstrated need.
+- **Require a fixed time budget for a fixed byte volume everywhere:** rejected because hardware, record count and payload shape affect runtime and no reference environment was agreed.
 
 ### Consequences
 
 **Positive:**
 
-- Repeated web refreshes avoid unchanged body reads.
-- No additional copy of log metadata is persisted by apsis.
+- Repeated web refreshes on Unix/macOS avoid unchanged body reads, with no weaker-heuristic risk anywhere.
+- No additional persistent index, and no dependency on the sibling spec's unmerged generic cache package.
 
 **Negative:**
 
-- Each new CLI process still pays cold parsing cost.
-- Replacement and removal invalidation must update affected history and references while preserving surviving identities.
+- Windows `apsis serve` re-reads the configured root's bodies on every refresh; large unthreaded roots pay that cost repeatedly on that platform.
+- Each new CLI process still pays cold parsing cost, matching every other source's existing per-invocation behaviour.
 
 ---
 
@@ -327,7 +333,7 @@ This spec must build on the sibling's approved scope and cannot silently change 
 ## Decision 9: Preserve Request Parameters as Evidence Outside Conversation Messages
 
 **Date**: 2026-11-05
-**Status**: proposed
+**Status**: accepted
 
 ### Context
 
