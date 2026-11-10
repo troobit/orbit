@@ -141,8 +141,8 @@ func TestParseLMStudio_LoggedResponses(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{
-		"assistant/assistant: text:Seven. | usage::prompt_tokens=20,completion_tokens=2,total_tokens=22",
-		"assistant/assistant: text:An example illustrates a rule. | usage::input_tokens=18,output_tokens=7,total_tokens=25",
+		"assistant/assistant: text:Seven. | usage:response:prompt_tokens=20,completion_tokens=2,total_tokens=22",
+		"assistant/assistant: text:An example illustrates a rule. | usage:response:input_tokens=18,output_tokens=7,total_tokens=25",
 	}, responses)
 }
 
@@ -234,7 +234,7 @@ func TestTranslateLMResponse(t *testing.T) {
 		},
 		"v0 usage and stats": {
 			body:    `{"choices":[{"text":"x"}],"usage":{"total_tokens":3},"stats":{"tokens_per_second":51.4}}`,
-			content: []string{"text:x", "usage::total_tokens=3", "usage:stats:tokens_per_second=51.4"},
+			content: []string{"text:x", "usage:response:total_tokens=3", "usage:stats:tokens_per_second=51.4"},
 		},
 		"responses output": {
 			body: `{"model":"m","output":[{"type":"reasoning","summary":[{"type":"summary_text","text":"s"}],"content":[{"type":"reasoning_text","text":"r"}]},` +

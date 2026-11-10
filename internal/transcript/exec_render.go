@@ -32,7 +32,7 @@ func usageLabel(basis string) string {
 	switch basis {
 	case UsageBasisThreadTotal:
 		return "Token usage (thread totals at turn completion)"
-	case "":
+	case "", UsageBasisResponse:
 		return "Token usage"
 	}
 	return "Token usage (" + basis + ")"

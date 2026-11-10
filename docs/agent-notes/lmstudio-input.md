@@ -2,7 +2,7 @@
 
 ## Current State
 
-- `specs/apsis-lmstudio-logs/` defines the server-log source. Phases 1 (shared representation, time zone), 2 (record parser, detection) and 3 (Markdown/HTML rendering) are implemented. Shared JSON fields, source registration, discovery and the CLI flags are not yet.
+- `specs/apsis-lmstudio-logs/` defines the server-log source. Phases 1 (shared representation, time zone), 2 (record parser, detection), 3 (Markdown/HTML rendering) and 4 (shared JSON projection) are implemented. Source registration, discovery and the CLI flags are not yet. `sessions.SourceLMStudio` and `SessionInfo.RequestCount` exist but are not yet registered in `allSources` or the lister.
 - The sibling `apsis-shared-json` supplies the common JSON contract and all-projects scope. Its approved requirements remain authoritative; the LM Studio requirements still have unanswered user-owned choices.
 - Public LM Studio API documentation defines endpoint payloads, not the disk-log grammar. Earlier structural inspections are labelled as reported observations in the handoff. Fixtures must be synthetic and distinguish those two kinds of evidence.
 
@@ -10,6 +10,8 @@
 
 - `FormatLMStudio`, `Entry.RequestID`/`SuppliedContext`/`Unattributed`/`SourceLine` (all `json:"-"`) and `ParseResult.LMStudioRequests` exist. `LMStudioRequest` lives in `lmstudio_types.go` with the `BodyState*` constants (`not_logged`, `malformed`, `incomplete`, `oversized`; empty = translated).
 - `LMStudioRequests` is parallel to `Entries`, not embedded: entries join their request through `Entry.RequestID`. A request with no translatable body has a request row and zero entries.
+- `LMStudioRequest.SessionID` is the listed logical-session ID (the request's own ID for a singleton). The parser leaves it empty; the sessions layer must set it with `ID`, since shared JSON's `requests[].session_id` reads it.
+- `ParseResult.LMStudioEvents` (`[]LMStudioEventSummary`: root-relative `File`, `NextFile`, per-kind `Counts`, start `Lines`) is for session assembly (Phase 6) to fill in place of the unattributed entries it drops. Shared JSON already projects it as `unattributed_summary`; the Markdown/HTML session view does not render it yet.
 
 ## Record Parser (`lmstudio_parser.go`, `lmstudio_translate.go`)
 

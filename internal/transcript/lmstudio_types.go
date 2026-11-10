@@ -34,4 +34,25 @@ type LMStudioRequest struct {
 	Parameters           json.RawMessage // remaining top-level body fields, including client_metadata and server-held-context references
 	ContextDiscontinuity bool            // the logged input does not extend the thread predecessor's
 	PriorPrefixCount     int             // leading items identical to the predecessor's; 0 = none
+
+	// SessionID is the listed logical-session identifier the request belongs
+	// to: its own ID for a singleton, the thread's ID otherwise. The sessions
+	// layer assigns it together with ID; "" until then.
+	SessionID string
+}
+
+// LMStudioEventSummary is a logical-session view's body-free reference to the
+// unattributed events in one file holding some of the session's requests
+// (requirement 4.2): where they are and how many of each kind, never their
+// content, and never a claim that they belong to the session.
+type LMStudioEventSummary struct {
+	File     string // root-relative path of the contributing file
+	NextFile string // root-relative path of the next discovered file; "" when File is the last
+	Counts   LMStudioEventCounts
+	Lines    []int // start line of each unattributed event in File, in source order
+}
+
+// LMStudioEventCounts counts unattributed events by kind.
+type LMStudioEventCounts struct {
+	Response, Warn, Error int
 }

@@ -78,8 +78,10 @@ func TestSharedJSONListing_ProjectScope(t *testing.T) {
 
 	rows := map[string]sharedjson.ListingRow{}
 	for _, row := range doc.Sessions {
-		assert.Positive(t, row.SizeBytes, "%s/%s", row.Source, row.ID)
-		row.SizeBytes = 0
+		if assert.NotNil(t, row.SizeBytes, "%s/%s", row.Source, row.ID) {
+			assert.Positive(t, *row.SizeBytes, "%s/%s", row.Source, row.ID)
+		}
+		row.SizeBytes = nil
 		rows[row.Source+"/"+row.ID] = row
 	}
 	row := func(source, id string, meta sharedjson.Metadata) sharedjson.ListingRow {

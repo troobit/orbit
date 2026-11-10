@@ -16,6 +16,8 @@ const (
 	SourceKiroIDE = "kiro-ide"
 	// SourceCodexExec is a Codex CLI `codex exec --json` event stream.
 	SourceCodexExec = "codex-exec"
+	// SourceLMStudio is a logical session in LM Studio's disk server logs.
+	SourceLMStudio = "lmstudio"
 )
 
 // allSources is the ordered list of all known agent sources.
@@ -79,7 +81,8 @@ type SessionInfo struct {
 	Model              string // First recorded model, when the listing read yields it
 	Provider           string // First recorded model provider, when the listing read yields it
 	Origin             string // Claude entrypoint or Codex originator from the bounded head scan
-	ThreadID           string // Codex exec thread ID; codex-exec only
+	ThreadID           string // Codex exec thread ID, or LM Studio client thread ID
+	RequestCount       int    // Requests in an LM Studio logical session; lmstudio only
 }
 
 // SessionMetadata is returned by the Resolver alongside the reader.

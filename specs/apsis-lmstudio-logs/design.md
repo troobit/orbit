@@ -162,6 +162,8 @@ func resolveZone(tzEnv string, tzSet bool) zoneResult
 
 Additive to the existing `Session`/`Listing` functions: a document gains a `requests[]` array, one object per `LMStudioRequest` (`id`, `session_id` — the listed logical-session ID this request belongs to, equal to `id` itself for a singleton — `start_line`, `end_line`, `endpoint`, `thread_id`, `parent_thread_id`, `request_kind`, `model`, timestamp fields, `body_state`, `parameters`, `context_discontinuity`, `prior_prefix_count` — each omitted when empty/false/zero, same convention as every other optional field), and each entry gains `request_id` (omitted when empty, i.e. on an unattributed entry) and `supplied_context`/`unattributed` booleans. This keeps `Parameters` and the rest of a request's metadata written once per request rather than once per entry it produced. A session-scoped document's `requests[]` holds only that thread's own requests; direct-view documents keep the unattributed entries themselves (full content, per Decision 7); session-scoped documents instead carry an `unattributed_summary` array (count, source locations, contributing/next files) in their place, matching [Components 6](#6-session-assembly-and-resolution)'s filtered result. The projection has no LM-Studio-specific logic of its own beyond this shape; it renders whatever the parse/assembly layer already produced. Listing rows gain `request_count` (new field, distinct from `size_bytes` — see [Data Models](#data-models)) and reuse the existing `thread_id` listing field `codex-exec` already defined.
 
+Implementation (Q29–Q33): a request's logged wall time is `wall_time` and its interpreted instant `timestamp`, the same pair log-level entries carry, so `timestamp` means an RFC 3339 instant everywhere in the document. Every request also carries `response_attribution: "unknown"` (2.4, Q16). `session_id` comes from a new `LMStudioRequest.SessionID`, which the sessions layer assigns together with `ID`. Log-level entries add `source_line` and `wall_time` (4.2, 5.1), blocks add `truncated` (2.6), and session metadata adds `time_zone` (5.1). The summary's data arrives on `ParseResult.LMStudioEvents`. For this format, session `created_at` comes only from the first request's own time, never from a later entry (5.4).
+
 ### 5. Discovery, identity and cache (`sessions`)
 
 **Roots.** `LMStudioLogDir` is a single resolved path (default `~/.lmstudio/server-logs`, applied by the CLI/web config layer exactly like `codexExecRoots`' flag/env/empty-disables resolution), canonicalised with the existing `CanonicalPath`. Discovery lists immediate subdirectories matching `^\d{4}-\d{2}$`, then within each, files matching `^\d{4}-\d{2}-\d{2}\.\d+\.log$`; a matching symlinked directory is not descended, a matching symlinked file is resolved and kept only inside the canonical root (1.3, mirroring `codex-exec`'s rule). Fingerprinting (below) always stats the resolved target, never the link itself, matching `codex-exec`'s existing candidate walk — otherwise an append to a symlinked file's target would never be seen. A discovered file is always treated as an LM Studio log, without re-running `ProbeLMStudio` (1.2) — a rotated file holding only routine/notice records is still part of the root.
@@ -290,16 +292,19 @@ Covered in [Components 1](#1-shared-representation-additions-transcript): one ne
 
 | Field | Derivation | Omitted when |
 |---|---|---|
-| `requests[]` | one object per `LMStudioRequest`: `id`, `session_id`, `start_line`, `end_line`, `endpoint`, `thread_id`, `parent_thread_id`, `request_kind`, `model`, `timestamp`/`resolved_time`, `body_state`, `parameters`, `context_discontinuity`, `prior_prefix_count` | the whole array, when there are no requests (an empty direct-view input); each field within an object, when empty/false/zero |
+| `requests[]` | one object per `LMStudioRequest`: `id`, `session_id`, `start_line`, `end_line`, `endpoint`, `thread_id`, `parent_thread_id`, `request_kind`, `model`, `wall_time`/`timestamp` (supersedes the earlier `timestamp`/`resolved_time` naming, Q29), `body_state`, `parameters`, `context_discontinuity`, `prior_prefix_count`, `response_attribution` | the whole array, when there are no requests (an empty direct-view input); each field within an object, when empty/false/zero |
 | entry `request_id` | `Entry.RequestID` | empty (unattributed entries) |
 | entry `supplied_context`, `unattributed` | `Entry` fields | false |
-| session `unattributed_summary[]` | assembled per [Components 6](#6-session-assembly-and-resolution), session-scoped documents only | direct-view documents |
+| session `unattributed_summary[]` | assembled per [Components 6](#6-session-assembly-and-resolution), session-scoped documents only: `file`, `next_file`, `counts` (`response`/`warn`/`error`), `lines` (Q31) | direct-view documents |
+| entry `source_line`, `wall_time` | `Entry` fields, log-level entries | request entries |
+| block `truncated` | `ContentItem.Truncated` | false |
+| session `time_zone` | `ParseResultMetadata.TimeZone` | other formats |
 
 ### Listing document additions
 
 | Field | Derivation | Omitted when |
 |---|---|---|
-| `request_count` | thread index entry count (7.2); replaces `size_bytes` for this source, since "size" in the requirements names a request count here, not a byte count, and overloading the existing byte-sized field would mislabel it in the schema | not an `lmstudio` row |
+| `request_count` | thread index entry count (7.2); replaces `size_bytes` for this source, since "size" in the requirements names a request count here, not a byte count, and overloading the existing byte-sized field would mislabel it in the schema | not an `lmstudio` row; `size_bytes` is omitted on `lmstudio` rows (Q32) |
 | `thread_id` | the recorded value (existing field, reused) | singleton |
 
 Text listing (`apsis -l`) prints `lmstudio` rows' count directly (e.g. `42 requests`) instead of calling `FormatSize`, which otherwise reads that column as a byte count.

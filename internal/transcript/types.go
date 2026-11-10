@@ -185,6 +185,10 @@ const UsageBasisThreadTotal = "thread_total_at_turn_completion"
 // and generation speed as the server reports them, beside any `usage` object.
 const UsageBasisStats = "stats"
 
+// UsageBasisResponse labels an LM Studio response's `usage` object: token
+// counts for that one response as the server reports them.
+const UsageBasisResponse = "response"
+
 // Usage is token usage as a source reports it.
 type Usage struct {
 	Basis    string         // what the counters measure, such as UsageBasisThreadTotal

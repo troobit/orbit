@@ -326,6 +326,11 @@ type ParseResult struct {
 	// other format. It carries per-request boundary metadata written once rather
 	// than duplicated on every message item the request produced.
 	LMStudioRequests []LMStudioRequest
+
+	// LMStudioEvents replaces the unattributed entries of the files a
+	// logical-session view draws on, one summary per contributing file in
+	// discovery order. Session assembly sets it; nil for direct views.
+	LMStudioEvents []LMStudioEventSummary
 }
 
 // ParseWarning represents a non-fatal parsing issue.

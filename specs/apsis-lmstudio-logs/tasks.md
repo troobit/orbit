@@ -32,9 +32,9 @@ references:
 
 ## Phase 4: Shared JSON projection (sharedjson)
 
-- [ ] 10. Project requests[] and the new entry fields into session documents
+- [x] 10. Project requests[] and the new entry fields into session documents
 
-- [ ] 11. Add listing request_count and unattributed_summary with schema conformance tests
+- [x] 11. Add listing request_count and unattributed_summary with schema conformance tests
 
 ## Phase 5: Discovery, identity and cache (sessions)
 

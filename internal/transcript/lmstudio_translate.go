@@ -647,7 +647,7 @@ func translateLMResponse(body json.RawMessage, scope string) ([]ContentItem, str
 	}
 
 	if counters, ok := orderedCounters(fieldValueOrNil(fields, "usage")); ok {
-		content = append(content, ContentItem{Type: "usage", Usage: &Usage{Counters: counters}})
+		content = append(content, ContentItem{Type: "usage", Usage: &Usage{Basis: UsageBasisResponse, Counters: counters}})
 	}
 	if counters, ok := orderedCounters(fieldValueOrNil(fields, "stats")); ok {
 		content = append(content, ContentItem{Type: "usage", Usage: &Usage{Basis: UsageBasisStats, Counters: counters}})

@@ -25,7 +25,8 @@ type Scope struct {
 // ListingRow is a listed session: the shared session metadata plus listing fields.
 type ListingRow struct {
 	Metadata
-	SizeBytes      int64  `json:"size_bytes"`
+	SizeBytes      *int64 `json:"size_bytes,omitempty"`       // every source but LM Studio, whose size is RequestCount
+	RequestCount   int    `json:"request_count,omitempty"`    // LM Studio: requests in the logical session
 	FileModifiedAt string `json:"file_modified_at,omitempty"` // filesystem time that orders a session without a recorded one
 }
 
@@ -71,7 +72,13 @@ func listingRow(s sessions.SessionInfo) ListingRow {
 			Provider: s.Provider,
 			Origin:   s.Origin,
 		},
-		SizeBytes: s.Size,
+	}
+	if s.Source == sessions.SourceLMStudio {
+		// A logical session's size is its request count, not the bytes of
+		// the log files it shares with other sessions (Q19).
+		row.RequestCount = s.RequestCount
+	} else {
+		row.SizeBytes = &s.Size
 	}
 	if !s.CreatedAt.IsZero() {
 		ts := s.CreatedAt.UTC().Format(time.RFC3339Nano)

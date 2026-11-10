@@ -45,6 +45,9 @@ var closedDefinitions = [][]string{
 	{"$defs", "usageBlock"},
 	{"$defs", "otherBlock"},
 	{"$defs", "warning"},
+	{"$defs", "request"},
+	{"$defs", "unattributedSummary"},
+	{"$defs", "eventCounts"},
 }
 
 type testSchemas struct {

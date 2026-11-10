@@ -79,3 +79,26 @@ func TestListing_KeepsRowOrder(t *testing.T) {
 	assert.Equal(t, "first", doc.Sessions[0].ID, "the projection keeps the lister's order")
 	assert.Equal(t, "second", doc.Sessions[1].ID)
 }
+
+// LM Studio rows report their request count instead of a byte size; other
+// rows keep size_bytes even when it is zero (requirement 7.2, Q19).
+func TestListing_LMStudioRows(t *testing.T) {
+	list := []sessions.SessionInfo{
+		{Source: sessions.SourceLMStudio, ID: "lmstudio-req-p-MjAyNi0wMy8yMDI2LTAzLTA1LjEubG9n-44", Size: 900,
+			Model: "example-model-b", Provider: "lmstudio", RequestCount: 1},
+		{Source: sessions.SourceClaude, ID: "0b5e1a40-0000-4000-8000-000000000010", Project: "/work/example-repo",
+			CreatedAt: time.Date(2026, 3, 5, 2, 0, 0, 0, time.UTC)},
+		{Source: sessions.SourceLMStudio, ID: "lmstudio-thread-a2ba3f64e66545724423033a46a31b5fa9f6db429bfffb60",
+			ThreadID: "thread-alpha", CreatedAt: time.Date(2026, 3, 5, 14, 0, 0, 0, time.FixedZone("AEDT", 11*60*60)),
+			Size: 4096, Model: "example-model-a", Provider: "lmstudio", RequestCount: 3},
+	}
+	warnings := []sessions.ListWarning{{Source: sessions.SourceLMStudio, Code: sessions.WarningPathUnreadable,
+		Err: errors.New("read 2026-03/2026-03-04.1.log: permission denied")}}
+
+	got := encode(t, Listing(list, warnings, Scope{AllProjects: true}))
+
+	want, err := os.ReadFile("testdata/handwritten/listing-lmstudio.json")
+	require.NoError(t, err)
+	assert.JSONEq(t, string(want), string(got))
+	requireValid(t, loadSchemas(t), decodeJSON(t, string(got)))
+}
