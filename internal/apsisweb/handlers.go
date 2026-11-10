@@ -65,6 +65,7 @@ func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {
 
 	opts := transcript.RenderOptions{
 		SessionID: id,
+		LMStudio:  transcript.NewLMStudioView(result),
 	}
 	if result.Metadata != nil {
 		opts.TotalCost = result.Metadata.TotalCost

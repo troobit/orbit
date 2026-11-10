@@ -2,7 +2,7 @@
 
 ## Current State
 
-- `specs/apsis-lmstudio-logs/` defines the server-log source. Phases 1 (shared representation, time zone) and 2 (record parser, detection) are implemented. Rendering of the new content, shared JSON fields, source registration, discovery and the CLI flags are not yet.
+- `specs/apsis-lmstudio-logs/` defines the server-log source. Phases 1 (shared representation, time zone), 2 (record parser, detection) and 3 (Markdown/HTML rendering) are implemented. Shared JSON fields, source registration, discovery and the CLI flags are not yet.
 - The sibling `apsis-shared-json` supplies the common JSON contract and all-projects scope. Its approved requirements remain authoritative; the LM Studio requirements still have unanswered user-owned choices.
 - Public LM Studio API documentation defines endpoint payloads, not the disk-log grammar. Earlier structural inspections are labelled as reported observations in the handoff. Fixtures must be synthetic and distinguish those two kinds of evidence.
 
@@ -25,7 +25,17 @@
 ## Detection (`parser.go`)
 
 - `DetectFormat` runs `probeLMStudio` after Kiro's validated check and before the exec probe, so a matched log never reaches the exec probe, which would otherwise read the whole file. If the chunk has headers but no included request, the substring Kiro guess is skipped and `errLMStudioWithoutRequest` is returned. `Parse` checks for that error and returns it instead of falling back to the Claude parser.
-- `-a lmstudio` in that error message isn't accepted by the CLI until Phase 7 adds it to `agentToFormat`. Until then, auto-detected LM Studio input renders through the existing renderers, which ignore `system` and `log` entries.
+- `-a lmstudio` in that error message isn't accepted by the CLI until Phase 7 adds it to `agentToFormat`. Auto-detected LM Studio input already renders through the LM Studio renderer (below).
+
+## Rendering (`lmstudio_render.go`)
+
+- `RenderOptions.LMStudio` (a `*LMStudioView` from `NewLMStudioView(res)`, nil for every other format) switches `RenderMarkdown` and `renderEntriesToBuilder` (standalone and fragment HTML) to the LM Studio body. The CLI and `apsisweb.handleTranscript` set it unconditionally. The CLI's "no entries" check also accepts a result that only has requests, since a body-less request still renders its boundary.
+- `segments` interleaves `Requests` and log-level entries (`RequestID == ""`) by start line. That only works in a direct view of one input; a session view has no log-level entries, so its requests keep their merged order. The session view's body-free unattributed summary (4.2) is not rendered yet; it needs Phase 6's assembled data.
+- Both formats build every label from the same helpers (`requestParts`, `eventParts`, `notes`, `lmParameterSummary`, `lmPrefixText`, `lmBodyStateLabels`), so parity comes from sharing them. `lmPartsMarkdown` and `lmPartsHTML` only differ in how recorded values are quoted.
+- Tool pairs render at the call, not the result (Q28): `formatToolUse`/`formatToolUseHTML` defer generic tools, and the LM Studio renderer then writes the combined block immediately and marks the call `paired`, so the result site skips it. HTML uses `toolResultBlockHTML`, the section-free part of `formatToolResultHTML`; the wrapped form would open a new Assistant section and detach the call from its "supplied context" heading. `BuildToolMeta` is prebuilt over all entries so a result whose call sits in a repeated prefix still finds it.
+- Tool-result-only entries get no heading. Assistant text and thinking go through `markdownToHTML` in HTML; user, system and tool text is escaped in `<p>`, as in the existing renderers.
+- `lmMarkdownSource` backslash-escapes `<Truncated in logs>` in text read as Markdown. Parameter JSON and log text are in code blocks and stay as logged.
+- Goldens are `testdata/lmstudio/{threads,tools,classification,recovery}.{md,html,fragment.html}.golden`; regenerate with `go test ./internal/transcript -run TestLMStudioRender_Goldens -update`. The parity test checks boundary order, shown text and marker counts across Markdown and fragment HTML, and that standalone HTML contains the fragment.
 
 ## Time Zone (`lmstudio_timezone.go`)
 

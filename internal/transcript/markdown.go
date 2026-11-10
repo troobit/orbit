@@ -61,6 +61,11 @@ func RenderMarkdown(entries []Entry, opts RenderOptions) string {
 
 	sb.WriteString("---\n\n")
 
+	if opts.LMStudio != nil {
+		sb.WriteString(renderLMStudioMarkdown(entries, opts.LMStudio))
+		return sb.String()
+	}
+
 	// Build state from all entries
 	toolMeta := BuildToolMeta(entries)
 	skillDescriptions := BuildSkillDescriptionMap(entries)
@@ -736,9 +741,13 @@ func extractSubagentResultText(content string) string {
 }
 
 // formatToolInput formats tool-specific input for display in the combined block.
+// A string input, such as a custom tool's free-form text, is shown as recorded.
 func formatToolInput(name string, input any) string {
 	inputMap, ok := input.(map[string]any)
 	if !ok {
+		if s, ok := input.(string); ok && s != "" {
+			return "**Input:**\n```\n" + s + "\n```\n\n"
+		}
 		return ""
 	}
 

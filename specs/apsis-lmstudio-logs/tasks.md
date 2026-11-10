@@ -26,9 +26,9 @@ references:
 
 ## Phase 3: Rendering of new content (transcript)
 
-- [ ] 8. Render LM Studio Markdown: request boundaries, unattributed events and the Parameters block
+- [x] 8. Render LM Studio Markdown: request boundaries, unattributed events and the Parameters block
 
-- [ ] 9. Render LM Studio HTML and metadata with golden-file parity tests
+- [x] 9. Render LM Studio HTML and metadata with golden-file parity tests
 
 ## Phase 4: Shared JSON projection (sharedjson)
 

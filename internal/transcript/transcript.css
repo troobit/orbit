@@ -434,6 +434,31 @@ details.read-item:last-child {
     }
 }
 
+/* LM Studio log transcripts */
+.lm-note {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.lm-note.warning {
+    color: var(--error-color);
+}
+
+.message.lm-request {
+    margin-top: 1.5rem;
+    border-left-color: var(--tool-accent);
+}
+
+.lm-meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+details.lm-event {
+    margin: 0.75rem 0;
+}
+
 /* Navigation */
 .transcript-nav {
     display: flex;

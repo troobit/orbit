@@ -264,4 +264,5 @@ type RenderOptions struct {
 	Navigation *NavigationContext // Optional navigation context for prev/next/back links
 	TotalCost  *float64           // nil = don't display, pointer = display if > 0.005
 	CostUnit   string             // e.g., "credits" (default if empty)
+	LMStudio   *LMStudioView      // LM Studio log transcripts: requests and assumed zone; nil for other formats
 }

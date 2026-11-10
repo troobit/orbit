@@ -973,7 +973,8 @@ func convert(input io.Reader, output io.Writer, in inputContext, format string, 
 		return nil
 	}
 
-	if len(result.Entries) == 0 {
+	// An LM Studio request without a translated body still renders its boundary.
+	if len(result.Entries) == 0 && len(result.LMStudioRequests) == 0 {
 		fmt.Fprintln(os.Stderr, "Session contains no entries")
 		return nil
 	}
@@ -982,6 +983,7 @@ func convert(input io.Reader, output io.Writer, in inputContext, format string, 
 		Title:     "Session Transcript",
 		SessionID: in.id,
 		ThreadID:  in.threadID,
+		LMStudio:  transcript.NewLMStudioView(result),
 	}
 
 	if result.Metadata != nil {

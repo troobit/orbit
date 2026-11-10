@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var updateGoldens = flag.Bool("update", false, "rewrite Codex exec golden files")
+var updateGoldens = flag.Bool("update", false, "rewrite renderer golden files")
 
 // styleBlock removes the embedded stylesheet, so standalone HTML goldens do
 // not change with unrelated CSS edits.
