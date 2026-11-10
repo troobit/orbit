@@ -48,11 +48,55 @@ type Config struct {
 	Help        bool   // -h, --help
 	Input       string // positional argument (session ID or file path)
 
-	CodexExecDirs []string // --codex-exec-dir values; nil when the flag is not given
+	CodexExecDirs  []string // --codex-exec-dir values; nil when the flag is not given
+	LMStudioLogDir *string  // --lmstudio-log-dir value; nil when the flag is not given
 }
 
 // codexExecDirsEnv lists Codex exec stream roots, separated like PATH.
 const codexExecDirsEnv = "APSIS_CODEX_EXEC_DIRS"
+
+// lmStudioLogDirEnv names the LM Studio server-log directory.
+const lmStudioLogDirEnv = "APSIS_LMSTUDIO_LOG_DIR"
+
+// lmStudioLogDir resolves the LM Studio server-log directory (requirement
+// 1.2): --lmstudio-log-dir replaces APSIS_LMSTUDIO_LOG_DIR, and with neither
+// set the directory is ~/.lmstudio/server-logs. An empty flag or variable
+// disables the source. explicit reports that the user chose the directory, so
+// a missing one is reported (7.4). A relative directory resolves against the
+// working directory.
+func lmStudioLogDir(flagValue *string) (dir string, explicit bool, err error) {
+	value, explicit := os.LookupEnv(lmStudioLogDirEnv)
+	if flagValue != nil {
+		value, explicit = *flagValue, true
+	}
+	if !explicit {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", false, nil
+		}
+		return filepath.Join(home, ".lmstudio", "server-logs"), false, nil
+	}
+	if value == "" {
+		return "", true, nil
+	}
+	abs, err := filepath.Abs(value)
+	if err != nil {
+		return "", false, fmt.Errorf("--lmstudio-log-dir %s: %w", value, err)
+	}
+	return abs, true, nil
+}
+
+// flagValue returns the value of a string flag the command line gave, or nil.
+func flagValue(fs *flag.FlagSet, name string) *string {
+	var value *string
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			v := f.Value.String()
+			value = &v
+		}
+	})
+	return value
+}
 
 // stringList is a repeatable string flag.
 type stringList []string
@@ -119,6 +163,7 @@ func serveCommand(args []string) error {
 	allProjects := fs.Bool("all-projects", false, "List sessions from every project")
 	var execDirs stringList
 	fs.Var(&execDirs, "codex-exec-dir", "Directory searched for Codex exec streams (repeatable; replaces "+codexExecDirsEnv+")")
+	fs.String("lmstudio-log-dir", "", "LM Studio server-log directory read with --all-projects (replaces "+lmStudioLogDirEnv+"; empty disables)")
 	showVersion := fs.Bool("version", false, "Show version and exit")
 
 	fs.Usage = func() {
@@ -130,6 +175,8 @@ func serveCommand(args []string) error {
 		fmt.Fprintf(os.Stderr, "  APSIS_SERVE_PORT    Port to listen on (default 8081)\n")
 		fmt.Fprintf(os.Stderr, "  APSIS_SERVE_BIND    Address to bind to (default localhost)\n")
 		fmt.Fprintf(os.Stderr, "  %s  Codex exec stream directories, separated like PATH\n", codexExecDirsEnv)
+		fmt.Fprintf(os.Stderr, "  %s  LM Studio server-log directory (default ~/.lmstudio/server-logs)\n", lmStudioLogDirEnv)
+		fmt.Fprintf(os.Stderr, "\n%s", lmStudioHelp)
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
 		fmt.Fprintf(os.Stderr, "  apsis serve                    Start with default settings\n")
 		fmt.Fprintf(os.Stderr, "  apsis serve --port 3000        Start on port 3000\n")
@@ -150,16 +197,15 @@ func serveCommand(args []string) error {
 	resolvedPort := resolveInt(*port, "APSIS_SERVE_PORT", 8081)
 	resolvedBind := resolveString(*bind, "APSIS_SERVE_BIND", "localhost")
 
-	// Network binding warning (req. 2.9)
-	if resolvedBind == "0.0.0.0" {
-		fmt.Fprintln(os.Stderr, "Warning: Server is accessible from the network. Session data may contain sensitive information.")
-	}
-
 	// Resolve project path; all-projects scope has none
 	if *allProjects && *project != "" {
 		return fmt.Errorf("cannot use --all-projects with --project")
 	}
 	execRoots, err := codexExecRoots(execDirs)
+	if err != nil {
+		return err
+	}
+	lmDir, lmExplicit, err := lmStudioLogDir(flagValue(fs, "lmstudio-log-dir"))
 	if err != nil {
 		return err
 	}
@@ -171,14 +217,23 @@ func serveCommand(args []string) error {
 		}
 	}
 
+	config := apsisweb.Config{
+		Port:                   resolvedPort,
+		Bind:                   resolvedBind,
+		ProjectPath:            projectPath,
+		AllProjects:            *allProjects,
+		CodexExecRoots:         execRoots,
+		LMStudioLogDir:         lmDir,
+		LMStudioLogDirExplicit: lmExplicit,
+	}
+
+	// Network binding warning (req. 2.9)
+	if warning := config.NetworkWarning(); warning != "" {
+		fmt.Fprintln(os.Stderr, warning)
+	}
+
 	// Create server
-	server, err := apsisweb.New(apsisweb.Config{
-		Port:           resolvedPort,
-		Bind:           resolvedBind,
-		ProjectPath:    projectPath,
-		AllProjects:    *allProjects,
-		CodexExecRoots: execRoots,
-	})
+	server, err := apsisweb.New(config)
 	if err != nil {
 		return fmt.Errorf("create server: %w", err)
 	}
@@ -256,9 +311,10 @@ func parseFlags() *Config {
 	flag.StringVar(&cfg.Source, "source", "", "Open the argument as a session ID of this source")
 	flag.StringVar(&cfg.Format, "f", "md", "Output format: md, markdown, html, json, shared-json (default: md)")
 	flag.StringVar(&cfg.Format, "format", "md", "Output format: md, markdown, html, json, shared-json (default: md)")
-	flag.StringVar(&cfg.Agent, "a", "", "Force agent format (claude-code, codex, codex-exec, kiro, kiro-ide, copilot)")
-	flag.StringVar(&cfg.Agent, "agent", "", "Force agent format (claude-code, codex, codex-exec, kiro, kiro-ide, copilot)")
+	flag.StringVar(&cfg.Agent, "a", "", "Force agent format (claude-code, codex, codex-exec, kiro, kiro-ide, copilot, lmstudio)")
+	flag.StringVar(&cfg.Agent, "agent", "", "Force agent format (claude-code, codex, codex-exec, kiro, kiro-ide, copilot, lmstudio)")
 	flag.Var((*stringList)(&cfg.CodexExecDirs), "codex-exec-dir", "Directory searched for Codex exec streams (repeatable)")
+	flag.String("lmstudio-log-dir", "", "LM Studio server-log directory read with --all-projects (empty disables)")
 	flag.BoolVar(&cfg.Follow, "F", false, "Follow mode: monitor file for new entries")
 	flag.BoolVar(&cfg.Follow, "follow", false, "Follow mode: monitor file for new entries")
 	flag.BoolVar(&cfg.Version, "v", false, "Show version")
@@ -269,6 +325,8 @@ func parseFlags() *Config {
 	flag.Usage = printUsage
 	flag.Parse()
 
+	cfg.LMStudioLogDir = flagValue(flag.CommandLine, "lmstudio-log-dir")
+
 	// Get positional argument
 	if flag.NArg() > 0 {
 		cfg.Input = flag.Arg(0)
@@ -276,6 +334,19 @@ func parseFlags() *Config {
 
 	return cfg
 }
+
+// lmStudioHelp discloses what LM Studio server logs expose and how
+// discovery grows listings (requirements 7.5, 7.6). apsis and apsis serve
+// both show it.
+const lmStudioHelp = `LM Studio server logs:
+  With --all-projects, sessions are also read from LM Studio's server logs
+  (--lmstudio-log-dir, else ` + lmStudioLogDirEnv + `, else ~/.lmstudio/server-logs;
+  an empty value disables them). These logs can hold full prompts, request
+  parameters including credential-bearing integration headers, and traffic
+  from every client of the LM Studio server. A request without a client
+  thread ID is listed as a session of its own, so listing rows grow
+  one-for-one with unthreaded requests.
+`
 
 func printUsage() {
 	fmt.Fprintf(os.Stderr, `apsis - Convert AI agent session transcripts to Markdown or HTML
@@ -296,21 +367,36 @@ Options:
       --all-projects      List, open and pick the latest session from every project
                           (with --list, adds a project column)
   -s, --source <source>   Open the argument as a session ID of this source:
-                          claude, codex, codex-exec, copilot, kiro-cli, kiro-ide
+                          claude, codex, codex-exec, copilot, kiro-cli, kiro-ide,
+                          lmstudio
       --codex-exec-dir <dir>
                           Directory searched for saved codex exec --json streams;
                           repeatable, replaces APSIS_CODEX_EXEC_DIRS (separated
                           like PATH); an empty value disables discovery
+      --lmstudio-log-dir <dir>
+                          LM Studio server-log directory read with --all-projects;
+                          replaces APSIS_LMSTUDIO_LOG_DIR (default
+                          ~/.lmstudio/server-logs); an empty value disables it
   -f, --format <format>   Output format: md, markdown, html, json, shared-json (default: md)
                           json outputs the raw session data as pretty-printed JSON
                           shared-json outputs the same structure for every agent,
                           described by docs/schemas/apsis-shared-json.v1.schema.json
   -a, --agent <name>      Force agent format: claude-code, codex, codex-exec, kiro,
-                          kiro-ide, copilot (default: auto-detect from content)
+                          kiro-ide, copilot, lmstudio (default: auto-detect from
+                          content)
   -F, --follow            Follow mode: continuously monitor file for new entries
                           (like tail -f, markdown output to stdout only)
   -v, --version           Show version
   -h, --help              Show this help
+
+%s  With LM Studio logs read, --all-projects latest can pick an LM Studio
+  session, which -F and -f json cannot show; disable the logs with
+  --lmstudio-log-dir '' or open another session explicitly.
+  Converting a log file (apsis -a lmstudio <file>) shows every record in it.
+  Its request identifiers are the listed ones when the file is in the log
+  directory; for other files and stdin they are input-scoped and do not open
+  with -s lmstudio. Logged wall times have no zone: they are read in TZ, the
+  host zone when TZ is unset and UTC when it is empty.
 
 Examples:
   apsis latest                                   Convert the most recent session
@@ -330,11 +416,13 @@ Examples:
   apsis --list -p /path/to/project               List sessions for different project
   apsis --list --all-projects                    List sessions from every project
   apsis --all-projects -s codex session-id       Open a Codex session from any directory
+  apsis --all-projects -s lmstudio session-id    Open an LM Studio session
+  apsis -a lmstudio 2026-11/2026-11-01.1.log     Convert a whole LM Studio server log
   apsis -F session-id                            Follow session in real-time
   apsis --follow /path/to/session.jsonl          Follow file for new entries
   apsis serve                                    Start web server on localhost:8081
   apsis serve --port 3000 --bind 0.0.0.0         Start on custom port and address
-`)
+`, lmStudioHelp)
 }
 
 func run(cfg *Config) (int, error) {
@@ -362,7 +450,11 @@ func run(cfg *Config) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	opts := []sessions.Option{sessions.WithCodexExecRoots(execRoots)}
+	lmDir, lmExplicit, err := lmStudioLogDir(cfg.LMStudioLogDir)
+	if err != nil {
+		return 0, err
+	}
+	opts := []sessions.Option{sessions.WithCodexExecRoots(execRoots), sessions.WithLMStudioLogDir(lmDir, lmExplicit)}
 
 	// Handle --list
 	if cfg.List {
@@ -409,6 +501,7 @@ func run(cfg *Config) (int, error) {
 		return 0, err
 	}
 	defer func() { _ = input.Close() }()
+	in.lmStudioLogDir = lmDir
 
 	// Determine output destination
 	var output io.Writer = os.Stdout
@@ -504,6 +597,8 @@ type inputContext struct {
 	resolved *sessions.SessionMetadata // resolver metadata; nil for file and stdin input
 	threadID string                    // Codex exec thread ID recorded in the content
 	project  string                    // Codex exec stream file's containing repository
+
+	lmStudioLogDir string // LM Studio log directory that a log file's request identifiers are keyed against
 }
 
 // execInput gives a Codex exec stream the identity a listing would: the
@@ -530,10 +625,18 @@ func execInput(in inputContext, threadID string) inputContext {
 	return in
 }
 
+// lmStudioInput gives a directly converted LM Studio log the request and
+// session identifiers a listing would (requirement 3.4). The document keeps
+// the input's own identifier: a log holds many sessions, so it is not one.
+func lmStudioInput(in inputContext, res *transcript.ParseResult) {
+	sessions.AssignLMStudioInputIDs(res, in.path, in.lmStudioLogDir)
+}
+
 // resolveInput determines the input source and returns a reader and its input context.
 // With a source, the argument is an ID of that source. Otherwise it checks
 // Claude location first, then Codex, then Copilot, then Kiro CLI, then Kiro IDE,
-// then Codex exec streams, which resolve only when roots are configured.
+// then Codex exec streams, which resolve only when roots are configured, then
+// LM Studio sessions, which resolve only in all-projects scope.
 // An empty projectPath searches every project.
 func resolveInput(arg, projectPath, source string, opts ...sessions.Option) (io.ReadCloser, inputContext, error) {
 	// If no argument, read from stdin
@@ -585,6 +688,7 @@ func resolveInput(arg, projectPath, source string, opts ...sessions.Option) (io.
 		sessions.SourceKiroCLI,
 		sessions.SourceKiroIDE,
 		sessions.SourceCodexExec,
+		sessions.SourceLMStudio,
 	}
 
 	for _, source := range sources {
@@ -643,7 +747,7 @@ func listSessions(w io.Writer, projectPath, format string, opts ...sessions.Opti
 			sessions.DisplayName(s.Source),
 			s.ID,
 			listedTime(s),
-			sessions.FormatSize(s.Size))
+			s.SizeLabel())
 		if allProjects {
 			line += "\t" + cmp.Or(s.Project, "-")
 		}
@@ -656,8 +760,13 @@ func listSessions(w io.Writer, projectPath, format string, opts ...sessions.Opti
 }
 
 // listedTime formats a listed session's time; codex-exec rows mark it as the
-// file modification time (Q37). Other sources' text output is unchanged.
+// file modification time (Q37), and an LM Studio session whose first request
+// has no unique time shows none (requirement 5.4). Other sources' text output
+// is unchanged.
 func listedTime(s sessions.SessionInfo) string {
+	if s.Source == sessions.SourceLMStudio && s.CreatedAt.IsZero() {
+		return "time unknown"
+	}
 	t := s.CreatedAt.Local().Format(time.RFC3339)
 	if s.Source == sessions.SourceCodexExec && s.TimeFromFilesystem {
 		t += " (file modified)"
@@ -714,6 +823,15 @@ func runLatest(cfg *Config, projectPath string, opts ...sessions.Option) (int, e
 		return 0, err
 	}
 
+	if latest.Source == sessions.SourceLMStudio {
+		switch {
+		case cfg.Follow:
+			return 0, latestLMStudioError(latest.ID, errFollowLMStudio)
+		case strings.ToLower(cfg.Format) == "json":
+			return 0, latestLMStudioError(latest.ID, errRawJSONLMStudio)
+		}
+	}
+
 	// Handle follow mode
 	if cfg.Follow {
 		if latest.Source == sessions.SourceCodexExec {
@@ -763,6 +881,14 @@ func runLatest(cfg *Config, projectPath string, opts ...sessions.Option) (int, e
 	return 0, convert(resolved.Reader, output, resolvedInput(resolved), cfg.Format, cfg.Agent)
 }
 
+// latestLMStudioError reports that latest picked an LM Studio session that
+// the requested mode cannot show, and how to pick another (requirement 7.6).
+// It never falls back to an older session.
+func latestLMStudioError(id string, modeErr error) error {
+	return fmt.Errorf("latest session is LM Studio session %s: %w; to pick another, disable LM Studio logs with --lmstudio-log-dir '' (or %s='') or open a session explicitly",
+		id, modeErr, lmStudioLogDirEnv)
+}
+
 // deriveChatFileCostPath extracts the executionId from a .chat file and derives
 // the cost path from the file's parent directory. Returns empty string on any error.
 func deriveChatFileCostPath(chatPath string) string {
@@ -795,8 +921,11 @@ func resolveFollowInput(input, projectPath, source string, opts ...sessions.Opti
 		// Kiro IDE could work but .chat files aren't JSONL
 	}
 
-	if source == sessions.SourceCodexExec {
+	switch source {
+	case sessions.SourceCodexExec:
 		return "", errFollowExec
+	case sessions.SourceLMStudio:
+		return "", errFollowLMStudio
 	}
 	if source != "" {
 		if !slices.Contains(fileSources, source) {
@@ -804,8 +933,8 @@ func resolveFollowInput(input, projectPath, source string, opts ...sessions.Opti
 		}
 		fileSources = []string{source}
 	} else if isFilePath(input) {
-		if isExecStreamFile(input) {
-			return "", errFollowExec
+		if err := followFileError(input); err != nil {
+			return "", err
 		}
 		return input, nil
 	}
@@ -826,24 +955,41 @@ func resolveFollowInput(input, projectPath, source string, opts ...sessions.Opti
 		if _, err := resolver.ResolvePath(sessions.SourceCodexExec, input); err == nil {
 			return "", errFollowExec
 		}
+		if resolved, err := resolver.Resolve(sessions.SourceLMStudio, input); err == nil {
+			_ = resolved.Reader.Close()
+			return "", errFollowLMStudio
+		}
 	}
 
 	return "", fmt.Errorf("session not found: %s", input)
 }
 
-// errFollowExec rejects following a Codex exec stream (requirement 5.3).
-var errFollowExec = errors.New("follow mode does not support Codex exec streams")
+var (
+	// errFollowExec rejects following a Codex exec stream (requirement 5.3).
+	errFollowExec = errors.New("follow mode does not support Codex exec streams")
+	// errFollowLMStudio rejects following LM Studio server logs, which are
+	// not JSONL (requirement 8.1 of apsis-lmstudio-logs).
+	errFollowLMStudio = errors.New("follow mode does not support LM Studio server logs")
+	// errRawJSONLMStudio rejects raw JSON for LM Studio server logs, which
+	// are text, not JSON records (8.1).
+	errRawJSONLMStudio = errors.New("-f json does not support LM Studio server logs; use -f shared-json")
+)
 
-// isExecStreamFile reports whether path holds a Codex exec stream, by the
-// same first-object probe that detection uses.
-func isExecStreamFile(path string) bool {
+// followFileError rejects following a file that detection identifies as a
+// Codex exec stream or an LM Studio log; the follower reads neither.
+func followFileError(path string) error {
 	f, err := os.Open(path)
 	if err != nil {
-		return false
+		return nil
 	}
 	defer func() { _ = f.Close() }()
-	probe, err := transcript.ProbeExecStream(f)
-	return err == nil && probe.Outcome == transcript.ExecProbeExec
+	switch format, _, _ := transcript.DetectFormat(f); format {
+	case transcript.FormatCodexExec:
+		return errFollowExec
+	case transcript.FormatLMStudio:
+		return errFollowLMStudio
+	}
+	return nil
 }
 
 // runFollow executes follow mode with signal handling.
@@ -893,8 +1039,11 @@ func validateFollowMode(cfg *Config) error {
 		return fmt.Errorf("follow mode does not support -f shared-json")
 	}
 
-	if cfg.Agent == "codex-exec" {
+	switch cfg.Agent {
+	case "codex-exec":
 		return errFollowExec
+	case "lmstudio":
+		return errFollowLMStudio
 	}
 
 	return nil
@@ -915,6 +1064,8 @@ func agentToFormat(agent string) transcript.Format {
 		return transcript.FormatKiroIDE
 	case "codex-exec":
 		return transcript.FormatCodexExec
+	case "lmstudio":
+		return transcript.FormatLMStudio
 	default:
 		return transcript.FormatUnknown
 	}
@@ -925,6 +1076,10 @@ func agentToFormat(agent string) transcript.Format {
 func convert(input io.Reader, output io.Writer, in inputContext, format string, agent string) error {
 	format = strings.ToLower(format)
 	if format == "json" {
+		// A resolved LM Studio session has no reader content to copy.
+		if in.source == sessions.SourceLMStudio || agent == "lmstudio" {
+			return errRawJSONLMStudio
+		}
 		return convertToJSON(input, output, agent)
 	}
 
@@ -936,10 +1091,13 @@ func convert(input io.Reader, output io.Writer, in inputContext, format string, 
 		parseOpts.PreserveModelChanges = true
 	}
 
-	// An explicit -a chooses the parser before the resolved source does.
+	// An explicit -a chooses the parser before the resolved source does,
+	// except for an assembled LM Studio session, which has nothing to reparse.
 	var result *transcript.ParseResult
 	var err error
 	switch {
+	case in.resolved != nil && in.resolved.PreParsed != nil:
+		result, err = sessions.ParseResolved(&sessions.ResolvedSession{Reader: io.NopCloser(input), Metadata: *in.resolved}, parseOpts)
 	case agent != "":
 		result, err = transcript.ParseJSONLWithFormat(input, agentToFormat(agent), parseOpts)
 	case in.resolved != nil:
@@ -952,12 +1110,20 @@ func convert(input io.Reader, output io.Writer, in inputContext, format string, 
 	if err != nil {
 		return fmt.Errorf("failed to parse transcript: %w", err)
 	}
-	if result.Format == transcript.FormatCodexExec {
+	switch {
+	case result.Format == transcript.FormatCodexExec:
 		in = execInput(in, result.Metadata.ThreadID)
+	case result.Format == transcript.FormatLMStudio && (in.resolved == nil || in.resolved.PreParsed == nil):
+		// An assembled session already has its final identifiers.
+		lmStudioInput(in, result)
 	}
 
 	for _, w := range result.Warnings {
-		fmt.Fprintf(os.Stderr, "Warning: line %d: %s\n", w.Line, w.Message)
+		if w.Line > 0 {
+			fmt.Fprintf(os.Stderr, "Warning: line %d: %s\n", w.Line, w.Message)
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: %s\n", w.Message)
+		}
 	}
 
 	if len(result.Warnings) > 0 {
@@ -1030,7 +1196,10 @@ func convertToJSON(input io.Reader, output io.Writer, agent string) error {
 			return fmt.Errorf("failed to detect format: %w", err)
 		}
 	}
-	if detectedFormat == transcript.FormatCodexExec {
+	switch detectedFormat {
+	case transcript.FormatLMStudio:
+		return errRawJSONLMStudio
+	case transcript.FormatCodexExec:
 		// Q48: a leading BOM would otherwise drop the stream's thread.started.
 		data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
 	}

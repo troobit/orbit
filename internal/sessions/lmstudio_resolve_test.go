@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -233,4 +234,42 @@ func TestResolvePath_LMStudio(t *testing.T) {
 	tree := lmResolveTree(t)
 	_, err := lmResolver(t, tree.path("root"), "").ResolvePath(SourceLMStudio, lmThreadSessionID("t"))
 	assert.ErrorContains(t, err, "no single file path")
+}
+
+// Direct conversion keys a file as discovery does when the log directory
+// lists it, including through a file symlink, and otherwise by its canonical
+// path or the stdin marker (requirement 3.4).
+func TestAssignLMStudioInputIDs(t *testing.T) {
+	tree := newLMTree(t)
+	log := lmReq("2026-11-01 10:00:00", "", "model-a") + lmReq("2026-11-01 10:00:01", "t", "model-b")
+	listed := tree.write(log, "root", "2026-11", "2026-11-01.1.log")
+	unlisted := tree.write(log, "root", "notes.log")
+	outside := tree.write(log, "elsewhere", "2026-11-01.1.log")
+	link := tree.path("root", "2026-11", "2026-11-02.1.log")
+	require.NoError(t, os.Symlink(listed, link))
+	root := tree.path("root")
+
+	for name, tc := range map[string]struct {
+		path, logDir, wantKey string
+	}{
+		"listed file":           {path: listed, logDir: root, wantKey: "2026-11/2026-11-01.1.log"},
+		"symlink to it":         {path: link, logDir: root, wantKey: "2026-11/2026-11-01.1.log"},
+		"unlisted file in root": {path: unlisted, logDir: root, wantKey: filepath.ToSlash(unlisted)},
+		"file outside root":     {path: outside, logDir: root, wantKey: filepath.ToSlash(outside)},
+		"source disabled":       {path: listed, wantKey: filepath.ToSlash(listed)},
+		"stdin":                 {logDir: root, wantKey: lmStdinKey},
+	} {
+		t.Run(name, func(t *testing.T) {
+			res, err := transcript.ParseLMStudio(strings.NewReader(log))
+			require.NoError(t, err)
+			AssignLMStudioInputIDs(res, tc.path, tc.logDir)
+
+			require.Len(t, res.LMStudioRequests, 2)
+			single, threaded := res.LMStudioRequests[0], res.LMStudioRequests[1]
+			assert.Equal(t, lmRequestID(tc.wantKey, 1), single.ID)
+			assert.Equal(t, single.ID, single.SessionID)
+			assert.Equal(t, lmRequestID(tc.wantKey, 2), threaded.ID)
+			assert.Equal(t, lmThreadSessionID("t"), threaded.SessionID)
+		})
+	}
 }

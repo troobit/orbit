@@ -88,6 +88,19 @@ type SessionInfo struct {
 	RequestCount       int    // Requests in an LM Studio logical session; lmstudio only
 }
 
+// SizeLabel is a listed session's size: its byte size, or an LM Studio
+// logical session's request count, since its records share log files with
+// other sessions (Q19).
+func (s SessionInfo) SizeLabel() string {
+	switch {
+	case s.Source != SourceLMStudio:
+		return FormatSize(s.Size)
+	case s.RequestCount == 1:
+		return "1 request"
+	}
+	return fmt.Sprintf("%d requests", s.RequestCount)
+}
+
 // SessionMetadata is returned by the Resolver alongside the reader.
 type SessionMetadata struct {
 	Source             string

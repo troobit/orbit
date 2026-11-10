@@ -269,9 +269,13 @@ For direct file conversion, a new `lmStudioInput(in inputContext, requests []LMS
 
 `apsis serve` accepts the same flag/variable. Both resolve the root once, the same way `codexExecRoots` already resolves its flag/environment pair, before constructing `sessions.Options`. `-h`'s usage text and `apsis serve`'s usage text each gain a line for 7.6: singleton rows grow one-for-one with unthreaded requests, and an enabled default root participates in all-projects `latest`, which can select an unsupported-mode LM Studio session — naming the source and pointing at `--lmstudio-log-dir ''` or explicit session opening as remedies, extending the same usage block 7.5's disclosure already extends.
 
+Implementation (Q43–Q46): `Config.LMStudioLogDir` is a `*string` that is nil when the flag is absent, and `lmStudioLogDir` resolves it together with `APSIS_LMSTUDIO_LOG_DIR` (read with `os.LookupEnv`, so an empty value disables the source) into the directory and the `explicit` flag Q34 needs. `lmStudioInput` calls `sessions.AssignLMStudioInputIDs(res, path, logDir)`, since the identifier formulas live in `sessions`, and the document keeps the input's own identifier. Follow-mode file checks use `DetectFormat`, which covers both exec streams and LM Studio logs. An explicit `-a` does not re-parse an assembled session.
+
 ### 8. `apsis serve`
 
 `apsisweb.Config` gains `LMStudioLogDir string`. The existing `0.0.0.0`/discovery disclosure warning (7.5) extends to name LM Studio's full-prompt and credential-bearing-header exposure whenever this root is configured, alongside the existing `codex-exec` text. The transcript view for an `lmstudio` session shows its parse warnings with the existing `.warning-banner` style and a thread-ID/correlation line in `session-meta`, matching the `codex-exec` precedent.
+
+Implementation (Q44): `Config` also carries `LMStudioLogDirExplicit`, and `New` passes the directory on only in all-projects scope. `Config.NetworkWarning()` builds the `0.0.0.0` warning, so `serveCommand` prints the disclosure only when the source is listed. The oversized-session error names `apsis --all-projects -s lmstudio <id>`, and listing rows show request counts. The badge is pink (`.source-lmstudio`), and `CSSVersion` is 4.
 
 ### 9. Rendering of new content
 

@@ -52,7 +52,7 @@ func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {
 	const maxSize = 50 * 1024 * 1024
 	if resolved.Metadata.Size > maxSize {
 		s.renderError(w, http.StatusRequestEntityTooLarge,
-			"This transcript is too large to render in the browser. Use the CLI instead: apsis "+id)
+			"This transcript is too large to render in the browser. Use the CLI instead: "+cliCommand(source, id))
 		return
 	}
 
@@ -86,18 +86,33 @@ func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    createdAt,
 		Size:         sessions.FormatSize(resolved.Metadata.Size),
 	}
-	// Exec streams show their parse warnings, thread ID and file time; other
-	// sources' views are unchanged (Q47).
-	if source == sessions.SourceCodexExec {
+	// Exec streams and LM Studio sessions show their parse warnings and
+	// thread ID, and exec streams their file time; other sources' views are
+	// unchanged (Q47).
+	if source == sessions.SourceCodexExec || source == sessions.SourceLMStudio {
 		data.FileTime = resolved.Metadata.TimeFromFilesystem
 		if result.Metadata != nil {
 			data.ThreadID = result.Metadata.ThreadID
 		}
 		for _, w := range result.Warnings {
-			data.Warnings = append(data.Warnings, fmt.Sprintf("line %d: %s", w.Line, w.Message))
+			if w.Line > 0 {
+				data.Warnings = append(data.Warnings, fmt.Sprintf("line %d: %s", w.Line, w.Message))
+			} else {
+				data.Warnings = append(data.Warnings, w.Message)
+			}
 		}
 	}
 	s.renderTemplate(w, "transcript.html", data)
+}
+
+// cliCommand is the apsis command that opens a session outside the browser.
+// An LM Studio session opens only by source in all-projects scope
+// (requirement 7.1 of apsis-lmstudio-logs).
+func cliCommand(source, id string) string {
+	if source == sessions.SourceLMStudio {
+		return "apsis --all-projects -s lmstudio " + id
+	}
+	return "apsis " + id
 }
 
 // handleTranscriptCSS serves the transcript CSS from the transcript package.
@@ -134,10 +149,14 @@ func (s *Server) buildSessionListData() (SessionListData, error) {
 			DisplayID:   displayID,
 			Source:      si.Source,
 			SourceClass: "source-" + si.Source,
-			CreatedAt:   si.CreatedAt.UTC().Format(time.RFC3339),
-			Size:        sessions.FormatSize(si.Size),
+			Size:        si.SizeLabel(),
 			URL:         fmt.Sprintf("/sessions/%s/%s", si.Source, si.ID),
 			FileTime:    si.Source == sessions.SourceCodexExec && si.TimeFromFilesystem,
+		}
+		// An LM Studio session whose first request has no unique time shows
+		// none (requirement 5.4 of apsis-lmstudio-logs).
+		if !si.CreatedAt.IsZero() {
+			view.CreatedAt = si.CreatedAt.UTC().Format(time.RFC3339)
 		}
 		if s.config.AllProjects {
 			view.Project = si.Project

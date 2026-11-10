@@ -39,7 +39,7 @@
 | [Local Compute Agent](#local-compute-agent) | 2026-08-13 | Done | Replace the `local-next-task` prototype with `orbit local <tasks.md>`, driving LM Studio models through the existing Codex agent and orchestration loop. |
 | [Run Termination Guarantees](#run-termination-guarantees) | 2026-08-13 | Planned | Guarantee every run ends: stop stalled phase loops, classify credit exhaustion, and always record a terminal state. |
 | [Apsis Shared JSON](#apsis-shared-json) | 2026-11-06 | In Progress | Versioned JSON output with one layout for every Apsis source, plus Codex exec streams, recorded providers and listing across projects. |
-| [Apsis LM Studio Logs](#apsis-lm-studio-logs) | 2026-11-06 | In Progress | Translate LM Studio server logs into Apsis's shared representation, showing missing content and uncertain attribution. |
+| [Apsis LM Studio Logs](#apsis-lm-studio-logs) | 2026-11-06 | Done | Translate LM Studio server logs into Apsis's shared representation, showing missing content and uncertain attribution. |
 
 ---
 

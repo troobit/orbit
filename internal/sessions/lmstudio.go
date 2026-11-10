@@ -476,6 +476,45 @@ func readLMStudioFile(root string, file lmLogFile) (*transcript.ParseResult, err
 	return res, nil
 }
 
+// lmStdinKey is the identifier key of LM Studio records read from stdin.
+const lmStdinKey = "stdin"
+
+// AssignLMStudioInputIDs gives a directly converted LM Studio log, a file at
+// path or stdin when path is "", its final request and session identifiers
+// (requirement 3.4). A file that discovery lists under logDir is keyed as
+// discovery keys it, so its identifiers equal the listed ones; finding it
+// takes a directory listing and reads no other log. Any other file is keyed
+// by its canonical absolute path and stdin by a fixed marker: those
+// identifiers are reproducible but input-scoped, since no listing holds them.
+func AssignLMStudioInputIDs(res *transcript.ParseResult, path, logDir string) {
+	key := lmStdinKey
+	if path != "" {
+		key = lmInputKey(path, logDir)
+	}
+	transcript.AssignLMStudioIDs(res, func(req transcript.LMStudioRequest) (string, string) {
+		id := lmRequestID(key, req.StartLine)
+		return id, lmSessionID(id, req.ThreadID)
+	})
+}
+
+// lmInputKey is a file's discovery key under logDir, or else its canonical
+// absolute path with forward slashes.
+func lmInputKey(path, logDir string) string {
+	canonical, err := CanonicalPath(path)
+	if err != nil {
+		return filepath.ToSlash(path)
+	}
+	if logDir != "" {
+		if root, err := lmStudioRoot(logDir); err == nil {
+			files, _, _ := findLMStudioFiles(root)
+			if i := slices.IndexFunc(files, func(f lmLogFile) bool { return f.path == canonical }); i >= 0 {
+				return files[i].key
+			}
+		}
+	}
+	return filepath.ToSlash(canonical)
+}
+
 // resolveLMStudio opens a listed logical session, or a single request, by
 // identifier, and only in all-projects scope (requirements 1.5, 7.1). A
 // request identifier names its file, so only that file is read, after a

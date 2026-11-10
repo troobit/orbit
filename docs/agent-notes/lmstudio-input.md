@@ -2,8 +2,7 @@
 
 ## Current State
 
-- `specs/apsis-lmstudio-logs/` defines the server-log source. Phases 1 (shared representation, time zone), 2 (record parser, detection), 3 (Markdown/HTML rendering), 4 (shared JSON projection), 5 (discovery, identity, cache, lister registration) and 6 (session assembly and resolution) are implemented. The CLI/web flags (Phase 7) are not yet.
-- Until Phase 7, nothing outside tests calls `WithLMStudioLogDir`, so the CLI and `apsis serve` neither list nor open the source, and the CLI's bare-ID fallback list does not include it.
+- `specs/apsis-lmstudio-logs/` defines the server-log source. All seven phases are implemented: shared representation and time zone, record parser and detection, Markdown/HTML rendering, shared JSON, discovery/identity/cache, session assembly and resolution, and the CLI/`apsis serve` surface.
 - The sibling `apsis-shared-json` supplies the common JSON contract and all-projects scope. Its approved requirements remain authoritative; the LM Studio requirements still have unanswered user-owned choices.
 - Public LM Studio API documentation defines endpoint payloads, not the disk-log grammar. Earlier structural inspections are labelled as reported observations in the handoff. Fixtures must be synthetic and distinguish those two kinds of evidence.
 
@@ -49,10 +48,19 @@
 - An unreadable file of a thread becomes a `path_unreadable` parse warning; when the opened identifier names a request, its file being unreadable is an error.
 - The result rides on `SessionMetadata.PreParsed`; `Reader` is an empty `NopCloser`, `Path` is empty, `Size` is the selected records' bytes (the web size guard reads it), `CreatedAt` is the first request's time or zero. `ParseResolved` returns `PreParsed` first. `ResolvePath(SourceLMStudio)` always errors, so Phase 7 must reject `-F` by source, not by a failed `ResolvePath`.
 
+## CLI and `apsis serve` (`cmd/apsis/main.go`, `internal/apsisweb/`)
+
+- `lmStudioLogDir(*string)`: the flag (nil when absent) replaces `APSIS_LMSTUDIO_LOG_DIR`, read with `os.LookupEnv`, so `APSIS_LMSTUDIO_LOG_DIR=` disables the source. With neither set, the directory is `~/.lmstudio/server-logs` and `explicit` is false (Q34). `flagValue(fs, name)` uses `FlagSet.Visit` to tell an empty flag from an absent one.
+- Direct conversion: `convert` calls `lmStudioInput` → `sessions.AssignLMStudioInputIDs(res, in.path, in.lmStudioLogDir)` for every LM Studio result except an assembled session (`PreParsed`). A file gets listed identifiers only when `findLMStudioFiles` lists it (matched by canonical path, so a symlink takes its target's key). Other files are keyed by their canonical absolute path and stdin by `stdin`; those are input-scoped and documented only in help (Q43). The document's own `session.id` stays empty for a `.log` file.
+- Rejections (Q45): `errFollowLMStudio` comes from `validateFollowMode` (`-a lmstudio`), `resolveFollowInput` (`-s lmstudio`, a detected file through `followFileError`, or a bare ID that `Resolve` finds) and `runLatest`. `errRawJSONLMStudio` comes from `convert` (resolved source or `-a`; a resolved session's reader is empty, so `convertToJSON` would otherwise print "no data") and from `convertToJSON` after detection. `latestLMStudioError` wraps either one, so tests use `require.ErrorIs`.
+- `lmstudio` is last in `resolveInput`'s bare-ID list. A bare thread-shaped ID reads every log body before it reports not found, but only in all-projects scope.
+- `apsisweb.New` passes the directory on only with `AllProjects`, so project scope has no `lmstudio` pill. `Config.NetworkWarning()` adds the disclosure when `Bind == "0.0.0.0"` and the source is listed. The transcript view shows warnings and the thread ID for `lmstudio` as for `codex-exec`. `cliCommand` gives the oversized-session instruction `apsis --all-projects -s lmstudio <id>`.
+- `SessionInfo.SizeLabel()` (`N requests` for LM Studio, `FormatSize` otherwise) feeds both `apsis -l` and the web list. A zero LM Studio time prints `time unknown` in `apsis -l`; the web list shows `time unknown` for any zero time.
+
 ## Detection (`parser.go`)
 
 - `DetectFormat` runs `probeLMStudio` after Kiro's validated check and before the exec probe, so a matched log never reaches the exec probe, which would otherwise read the whole file. If the chunk has headers but no included request, the substring Kiro guess is skipped and `errLMStudioWithoutRequest` is returned. `Parse` checks for that error and returns it instead of falling back to the Claude parser.
-- `-a lmstudio` in that error message isn't accepted by the CLI until Phase 7 adds it to `agentToFormat`. Auto-detected LM Studio input already renders through the LM Studio renderer (below).
+- Auto-detected and `-a lmstudio` input both render through the LM Studio renderer (below).
 
 ## Rendering (`lmstudio_render.go`)
 

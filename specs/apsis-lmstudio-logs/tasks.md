@@ -54,6 +54,6 @@ references:
 
 ## Phase 7: CLI surface and apsis serve
 
-- [ ] 18. Add the lmstudio CLI flags, agentToFormat, rejections and lmStudioInput to main.go
+- [x] 18. Add the lmstudio CLI flags, agentToFormat, rejections and lmStudioInput to main.go
 
-- [ ] 19. Add the apsisweb Config, discovery-disclosure warning and source badge CSS
+- [x] 19. Add the apsisweb Config, discovery-disclosure warning and source badge CSS
