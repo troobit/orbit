@@ -2,7 +2,7 @@
 
 ## Current State
 
-- `specs/apsis-lmstudio-logs/` defines the server-log source. Phase 1 (shared representation, time zone) is implemented; no record parser, detection, source registration or discovery exists yet.
+- `specs/apsis-lmstudio-logs/` defines the server-log source. Phases 1 (shared representation, time zone) and 2 (record parser, detection) are implemented. Rendering of the new content, shared JSON fields, source registration, discovery and the CLI flags are not yet.
 - The sibling `apsis-shared-json` supplies the common JSON contract and all-projects scope. Its approved requirements remain authoritative; the LM Studio requirements still have unanswered user-owned choices.
 - Public LM Studio API documentation defines endpoint payloads, not the disk-log grammar. Earlier structural inspections are labelled as reported observations in the handoff. Fixtures must be synthetic and distinguish those two kinds of evidence.
 
@@ -10,6 +10,22 @@
 
 - `FormatLMStudio`, `Entry.RequestID`/`SuppliedContext`/`Unattributed`/`SourceLine` (all `json:"-"`) and `ParseResult.LMStudioRequests` exist. `LMStudioRequest` lives in `lmstudio_types.go` with the `BodyState*` constants (`not_logged`, `malformed`, `incomplete`, `oversized`; empty = translated).
 - `LMStudioRequests` is parallel to `Entries`, not embedded: entries join their request through `Entry.RequestID`. A request with no translatable body has a request row and zero entries.
+
+## Record Parser (`lmstudio_parser.go`, `lmstudio_translate.go`)
+
+- `ParseLMStudioRecords(r, zone)` lexes physical lines: a header `[YYYY-MM-DD HH:MM:SS][LEVEL][tag]... message` starts a record, and everything up to the next header continues it. A header can't occur inside valid pretty-printed JSON, so any header-matching line ends the previous record. Lines that only start like a header (`^\[\d{4}-\d{2}-\d{2}`) get `unparsed_text` warnings when outside a JSON body. Inside a body they make the body malformed.
+- Classification order matters (design table): an included `Received request: POST to <path>` first, then the response markers, then any reported POST path (`\bPOST (to )?/...`, which also catches error texts like `(POST /x)`). Only after that does level decide: WARN/WARNING/ERROR are retained, anything else is ignored. An excluded path at WARN is therefore retained as a WARN entry, with its body text as content.
+- Body states: no ` with body` gives `not_logged`. A JSON decode failing with EOF/unexpected EOF on the input's last record gives `incomplete` (no warning). Any other failure, including an unterminated body followed by another header, gives `malformed` with `invalid_record`. Over `lmMaxRecordBytes` (10 MiB, whole record) gives `oversized`; the bytes are counted but not kept. Text after a complete body is `unparsed_text` and the body is still used.
+- Temporary IDs: `LMStudioRequest.ID` and `Entry.RequestID` are `strconv.Itoa(StartLine)`. Request tool IDs are `req:<key>:<recorded>` and response tool IDs `evt:<SourceLine>:<recorded>`; the recorded ID stays on `ItemID`. Native chat `tool_call` output records no ID, so it links by `evt:<line>:output-<index>`. The sessions layer must rewrite `req:` keys before merging files.
+- One entry per logged item: each element of `messages`/`input`/`prompt`, a string `input`/`prompt`, and separate `instructions`/`system`/`system_prompt` fields. `PriorPrefixCount` therefore counts entries. Entry types are `user`, `assistant` and `system` (system or developer role). Tool outputs are `user` entries with role `tool`, so the Claude-style result pairing still works. Assistant request entries set `SuppliedContext`.
+- `Entry.ItemDigest` is SHA-256 over `field + "\x00" + json.Marshal(decodeJSONValue(item))`. `json.Marshal` sorts map keys, so key order doesn't matter, and `json.Number` keeps number text, so `1.0` and `1` differ. `annotateExtensions` compares digests and resets stale annotations, so it can run again after session assembly.
+- `Parameters` is rebuilt from `orderedFields` (shared with `orderedCounters`), with source key order and compact values as logged. Only a string `model` and the endpoint's conversation fields are removed. `client_metadata` stays in, even though thread, parent and kind are read from it: flat `thread_id`, `x-codex-parent-thread-id`, and `request_kind`/`parent_thread_id` inside the `x-codex-turn-metadata` JSON string. Any value containing the truncation marker counts as absent.
+- Representation choices for later phases are in decision log Q22–Q27. Log entries use `Type: "log"`, with the WARN/ERROR level in the item's `Status`. Unattributed entries carry `WallTime` because they have no `LMStudioRequest`.
+
+## Detection (`parser.go`)
+
+- `DetectFormat` runs `probeLMStudio` after Kiro's validated check and before the exec probe, so a matched log never reaches the exec probe, which would otherwise read the whole file. If the chunk has headers but no included request, the substring Kiro guess is skipped and `errLMStudioWithoutRequest` is returned. `Parse` checks for that error and returns it instead of falling back to the Claude parser.
+- `-a lmstudio` in that error message isn't accepted by the CLI until Phase 7 adds it to `agentToFormat`. Until then, auto-detected LM Studio input renders through the existing renderers, which ignore `system` and `log` entries.
 
 ## Time Zone (`lmstudio_timezone.go`)
 

@@ -1,0 +1,152 @@
+[2026-03-05 14:00:00][DEBUG] Received request: POST to /v1/responses with body {
+  "model": "example-model-a",
+  "instructions": "You are a coding agent.",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Fix the failing test."
+        }
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "name": "shell",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "stream": true,
+  "store": false,
+  "prompt_cache_key": "thread-alpha",
+  "client_metadata": {
+    "x-codex-installation-id": "install-example",
+    "session_id": "session-example",
+    "thread_id": "thread-alpha",
+    "x-codex-window-id": "window-example",
+    "turn_id": "turn-1",
+    "x-codex-turn-metadata": "{\"request_kind\":\"turn\",\"thread_id\":\"thread-alpha\",\"turn_id\":\"turn-1\"}"
+  }
+}
+[2026-03-05 14:00:01][WARN][example-model-a] Field 'tool_choice' is not supported and will be ignored.
+[2026-03-05 14:00:02][DEBUG] Received request: POST to /v1/responses with body {
+  "model": "example-model-a",
+  "input": "An unrelated question.",
+  "max_output_tokens": 64
+}
+[2026-03-05 14:00:03][DEBUG] Received request: POST to /v1/responses with body {
+  "model": "example-model-a",
+  "instructions": "You are a coding agent.",
+  "input": [
+    {
+      "content": [
+        {
+          "text": "Fix the failing test.",
+          "type": "input_text"
+        }
+      ],
+      "role": "user",
+      "type": "message"
+    },
+    {
+      "type": "function_call",
+      "call_id": "call_shell_1",
+      "name": "shell",
+      "arguments": "{\"command\":\"make test\"}"
+    },
+    {
+      "type": "function_call_output",
+      "call_id": "call_shell_1",
+      "output": "FAIL example_test"
+    }
+  ],
+  "stream": true,
+  "store": false,
+  "prompt_cache_key": "thread-alpha",
+  "client_metadata": {
+    "x-codex-installation-id": "install-example",
+    "session_id": "session-example",
+    "thread_id": "thread-alpha",
+    "x-codex-window-id": "window-example",
+    "turn_id": "turn-1",
+    "x-codex-turn-metadata": "{\"request_kind\":\"turn\",\"thread_id\":\"thread-alpha\",\"turn_id\":\"turn-1\"}"
+  }
+}
+[2026-03-05 14:00:04][INFO][example-model-a] Generated synchronous v1/responses response: {
+  "id": "resp_example2",
+  "object": "response",
+  "model": "example-model-a",
+  "output": [
+    {
+      "type": "function_call",
+      "call_id": "call_shell_1",
+      "name": "shell",
+      "arguments": "{\"command\":\"make test\"}"
+    }
+  ]
+}
+[2026-03-05 14:00:05][DEBUG] Received request: POST to /v1/responses with body {
+  "model": "example-model-a",
+  "instructions": "You are a coding agent.",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "Summary of the earlier work."
+        }
+      ]
+    }
+  ],
+  "client_metadata": {
+    "thread_id": "thread-alpha",
+    "turn_id": "turn-2",
+    "x-codex-turn-metadata": "{\"request_kind\":\"compaction\",\"thread_id\":\"thread-alpha\",\"turn_id\":\"turn-2\"}"
+  }
+}
+[2026-03-05 14:00:06][ERROR][example-model-a] Generation failed: context length exceeded
+[2026-03-05 14:00:07][DEBUG] Received request: POST to /v1/responses with body {
+  "model": "example-model-b",
+  "input": "Record a memory about the work.",
+  "client_metadata": {
+    "thread_id": "thread-alpha",
+    "x-codex-turn-metadata": "{\"request_kind\":\"memory\"}"
+  }
+}
+[2026-03-05 14:00:08][DEBUG] Received request: POST to /v1/responses with body {
+  "model": "example-model-a",
+  "input": "Review the change as a sub-agent.",
+  "client_metadata": {
+    "thread_id": "thread-beta",
+    "x-codex-parent-thread-id": "thread-alpha",
+    "x-codex-turn-metadata": "{\"request_kind\":\"turn\",\"thread_id\":\"thread-beta\",\"sandbox\":\"wor ... <Truncated in logs> ... \"}"
+  }
+}
+[2026-03-05 14:00:09][DEBUG] Received request: POST to /v1/responses with body {
+  "model": "example-model-a",
+  "input": "A request whose thread identifier was cut.",
+  "client_metadata": {
+    "thread_id": "thread-gam ... <Truncated in logs> ... mma-long"
+  }
+}
+[2026-03-05 14:00:10][DEBUG] Received request: POST to /v1/responses with body {
+  "model": "example-model-a",
+  "input": "A request with an empty thread identifier.",
+  "client_metadata": {
+    "thread_id": ""
+  }
+}

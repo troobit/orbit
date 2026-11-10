@@ -453,29 +453,58 @@ func translateItem(rec *execRecord, turn int) ([]ContentItem, bool) {
 // orderedCounters reads a usage object's counters in source key order, keeping
 // each value as raw JSON. A repeated key keeps its first position and last value.
 func orderedCounters(raw json.RawMessage) ([]UsageCounter, bool) {
+	fields, ok := orderedFields(raw)
+	if !ok {
+		return nil, false
+	}
+	counters := make([]UsageCounter, 0, len(fields))
+	for _, f := range fields {
+		counters = append(counters, UsageCounter{Name: f.key, Value: f.value})
+	}
+	return counters, true
+}
+
+// jsonField is one member of a JSON object, its value compact.
+type jsonField struct {
+	key   string
+	value json.RawMessage
+}
+
+// orderedFields reads a JSON object's members in source key order. A repeated
+// key keeps its first position and last value.
+func orderedFields(raw json.RawMessage) ([]jsonField, bool) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
 		return nil, false
 	}
-	counters := []UsageCounter{}
+	fields := []jsonField{}
 	for dec.More() {
 		tok, err := dec.Token()
 		if err != nil {
 			return nil, false
 		}
-		name, _ := tok.(string)
+		key, _ := tok.(string)
 		var value json.RawMessage
 		if err := dec.Decode(&value); err != nil {
 			return nil, false
 		}
 		value = compactJSON(value)
-		if i := slices.IndexFunc(counters, func(c UsageCounter) bool { return c.Name == name }); i >= 0 {
-			counters[i].Value = value
+		if i := slices.IndexFunc(fields, func(f jsonField) bool { return f.key == key }); i >= 0 {
+			fields[i].value = value
 			continue
 		}
-		counters = append(counters, UsageCounter{Name: name, Value: value})
+		fields = append(fields, jsonField{key: key, value: value})
 	}
-	return counters, true
+	return fields, true
+}
+
+// fieldValue returns the value of key in fields.
+func fieldValue(fields []jsonField, key string) (json.RawMessage, bool) {
+	i := slices.IndexFunc(fields, func(f jsonField) bool { return f.key == key })
+	if i < 0 {
+		return nil, false
+	}
+	return fields[i].value, true
 }
 
 // jsonString decodes raw as a JSON string.

@@ -14,15 +14,15 @@ references:
 
 ## Phase 2: Record parser and detection (transcript)
 
-- [ ] 3. Write synthetic fixtures and PROVENANCE.md under testdata/lmstudio/
+- [x] 3. Write synthetic fixtures and PROVENANCE.md under testdata/lmstudio/
 
-- [ ] 4. Implement ProbeLMStudio and wire it into DetectFormat ahead of the exec probe
+- [x] 4. Implement ProbeLMStudio and wire it into DetectFormat ahead of the exec probe
 
-- [ ] 5. Implement ParseLMStudioRecords: header/record lexing and the five-row classification table
+- [x] 5. Implement ParseLMStudioRecords: header/record lexing and the five-row classification table
 
-- [ ] 6. Implement request/message translation: endpoint shapes, client_metadata and Parameters retention
+- [x] 6. Implement request/message translation: endpoint shapes, client_metadata and Parameters retention
 
-- [ ] 7. Implement ParseLMStudio and annotateExtensions with the extension-prefix property test
+- [x] 7. Implement ParseLMStudio and annotateExtensions with the extension-prefix property test
 
 ## Phase 3: Rendering of new content (transcript)
 

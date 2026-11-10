@@ -1,0 +1,138 @@
+[2026-03-02 09:15:00][INFO][LM STUDIO SERVER] Success! HTTP server listening on port 1234
+[2026-03-02 09:15:01][DEBUG] Received request: POST to /v1/chat/completions with body {
+  "model": "example-model-a",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You answer briefly."
+    },
+    {
+      "role": "user",
+      "content": "Name a prime number."
+    }
+  ],
+  "temperature": 0.2,
+  "stream": false
+}
+[2026-03-02 09:15:02][INFO][example-model-a] Generated prediction: {
+  "id": "chatcmpl-example1",
+  "object": "chat.completion",
+  "created": 1772442902,
+  "model": "example-model-a",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Seven."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 20,
+    "completion_tokens": 2,
+    "total_tokens": 22
+  }
+}
+[2026-03-02 09:15:03][DEBUG] Received request: POST to /api/v0/chat/completions with body {
+  "model": "example-model-a",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Introduce yourself."
+        }
+      ]
+    }
+  ],
+  "max_tokens": -1,
+  "stream": false
+}
+[2026-03-02 09:15:04][DEBUG] Received request: POST to /v1/completions with body {
+  "model": "example-model-b",
+  "prompt": "The capital of the example country is",
+  "max_tokens": 8,
+  "stop": "\n"
+}
+[2026-03-02 09:15:05][DEBUG] Received request: POST to /api/v0/completions with body {
+  "model": "example-model-b",
+  "prompt": [
+    "First prompt.",
+    "Second prompt."
+  ],
+  "temperature": 0.7
+}
+[2026-03-02 09:15:06][DEBUG] Received request: POST to /v1/messages with body {
+  "model": "example-model-a",
+  "max_tokens": 256,
+  "system": "You are a careful assistant.",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Summarise the example."
+    }
+  ]
+}
+[2026-03-02 09:15:07][DEBUG] Received request: POST to /v1/responses with body {
+  "model": "example-model-a",
+  "instructions": "Reply in one sentence.",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "What is an example?"
+        }
+      ]
+    }
+  ],
+  "store": false,
+  "stream": false
+}
+[2026-03-02 09:15:08][INFO][example-model-a] Generated synchronous v1/responses response: {
+  "id": "resp_example1",
+  "object": "response",
+  "model": "example-model-a",
+  "output": [
+    {
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "An example illustrates a rule."
+        }
+      ]
+    }
+  ],
+  "usage": {
+    "input_tokens": 18,
+    "output_tokens": 7,
+    "total_tokens": 25
+  }
+}
+[2026-03-02 09:15:09][DEBUG] Received request: POST to /api/v1/chat with body {
+  "model": "example-model-b",
+  "input": "Tell me about the example.",
+  "system_prompt": "Be concise.",
+  "store": true
+}
+[2026-03-02 09:15:10][DEBUG] Received request: POST to /api/v1/chat with body {
+  "model": "example-model-b",
+  "input": [
+    {
+      "type": "text",
+      "content": "Describe this picture."
+    },
+    {
+      "type": "image",
+      "data_url": "data:image/png;base64,AAAA"
+    }
+  ],
+  "previous_response_id": "resp_example0"
+}

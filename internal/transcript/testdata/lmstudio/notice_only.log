@@ -1,0 +1,14 @@
+[2026-03-07 00:00:00][INFO][LM STUDIO SERVER] Success! HTTP server listening on port 1234
+[2026-03-07 00:00:01][INFO][LM STUDIO SERVER] Supported endpoints:
+[2026-03-07 00:00:01][INFO][LM STUDIO SERVER] ->	GET  http://localhost:1234/v1/models
+[2026-03-07 00:00:01][INFO][LM STUDIO SERVER] ->	POST http://localhost:1234/v1/chat/completions
+[2026-03-07 00:00:02][DEBUG] Received request: GET to /v1/models
+[2026-03-07 00:00:02][INFO][example-model-a] Returning {
+  "data": [
+    {
+      "id": "example-model-a",
+      "object": "model"
+    }
+  ],
+  "object": "list"
+}

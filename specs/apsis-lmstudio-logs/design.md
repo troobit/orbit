@@ -117,6 +117,8 @@ Logged responses, WARN and ERROR records become entries with `Unattributed: true
 
 `ParseResultMetadata.ThreadID` is unused for this format (a direct-view document can hold many threads); per-thread/request identity lives on `LMStudioRequest` instead.
 
+Implementation added four fields the struct above omits (Q23–Q25): `Entry.WallTime` (a log-level entry's logged wall time, since it has no `LMStudioRequest`), `Entry.ItemDigest` (the extension-prefix comparison key; one entry per logged item), `ContentItem.Truncated` (set wherever `<Truncated in logs>` appears) and `ParseResultMetadata.TimeZone` (the assumed zone's label). WARN/ERROR records are `Type: "log"` entries holding one `text` (WARN) or `error` (ERROR) item whose `Status` is the logged level; unsupported POST paths are `log` entries with a body-free `unsupported_endpoint` event; logged responses are `assistant` entries. All carry `SourceLine`.
+
 ### 2. LM Studio record parser (`transcript`)
 
 ```go
@@ -314,8 +316,9 @@ Text listing (`apsis -l`) prints `lmstudio` rows' count directly (e.g. `42 reque
 | oversized request body | `BodyState: "oversized"`; `oversized_record` warning, same surfaces |
 | incomplete request body (final record at EOF) | `BodyState: "incomplete"`; state only, no stderr warning (6.1); replaced on the next refresh once the record completes |
 | unrecognised item shape inside an otherwise-decodable body | generic `event`-kind block; `unrecognized_record` warning (2.3, 4.4) |
-| unsupported POST path | one aggregated warning per path with a count (4.6) |
-| zone override invalid or unloadable | one visible warning per transcript; wall times retained, no interpreted instant |
+| unsupported POST path | one aggregated `unsupported_endpoint` warning per path with a count (4.6) |
+| text before the first header, malformed header-like text outside a body, text after a body, or no recognised records | `unparsed_text` warning naming the line range (6.3) |
+| zone override invalid or unloadable | one visible `time_zone` warning per transcript, without a line; wall times retained, no interpreted instant |
 | `Resolver.ResolvePath(SourceLMStudio, id)` | always an error: no single file backs a logical session |
 | session ID with no surviving requests | `session not found`, same as every other source |
 

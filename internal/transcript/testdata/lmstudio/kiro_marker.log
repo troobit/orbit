@@ -1,0 +1,15 @@
+[2026-03-08 16:30:00][DEBUG] Received request: POST to /v1/chat/completions with body {
+  "model": "example-model-a",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Explain the session format."
+    }
+  ],
+  "metadata": {
+    "conversation_id": "conversation-example",
+    "history": [],
+    "executionId": "execution-example",
+    "chat": []
+  }
+}
