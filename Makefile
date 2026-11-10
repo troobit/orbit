@@ -40,9 +40,12 @@ test-coverage:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
-# Run linter
+# Run linter, then vet the build-tagged LM Studio cache for the other release
+# platforms, since CI runs on Linux only
 lint:
 	golangci-lint run
+	GOOS=darwin go vet ./internal/sessions/...
+	GOOS=windows go vet ./internal/sessions/...
 
 # Clean build artifacts
 clean:

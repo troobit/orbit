@@ -9,7 +9,7 @@ import (
 )
 
 // extendedSourceOrder is the tie-break order of requirement 4.4.
-var extendedSourceOrder = []string{SourceClaude, SourceCopilot, SourceCodex, SourceKiroCLI, SourceKiroIDE}
+var extendedSourceOrder = []string{SourceClaude, SourceCopilot, SourceCodex, SourceKiroCLI, SourceKiroIDE, SourceCodexExec, SourceLMStudio}
 
 func TestSortSessionsExtended_Example(t *testing.T) {
 	base := time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)

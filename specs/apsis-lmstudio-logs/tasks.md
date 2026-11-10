@@ -38,13 +38,13 @@ references:
 
 ## Phase 5: Discovery, identity and cache (sessions)
 
-- [ ] 12. Implement the build-tagged lmFingerprint and per-file summary cache
+- [x] 12. Implement the build-tagged lmFingerprint and per-file summary cache
 
-- [ ] 13. Implement root resolution, file discovery and buildLMStudioIndex
+- [x] 13. Implement root resolution, file discovery and buildLMStudioIndex
 
-- [ ] 14. Implement request/thread identifiers with the stability property test
+- [x] 14. Implement request/thread identifiers with the stability property test
 
-- [ ] 15. Wire SourceLMStudio into types.go and lister.go with the project-scope read-nothing guarantee
+- [x] 15. Wire SourceLMStudio into types.go and lister.go with the project-scope read-nothing guarantee
 
 ## Phase 6: Session assembly and resolution (sessions)
 

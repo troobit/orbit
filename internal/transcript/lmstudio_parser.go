@@ -379,6 +379,7 @@ func (p *lmParser) request(rec *lmRecord, endpoint string, hasBody bool, tail st
 		ID:        strconv.Itoa(rec.start),
 		StartLine: rec.start,
 		EndLine:   rec.end,
+		Size:      rec.size,
 		Endpoint:  endpoint,
 		Timestamp: rec.wall,
 	}

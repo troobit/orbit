@@ -21,7 +21,7 @@ const (
 )
 
 // allSources is the ordered list of all known agent sources.
-var allSources = []string{SourceClaude, SourceCodex, SourceCopilot, SourceKiroCLI, SourceKiroIDE, SourceCodexExec}
+var allSources = []string{SourceClaude, SourceCodex, SourceCopilot, SourceKiroCLI, SourceKiroIDE, SourceCodexExec, SourceLMStudio}
 
 // displayNames maps source constants to their display strings.
 var displayNames = map[string]string{
@@ -31,6 +31,7 @@ var displayNames = map[string]string{
 	SourceKiroCLI:   "kiro-cli",
 	SourceKiroIDE:   "kiro ide",
 	SourceCodexExec: "codex-exec",
+	SourceLMStudio:  "lmstudio",
 }
 
 // AllSources returns all known source identifiers.
@@ -127,6 +128,12 @@ type ListWarning struct {
 type Options struct {
 	ExtendedOrdering bool     // sort by time, then source, then identifier (requirement 4.4)
 	CodexExecRoots   []string // directories searched for Codex exec streams; none by default
+
+	// LMStudioLogDir is the LM Studio server-log root; "" disables the
+	// source. LMStudioLogDirExplicit records that the user chose it, so a
+	// missing root is a warning rather than silence (requirement 7.4).
+	LMStudioLogDir         string
+	LMStudioLogDirExplicit bool
 }
 
 // Option changes Options. NewLister and NewResolver apply the same functions.
@@ -143,6 +150,13 @@ func WithExtendedOrdering(enabled bool) Option {
 // by file modification time beside recorded times.
 func WithCodexExecRoots(roots []string) Option {
 	return func(o *Options) { o.CodexExecRoots = slices.Clone(roots) }
+}
+
+// WithLMStudioLogDir sets the LM Studio server-log root, or disables the
+// source when dir is empty. explicit is false for the default root, whose
+// absence is not reported.
+func WithLMStudioLogDir(dir string, explicit bool) Option {
+	return func(o *Options) { o.LMStudioLogDir, o.LMStudioLogDirExplicit = dir, explicit }
 }
 
 // applyOptions returns the Options that opts produce.

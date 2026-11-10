@@ -101,7 +101,7 @@ func TestParseLMStudioRecords_Classification(t *testing.T) {
 
 	require.Len(t, requests, 1, "only the included endpoint is a request, whatever its level")
 	assert.Equal(t, LMStudioRequest{
-		ID: "12", StartLine: 12, EndLine: 20, Endpoint: "/v1/chat/completions", Model: "example-model-a",
+		ID: "12", StartLine: 12, EndLine: 20, Size: 208, Endpoint: "/v1/chat/completions", Model: "example-model-a",
 		Timestamp: "2026-03-03 10:00:03", ResolvedTime: time.Date(2026, 3, 3, 10, 0, 3, 0, time.UTC),
 	}, requests[0])
 

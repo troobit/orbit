@@ -23,6 +23,7 @@ const (
 type LMStudioRequest struct {
 	ID                   string          // the parser's temporary StartLine key until the sessions layer assigns the final ID
 	StartLine, EndLine   int             // one-based physical line range of the record
+	Size                 int             // record bytes, line terminators included, measured in full when oversized
 	Endpoint             string          // the logged POST path
 	ThreadID             string          // client_metadata.thread_id as recorded; empty = singleton session
 	ParentThreadID       string          // client_metadata parent-thread identifier, when recorded
