@@ -16,7 +16,7 @@ const (
 	FormatCopilot
 	FormatKiroIDE
 	FormatCodexExec // Codex CLI `codex exec --json` event stream
-	FormatLMStudio // LM Studio disk server log (header-delimited text grammar)
+	FormatLMStudio  // LM Studio disk server log (header-delimited text grammar)
 )
 
 // Entry represents a single line in the Claude session JSONL.
@@ -36,10 +36,10 @@ type Entry struct {
 	ParentUUID      string         `json:"parentUuid,omitempty"`      // Links to parent entry's UUID
 	SourceToolUseID string         `json:"sourceToolUseID,omitempty"` // Links meta entry to originating tool_use
 	ToolUseResult   *ToolUseResult `json:"toolUseResult,omitempty"`   // Result metadata for tool calls
-	RequestID       string         `json:"-"` // The owning LMStudioRequest ID; empty on an unattributed entry
-	SuppliedContext bool           `json:"-"` // An assistant message resent as request input, not a new completion
-	Unattributed    bool           `json:"-"` // A logged response/WARN/ERROR event; request attribution unknown
-	SourceLine      int            `json:"-"` // Unattributed entries only: physical start line, for event-scoped tool IDs
+	RequestID       string         `json:"-"`                         // The owning LMStudioRequest ID; empty on an unattributed entry
+	SuppliedContext bool           `json:"-"`                         // An assistant message resent as request input, not a new completion
+	Unattributed    bool           `json:"-"`                         // A logged response/WARN/ERROR event; request attribution unknown
+	SourceLine      int            `json:"-"`                         // Unattributed entries only: physical start line, for event-scoped tool IDs
 }
 
 // ToolUseResult contains metadata about a tool execution result.

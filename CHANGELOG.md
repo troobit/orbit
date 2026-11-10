@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Groundwork for LM Studio server logs in Apsis: the shared transcript representation gains per-request boundary metadata (`LMStudioRequest`) and request/attribution fields on entries, and a `TZ` resolver interprets logged wall times. It distinguishes unset `TZ` (host zone) from empty `TZ` (UTC), accepts IANA names and absolute TZif file paths with an optional leading `:`, warns instead of substituting a zone when an override fails to load, and gives no timestamp for nonexistent or ambiguous wall times. Binaries that link the transcript package embed the IANA zone database (`time/tzdata`).
 - `orbit local` accepts `--context-window`, `--compact-at`, and opt-in `--network` controls for local model budgets and sandboxed dependency downloads.
 - `orbit local <tasks.md>` implements an explicit rune task file through Codex and LM Studio, using the `8-bit` model by default with fresh sessions, task or phase selection, and configurable timeout and iteration limits.
 - Local runs retain prompts and live stdout/stderr, report elapsed time, and stop on halt signals, changed task graphs, worker failures, or lack of completed work. Unix cancellation terminates worker child processes.

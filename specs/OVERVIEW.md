@@ -36,9 +36,10 @@
 | [Shared Retry Executor](#shared-retry-executor) | 2026-02-18 | No Tasks | Consolidate four near-identical retry executors into a single shared implementation. |
 | [Message Metadata](#message-metadata) | 2026-03-12 | Done | Show timestamps and model identifiers inline in rendered Apsis transcripts. |
 | [Finalize Show Verify](#finalize-show-verify) | 2026-05-10 | Done | Show variant agent and warn on consolidation mismatch in `orbit finalize`. |
-| [Run Termination Guarantees](#run-termination-guarantees) | 2026-08-13 | Not Started | Guarantee every run ends: stop stalled phase loops, classify credit exhaustion, and always record a terminal state. |
+| [Local Compute Agent](#local-compute-agent) | 2026-08-13 | Done | Replace the `local-next-task` prototype with `orbit local <tasks.md>`, driving LM Studio models through the existing Codex agent and orchestration loop. |
+| [Run Termination Guarantees](#run-termination-guarantees) | 2026-08-13 | Planned | Guarantee every run ends: stop stalled phase loops, classify credit exhaustion, and always record a terminal state. |
 | [Apsis Shared JSON](#apsis-shared-json) | 2026-11-06 | In Progress | Versioned JSON output with one layout for every Apsis source, plus Codex exec streams, recorded providers and listing across projects. |
-| [Apsis LM Studio Logs](#apsis-lm-studio-logs) | 2026-11-06 | No Tasks | Translate LM Studio server logs into Apsis's shared representation, showing missing content and uncertain attribution. |
+| [Apsis LM Studio Logs](#apsis-lm-studio-logs) | 2026-11-06 | In Progress | Translate LM Studio server logs into Apsis's shared representation, showing missing content and uncertain attribution. |
 
 ---
 
@@ -352,6 +353,16 @@ Show variant agent and warn on consolidation mismatch in `orbit finalize`.
 - [smolspec.md](finalize-show-verify/smolspec.md)
 - [tasks.md](finalize-show-verify/tasks.md)
 
+## Local Compute Agent
+
+Replace the `local-next-task` prototype with `orbit local <tasks.md>`, driving LM Studio models through the existing Codex agent and orchestration loop.
+
+- [decision_log.md](local-compute-agent/decision_log.md)
+- [design.md](local-compute-agent/design.md)
+- [requirements.md](local-compute-agent/requirements.md)
+- [tasks.md](local-compute-agent/tasks.md)
+- [verification.md](local-compute-agent/verification.md)
+
 ## Run Termination Guarantees
 
 Guarantee every run ends: stop stalled phase loops, classify credit exhaustion, and always record a terminal state.
@@ -367,7 +378,6 @@ Versioned JSON output with one layout for every Apsis source, plus Codex exec st
 
 - [decision_log.md](apsis-shared-json/decision_log.md)
 - [design.md](apsis-shared-json/design.md)
-- [handoff.md](apsis-shared-json/handoff.md)
 - [prerequisites.md](apsis-shared-json/prerequisites.md)
 - [requirements.md](apsis-shared-json/requirements.md)
 - [tasks-cache.md](apsis-shared-json/tasks-cache.md)
@@ -378,5 +388,6 @@ Versioned JSON output with one layout for every Apsis source, plus Codex exec st
 Translate LM Studio server logs into Apsis's shared representation, showing missing content and uncertain attribution.
 
 - [decision_log.md](apsis-lmstudio-logs/decision_log.md)
-- [handoff.md](apsis-lmstudio-logs/handoff.md)
+- [design.md](apsis-lmstudio-logs/design.md)
 - [requirements.md](apsis-lmstudio-logs/requirements.md)
+- [tasks.md](apsis-lmstudio-logs/tasks.md)

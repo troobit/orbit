@@ -8,9 +8,9 @@ references:
 
 ## Phase 1: Shared representation and time zone (transcript)
 
-- [ ] 1. Add FormatLMStudio, new Entry fields and LMStudioRequest to the shared representation
+- [x] 1. Add FormatLMStudio, new Entry fields and LMStudioRequest to the shared representation
 
-- [ ] 2. Implement resolveZone with the embedded tzdata and a table test
+- [x] 2. Implement resolveZone with the embedded tzdata and a table test
 
 ## Phase 2: Record parser and detection (transcript)
 

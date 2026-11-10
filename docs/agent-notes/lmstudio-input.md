@@ -2,9 +2,22 @@
 
 ## Current State
 
-- `specs/apsis-lmstudio-logs/` defines a proposed server-log source; no LM Studio parser, source registration or discovery implementation exists yet.
+- `specs/apsis-lmstudio-logs/` defines the server-log source. Phase 1 (shared representation, time zone) is implemented; no record parser, detection, source registration or discovery exists yet.
 - The sibling `apsis-shared-json` supplies the common JSON contract and all-projects scope. Its approved requirements remain authoritative; the LM Studio requirements still have unanswered user-owned choices.
 - Public LM Studio API documentation defines endpoint payloads, not the disk-log grammar. Earlier structural inspections are labelled as reported observations in the handoff. Fixtures must be synthetic and distinguish those two kinds of evidence.
+
+## Shared Representation (`internal/transcript`)
+
+- `FormatLMStudio`, `Entry.RequestID`/`SuppliedContext`/`Unattributed`/`SourceLine` (all `json:"-"`) and `ParseResult.LMStudioRequests` exist. `LMStudioRequest` lives in `lmstudio_types.go` with the `BodyState*` constants (`not_logged`, `malformed`, `incomplete`, `oversized`; empty = translated).
+- `LMStudioRequests` is parallel to `Entries`, not embedded: entries join their request through `Entry.RequestID`. A request with no translatable body has a request row and zero entries.
+
+## Time Zone (`lmstudio_timezone.go`)
+
+- `zoneFromEnvironment()` reads `TZ` with `os.LookupEnv` and calls `resolveZone(tz, set)`: unset → `time.Local` (label `host local zone`), empty → UTC, otherwise an optional leading `:` then an absolute path (`filepath.IsAbs`, so drive/UNC on Windows) via `os.ReadFile` + `time.LoadLocationFromTZData`, or an IANA name via `time.LoadLocation`. Failure gives `loc == nil` plus a warning; nothing substitutes another zone.
+- `:` alone and `Local` are rejected explicitly, because `time.LoadLocation` silently maps `""` to UTC and `"Local"` to the host zone.
+- `zoneResult.interpret(wall)` returns an offset-bearing instant only when the wall time maps to exactly one instant. It tries the offsets in force 24 hours either side of and at the wall time; nonexistent (gap) and ambiguous (repeated hour) times, invalid dates and a failed zone all return false.
+- The package blank-imports `time/tzdata` (about 450 KB in every binary that links `transcript`, including `orbit`). The embedded data is only a fallback: Go consults `ZONEINFO` and the system zone directories first. The no-system-database path cannot be tested in-process because those directories cannot be disabled; `go list -deps ./cmd/apsis` shows the import is linked.
+- Tests build a fixed-offset version-1 TZif file in-process (`fixedTZif`), so the path form is tested without platform zone files.
 
 ## Current Integration Points
 
