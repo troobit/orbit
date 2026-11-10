@@ -168,6 +168,7 @@ func request(req transcript.LMStudioRequest) Request {
 	out := Request{
 		ID:                   req.ID,
 		SessionID:            req.SessionID,
+		File:                 req.File,
 		StartLine:            req.StartLine,
 		EndLine:              req.EndLine,
 		Endpoint:             req.Endpoint,

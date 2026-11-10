@@ -197,7 +197,7 @@ func TestSession_LMStudioNoRequestsOmitsArray(t *testing.T) {
 	assert.Equal(t, []any{}, doc["entries"])
 }
 
-// lmSessionView is the parse result session assembly will produce for the
+// lmSessionView is the parse result session assembly produces for the
 // handwritten session-view document: a thread's requests from two files,
 // with each file's unattributed events reduced to a summary.
 func lmSessionView(t *testing.T) *transcript.ParseResult {
@@ -211,11 +211,11 @@ func lmSessionView(t *testing.T) *transcript.ParseResult {
 		third   = "lmstudio-req-p-MjAyNi0wMy8yMDI2LTAzLTA1LjIubG9n-30"
 	)
 	params := json.RawMessage(`{"stream":true,"client_metadata":{"thread_id":"thread-alpha"}}`)
-	request := func(id string, start, end int, wall string) transcript.LMStudioRequest {
+	request := func(id, file string, start, end int, wall string) transcript.LMStudioRequest {
 		resolved, err := time.ParseInLocation(time.DateTime, wall, zone)
 		require.NoError(t, err)
 		return transcript.LMStudioRequest{
-			ID: id, SessionID: session, StartLine: start, EndLine: end, Endpoint: "/v1/responses",
+			ID: id, SessionID: session, File: file, StartLine: start, EndLine: end, Endpoint: "/v1/responses",
 			ThreadID: "thread-alpha", RequestKind: "turn", Model: "example-model-a",
 			Timestamp: wall, ResolvedTime: resolved, Parameters: params,
 		}
@@ -228,9 +228,9 @@ func lmSessionView(t *testing.T) *transcript.ParseResult {
 		}
 	}
 
-	resent := request(second, 3, 20, "2026-03-05 14:05:00")
+	resent := request(second, "2026-03/2026-03-05.2.log", 3, 20, "2026-03-05 14:05:00")
 	resent.PriorPrefixCount = 1
-	incomplete := request(third, 30, 31, "2026-03-05 14:06:00")
+	incomplete := request(third, "2026-03/2026-03-05.2.log", 30, 31, "2026-03-05 14:06:00")
 	incomplete.RequestKind, incomplete.Parameters, incomplete.BodyState = "", nil, transcript.BodyStateIncomplete
 	assistant := text("assistant", second, "2026-03-05T14:05:00+11:00", "The test expects a sorted list ... <Truncated in logs> ... order.")
 	assistant.SuppliedContext = true
@@ -242,7 +242,7 @@ func lmSessionView(t *testing.T) *transcript.ParseResult {
 			StartedAt: "2026-03-05T14:00:00+11:00", FirstModel: "example-model-a", FirstProvider: "lmstudio",
 			ThreadID: "thread-alpha", TimeZone: lmZone,
 		},
-		LMStudioRequests: []transcript.LMStudioRequest{request(first, 1, 12, "2026-03-05 14:00:00"), resent, incomplete},
+		LMStudioRequests: []transcript.LMStudioRequest{request(first, "2026-03/2026-03-05.1.log", 1, 12, "2026-03-05 14:00:00"), resent, incomplete},
 		Entries: []transcript.Entry{
 			text("user", first, "2026-03-05T14:00:00+11:00", "Fix the failing test."),
 			text("user", second, "2026-03-05T14:05:00+11:00", "Fix the failing test."),

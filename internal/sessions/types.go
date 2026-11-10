@@ -5,6 +5,8 @@ import (
 	"io"
 	"slices"
 	"time"
+
+	"github.com/arjenschwarz/orbit/internal/transcript"
 )
 
 // Source constants — canonical identifiers used in URLs, code, and storage.
@@ -96,8 +98,13 @@ type SessionMetadata struct {
 	Size               int64
 	CostPath           string // Non-empty only for Kiro IDE sessions
 	Project            string // Recorded project outside the transcript, such as Copilot's workspace.yaml git_root
-	Path               string // Path of the resolved transcript file
-	ThreadID           string // Codex exec thread ID; codex-exec only
+	Path               string // Path of the resolved transcript file; empty for sources without one file
+	ThreadID           string // Codex exec thread ID, or an LM Studio session's client thread ID
+
+	// PreParsed is an LM Studio session view assembled from the log files
+	// holding it. No single reader backs such a session, so ParseResolved
+	// returns this instead of reading Reader, which is then empty.
+	PreParsed *transcript.ParseResult
 }
 
 // ResolvedSession is the result of resolving a session by source and ID.

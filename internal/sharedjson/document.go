@@ -73,6 +73,7 @@ type Entry struct {
 type Request struct {
 	ID                   string          `json:"id"`
 	SessionID            string          `json:"session_id,omitempty"` // listed logical session; the request's own ID for a singleton
+	File                 string          `json:"file,omitempty"`       // logical-session views: root-relative file holding the record
 	StartLine            int             `json:"start_line"`
 	EndLine              int             `json:"end_line"`
 	Endpoint             string          `json:"endpoint"`

@@ -48,9 +48,9 @@ references:
 
 ## Phase 6: Session assembly and resolution (sessions)
 
-- [ ] 16. Implement resolveLMStudio with the three identifier forms and the singleton fast path
+- [x] 16. Implement resolveLMStudio with the three identifier forms and the singleton fast path
 
-- [ ] 17. Wire PreParsed through resolver.go, parse.go and the ResolvePath rejection
+- [x] 17. Wire PreParsed through resolver.go, parse.go and the ResolvePath rejection
 
 ## Phase 7: CLI surface and apsis serve
 

@@ -22,6 +22,7 @@ const (
 // Entry.RequestID.
 type LMStudioRequest struct {
 	ID                   string          // the parser's temporary StartLine key until the sessions layer assigns the final ID
+	File                 string          // root-relative path of the file holding the record, in a logical-session view; "" in a direct view of one input
 	StartLine, EndLine   int             // one-based physical line range of the record
 	Size                 int             // record bytes, line terminators included, measured in full when oversized
 	Endpoint             string          // the logged POST path

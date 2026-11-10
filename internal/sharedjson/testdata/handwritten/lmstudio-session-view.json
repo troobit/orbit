@@ -14,6 +14,7 @@
     {
       "id": "lmstudio-req-p-MjAyNi0wMy8yMDI2LTAzLTA1LjEubG9n-1",
       "session_id": "lmstudio-thread-a2ba3f64e66545724423033a46a31b5fa9f6db429bfffb60",
+      "file": "2026-03/2026-03-05.1.log",
       "start_line": 1,
       "end_line": 12,
       "endpoint": "/v1/responses",
@@ -28,6 +29,7 @@
     {
       "id": "lmstudio-req-p-MjAyNi0wMy8yMDI2LTAzLTA1LjIubG9n-3",
       "session_id": "lmstudio-thread-a2ba3f64e66545724423033a46a31b5fa9f6db429bfffb60",
+      "file": "2026-03/2026-03-05.2.log",
       "start_line": 3,
       "end_line": 20,
       "endpoint": "/v1/responses",
@@ -43,6 +45,7 @@
     {
       "id": "lmstudio-req-p-MjAyNi0wMy8yMDI2LTAzLTA1LjIubG9n-30",
       "session_id": "lmstudio-thread-a2ba3f64e66545724423033a46a31b5fa9f6db429bfffb60",
+      "file": "2026-03/2026-03-05.2.log",
       "start_line": 30,
       "end_line": 31,
       "endpoint": "/v1/responses",

@@ -214,20 +214,27 @@ func ParseLMStudio(r io.Reader) (*ParseResult, error) {
 		warnings = append([]ParseWarning{{Code: WarningTimeZone, Message: zone.warning}}, warnings...)
 	}
 
-	meta := &ParseResultMetadata{FirstProvider: lmProvider, TimeZone: zone.label}
+	return &ParseResult{
+		Entries:          entries,
+		Warnings:         warnings,
+		Metadata:         lmMetadata(requests, zone.label),
+		Format:           FormatLMStudio,
+		LMStudioRequests: requests,
+	}, nil
+}
+
+// lmMetadata is an LM Studio transcript's metadata: its first recorded model,
+// and its start time from the first request alone, absent when that request
+// has no unique time (requirement 5.4).
+func lmMetadata(requests []LMStudioRequest, timeZone string) *ParseResultMetadata {
+	meta := &ParseResultMetadata{FirstProvider: lmProvider, TimeZone: timeZone}
 	if i := slices.IndexFunc(requests, func(req LMStudioRequest) bool { return req.Model != "" }); i >= 0 {
 		meta.FirstModel = requests[i].Model
 	}
 	if len(requests) > 0 && !requests[0].ResolvedTime.IsZero() {
 		meta.StartedAt = requests[0].ResolvedTime.Format(time.RFC3339)
 	}
-	return &ParseResult{
-		Entries:          entries,
-		Warnings:         warnings,
-		Metadata:         meta,
-		Format:           FormatLMStudio,
-		LMStudioRequests: requests,
-	}, nil
+	return meta
 }
 
 // lex splits the input into records and classifies each as it completes.

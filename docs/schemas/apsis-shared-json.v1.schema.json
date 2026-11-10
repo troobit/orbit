@@ -113,6 +113,7 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "session_id": { "type": "string", "minLength": 1, "description": "The listed logical session the request belongs to; the request's own id for a session without a valid client thread identifier." },
+        "file": { "type": "string", "minLength": 1, "description": "Logical-session views: the file holding the record, relative to the LM Studio log directory; start_line and end_line count lines in it. Omitted in direct log views, whose records all come from the one input." },
         "start_line": { "type": "integer", "minimum": 1 },
         "end_line": { "type": "integer", "minimum": 1 },
         "endpoint": { "type": "string", "minLength": 1, "description": "The logged POST path." },

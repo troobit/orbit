@@ -7,6 +7,7 @@ import (
 	stdhtml "html"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -19,9 +20,10 @@ import (
 
 // LMStudioView is what an LM Studio transcript renders besides its entries.
 type LMStudioView struct {
-	Requests    []LMStudioRequest // source order, or a session's merged discovery order
-	TimeZone    string            // label of the zone logged wall times are assumed to be in
-	ZoneWarning string            // set when a TZ override could not be loaded
+	Requests    []LMStudioRequest      // source order, or a session's merged discovery order
+	Events      []LMStudioEventSummary // a session view's references to unattributed events; nil in a direct view
+	TimeZone    string                 // label of the zone logged wall times are assumed to be in
+	ZoneWarning string                 // set when a TZ override could not be loaded
 }
 
 // NewLMStudioView returns the render view of an LM Studio parse result, or
@@ -30,7 +32,7 @@ func NewLMStudioView(res *ParseResult) *LMStudioView {
 	if res == nil || res.Format != FormatLMStudio {
 		return nil
 	}
-	view := &LMStudioView{Requests: res.LMStudioRequests}
+	view := &LMStudioView{Requests: res.LMStudioRequests, Events: res.LMStudioEvents}
 	if res.Metadata != nil {
 		view.TimeZone = res.Metadata.TimeZone
 	}
@@ -120,6 +122,9 @@ func (v *LMStudioView) requestParts(req *LMStudioRequest) []lmPart {
 		assumed = req.ResolvedTime.Format(time.RFC3339)
 	}
 	parts := []lmPart{{text: lineRange(req.StartLine, req.EndLine)}, {text: v.timeLabel(req.Timestamp, assumed)}}
+	if req.File != "" {
+		parts = append([]lmPart{{code: req.File}}, parts...)
+	}
 	if req.Model != "" {
 		parts = append(parts, lmPart{"model", req.Model})
 	}
@@ -154,6 +159,49 @@ func (v *LMStudioView) eventParts(e *Entry) []lmPart {
 		parts = append(parts, lmPart{"model", e.Model})
 	}
 	return parts
+}
+
+const (
+	lmEventsHeading = "Unattributed events in these log files"
+	lmEventsNotice  = "Logged responses, warnings and errors in the files holding this session's requests " +
+		"are counted here without content and are not claimed for this session. " +
+		"This view, opened by source and session identifier, shows only the session's requests; " +
+		"converting a whole file with `apsis -a lmstudio <file>` shows every record it holds, from every client of the server, " +
+		"and needs CLI access to the server's log files. Paths are relative to the LM Studio log directory."
+)
+
+// eventSummaryParts describe one file's unattributed events in a session
+// view: the file, counts by kind, start lines and the next discovered file,
+// which can hold later events (requirement 4.2).
+func eventSummaryParts(s LMStudioEventSummary) []lmPart {
+	parts := []lmPart{
+		{code: s.File},
+		{text: lmCount(s.Counts.Response, "response") + ", " + lmCount(s.Counts.Warn, "warning") + ", " + lmCount(s.Counts.Error, "error")},
+	}
+	if len(s.Lines) > 0 {
+		lines := make([]string, len(s.Lines))
+		for i, line := range s.Lines {
+			lines[i] = strconv.Itoa(line)
+		}
+		label := "lines "
+		if len(lines) == 1 {
+			label = "line "
+		}
+		parts = append(parts, lmPart{text: label + strings.Join(lines, ", ")})
+	}
+	if s.NextFile != "" {
+		parts = append(parts, lmPart{"next file", s.NextFile})
+	} else {
+		parts = append(parts, lmPart{text: "last discovered file"})
+	}
+	return parts
+}
+
+func lmCount(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return strconv.Itoa(n) + " " + noun + "s"
 }
 
 // lmPrefixText stands in for the logged items a request repeats from its
@@ -346,6 +394,13 @@ func renderLMStudioMarkdown(entries []Entry, view *LMStudioView) string {
 		}
 		sb.WriteString("---\n\n")
 	}
+	if len(view.Events) > 0 {
+		fmt.Fprintf(&sb, "## 📄 %s\n\n%s\n\n", lmEventsHeading, lmEventsNotice)
+		for _, s := range view.Events {
+			sb.WriteString("- " + lmPartsMarkdown(eventSummaryParts(s)) + "\n")
+		}
+		sb.WriteString("\n")
+	}
 	return sb.String()
 }
 
@@ -465,6 +520,38 @@ func renderLMStudioHTML(sb *strings.Builder, entries []Entry, view *LMStudioView
 			r.eventHTML(sb, &seg.entries[0])
 		}
 	}
+	if len(view.Events) > 0 {
+		sb.WriteString("        <section class=\"message lm-events\">\n")
+		sb.WriteString("            <div class=\"message-header\">\n")
+		sb.WriteString("                <span class=\"icon\">📄</span>\n")
+		fmt.Fprintf(sb, "                <span class=\"message-role\">%s</span>\n", lmEventsHeading)
+		sb.WriteString("            </div>\n")
+		sb.WriteString("            <div class=\"message-content\">\n")
+		fmt.Fprintf(sb, "                <p class=\"lm-meta\">%s</p>\n", lmInlineCodeHTML(lmEventsNotice))
+		sb.WriteString("                <ul>\n")
+		for _, s := range view.Events {
+			fmt.Fprintf(sb, "                    <li class=\"lm-meta\">%s</li>\n", lmPartsHTML(eventSummaryParts(s)))
+		}
+		sb.WriteString("                </ul>\n")
+		sb.WriteString("            </div>\n")
+		sb.WriteString("        </section>\n")
+	}
+}
+
+// lmInlineCodeHTML escapes a fixed notice and turns its backquoted spans into
+// code elements, so Markdown and HTML show the same command.
+func lmInlineCodeHTML(s string) string {
+	var sb strings.Builder
+	code := false
+	for part := range strings.SplitSeq(s, "`") {
+		if code {
+			sb.WriteString("<code>" + stdhtml.EscapeString(part) + "</code>")
+		} else {
+			sb.WriteString(stdhtml.EscapeString(part))
+		}
+		code = !code
+	}
+	return sb.String()
 }
 
 func (r *lmRenderer) requestHTML(sb *strings.Builder, seg lmSegment) {

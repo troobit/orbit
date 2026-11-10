@@ -200,13 +200,10 @@ func findLMStudioFiles(root string) ([]lmLogFile, []ListWarning, error) {
 	return files, warnings, nil
 }
 
-// lmFileSummary is what listing keeps of one log file: request identity and
-// listing metadata, unattributed-event counts and file-level warnings, never
-// message content.
+// lmFileSummary is what listing keeps of one log file: request identity,
+// listing metadata and file-level warnings, never message content.
 type lmFileSummary struct {
 	requests    []lmRequestSummary // source order
-	events      transcript.LMStudioEventCounts
-	eventLines  []int // start line of each unattributed event, for session-view references (4.2)
 	warnings    []ListWarning
 	zoneWarning string // the TZ override failed; reported once per pass
 }
@@ -249,20 +246,6 @@ func summarizeLMStudioFile(file lmLogFile) (lmFileSummary, error) {
 			createdAt: req.ResolvedTime,
 			model:     req.Model,
 		})
-	}
-	for _, e := range res.Entries {
-		if !e.Unattributed {
-			continue
-		}
-		switch {
-		case e.Type == "assistant":
-			s.events.Response++
-		case e.Message != nil && len(e.Message.Content) > 0 && e.Message.Content[0].Type == "error":
-			s.events.Error++
-		default:
-			s.events.Warn++
-		}
-		s.eventLines = append(s.eventLines, e.SourceLine)
 	}
 	empty := len(res.LMStudioRequests) == 0 && len(res.Entries) == 0
 	for _, w := range res.Warnings {
@@ -331,7 +314,6 @@ type lmFileRef struct {
 
 // lmIndex is one pass over a log root.
 type lmIndex struct {
-	files     []lmLogFile              // every discovered file, in discovery order
 	summaries map[string]lmFileSummary // canonical path -> summary; absent when the file could not be read
 	sessions  map[string][]lmFileRef   // session ID -> the files holding it, in discovery order
 	order     []string                 // session IDs by first request, in discovery order
@@ -355,7 +337,6 @@ func buildLMStudioIndex(root string, cache *lmCache) (*lmIndex, []ListWarning, e
 	defer cache.mu.Unlock()
 
 	idx := &lmIndex{
-		files:     files,
 		summaries: make(map[string]lmFileSummary, len(files)),
 		sessions:  make(map[string][]lmFileRef),
 	}
@@ -445,4 +426,123 @@ func lmSessionInfo(id string, refs []lmFileRef) SessionInfo {
 		}
 	}
 	return info
+}
+
+// lmLocateRequest returns the index of the discovered file a request
+// identifier names, or -1. Both identifier forms derive from the file key and
+// start line alone, so this needs directory metadata only (Q39).
+func lmLocateRequest(files []lmLogFile, id string) int {
+	if !strings.HasPrefix(id, lmRequestPathPrefix) && !strings.HasPrefix(id, lmRequestHashPrefix) {
+		return -1
+	}
+	line, err := strconv.Atoi(id[strings.LastIndexByte(id, '-')+1:])
+	if err != nil || line < 1 {
+		return -1
+	}
+	return slices.IndexFunc(files, func(f lmLogFile) bool { return lmRequestID(f.key, line) == id })
+}
+
+// isLMThreadSessionID reports whether id has the shape lmThreadSessionID
+// produces, so a malformed identifier opens no file.
+func isLMThreadSessionID(id string) bool {
+	digest, ok := strings.CutPrefix(id, lmThreadPrefix)
+	if !ok || len(digest) != lmDigestLength {
+		return false
+	}
+	_, err := hex.DecodeString(digest)
+	return err == nil && strings.ToLower(digest) == digest
+}
+
+// readLMStudioFile parses one discovered file for a session view, with final
+// identifiers. Containment is checked again on the opened path, in case the
+// file changed after discovery (requirement 1.3).
+func readLMStudioFile(root string, file lmLogFile) (*transcript.ParseResult, error) {
+	f, err := lmOpen(file.path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	if canonical, err := CanonicalPath(file.path); err != nil || canonical != file.path || !withinAnyRoot(canonical, []string{root}) {
+		return nil, fmt.Errorf("%s is no longer a file inside the log directory", file.key)
+	}
+	res, err := transcript.ParseLMStudio(f)
+	if err != nil {
+		return nil, err
+	}
+	transcript.AssignLMStudioIDs(res, func(req transcript.LMStudioRequest) (string, string) {
+		id := lmRequestID(file.key, req.StartLine)
+		return id, lmSessionID(id, req.ThreadID)
+	})
+	return res, nil
+}
+
+// resolveLMStudio opens a listed logical session, or a single request, by
+// identifier, and only in all-projects scope (requirements 1.5, 7.1). A
+// request identifier names its file, so only that file is read, after a
+// directory listing that also names the next file. A thread can sit in any
+// file, so every discovered file is read once and the thread's requests kept
+// (Q39). The assembled view rides on the metadata, since no single reader
+// backs a session that spans files.
+func (r *Resolver) resolveLMStudio(id string) (*ResolvedSession, error) {
+	notFound := fmt.Errorf("session not found: %s", id)
+	if r.projectPath != "" || r.opts.LMStudioLogDir == "" {
+		return nil, notFound
+	}
+	root, err := lmStudioRoot(r.opts.LMStudioLogDir)
+	if err != nil {
+		return nil, notFound
+	}
+	files, _, err := findLMStudioFiles(root)
+	if err != nil {
+		return nil, notFound
+	}
+
+	from, to := 0, len(files)
+	if !isLMThreadSessionID(id) {
+		i := lmLocateRequest(files, id)
+		if i < 0 {
+			return nil, notFound
+		}
+		from, to = i, i+1
+	}
+	selected := func(req transcript.LMStudioRequest) bool { return req.ID == id || req.SessionID == id }
+	var parts []transcript.LMStudioSessionPart
+	var unreadable []transcript.ParseWarning
+	for i := from; i < to; i++ {
+		res, err := readLMStudioFile(root, files[i])
+		if err != nil {
+			if to-from == 1 {
+				return nil, err
+			}
+			unreadable = append(unreadable, transcript.ParseWarning{Code: WarningPathUnreadable,
+				Message: fmt.Sprintf("%s could not be read, so requests it holds are missing: %v", files[i].key, err)})
+			continue
+		}
+		if !slices.ContainsFunc(res.LMStudioRequests, selected) {
+			continue
+		}
+		part := transcript.LMStudioSessionPart{File: files[i].key, Result: res}
+		if i+1 < len(files) {
+			part.NextFile = files[i+1].key
+		}
+		parts = append(parts, part)
+	}
+	if len(parts) == 0 {
+		return nil, notFound
+	}
+
+	res := transcript.AssembleLMStudioSession(parts, selected)
+	res.Warnings = append(res.Warnings, unreadable...)
+	first := res.LMStudioRequests[0]
+	metadata := SessionMetadata{
+		Source:    SourceLMStudio,
+		ID:        id,
+		CreatedAt: first.ResolvedTime,
+		ThreadID:  first.ThreadID,
+		PreParsed: res,
+	}
+	for _, req := range res.LMStudioRequests {
+		metadata.Size += int64(req.Size)
+	}
+	return &ResolvedSession{Reader: io.NopCloser(strings.NewReader("")), Metadata: metadata}, nil
 }

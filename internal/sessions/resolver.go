@@ -57,6 +57,8 @@ func (r *Resolver) Resolve(source, sessionID string) (*ResolvedSession, error) {
 		return r.resolveKiroIDE(sessionID)
 	case SourceCodexExec:
 		return r.resolveCodexExec(sessionID)
+	case SourceLMStudio:
+		return r.resolveLMStudio(sessionID)
 	default:
 		return nil, fmt.Errorf("unknown source: %s", source)
 	}
@@ -229,7 +231,8 @@ func kiroIDECreatedAt(rs io.ReadSeeker, modTime time.Time) (createdAt time.Time,
 
 // ResolvePath returns the file path for a session, without opening it.
 // This is needed for follow mode which requires a path rather than a reader.
-// Returns an error for Kiro CLI sessions (SQLite-backed, no file path).
+// Returns an error for Kiro CLI sessions (SQLite-backed, no file path) and
+// LM Studio sessions (assembled from several log files).
 func (r *Resolver) ResolvePath(source, sessionID string) (string, error) {
 	if !IsValidSource(source) {
 		return "", fmt.Errorf("unknown source: %s", source)
@@ -271,6 +274,8 @@ func (r *Resolver) ResolvePath(source, sessionID string) (string, error) {
 	case SourceCodexExec:
 		path, _, err := r.locateCodexExec(sessionID)
 		return path, err
+	case SourceLMStudio:
+		return "", fmt.Errorf("lmstudio sessions are assembled from server-log records and have no single file path")
 	default:
 		return "", fmt.Errorf("unknown source: %s", source)
 	}

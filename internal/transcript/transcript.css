@@ -445,7 +445,8 @@ details.read-item:last-child {
     color: var(--error-color);
 }
 
-.message.lm-request {
+.message.lm-request,
+.message.lm-events {
     margin-top: 1.5rem;
     border-left-color: var(--tool-accent);
 }
