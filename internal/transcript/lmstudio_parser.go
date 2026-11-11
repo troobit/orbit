@@ -373,11 +373,19 @@ func lmResponseBody(message string) (string, bool) {
 	return strings.CutPrefix(message, lmSyncResponseMarker)
 }
 
+// translationWarnings reports a record's translation warnings with the
+// record's line range, which the translator does not know (requirement 6.2).
+func (p *lmParser) translationWarnings(rec *lmRecord, warnings []lmWarning) {
+	for _, w := range warnings {
+		p.warn(rec.start, w.code, fmt.Sprintf("%s (%s)", w.message, rec.lines()))
+	}
+}
+
 // headerLikeLines warns about continuation lines that look like a malformed
 // header in a record without a JSON body (requirement 6.3).
 func (p *lmParser) headerLikeLines(rec *lmRecord) {
 	for _, line := range rec.headerLike {
-		p.warn(line, WarningUnparsedText, "malformed log header")
+		p.warn(line, WarningUnparsedText, fmt.Sprintf("malformed log header (%s)", lineRange(line, line)))
 	}
 }
 
@@ -429,9 +437,7 @@ func (p *lmParser) request(rec *lmRecord, endpoint string, hasBody bool, tail st
 				ItemDigest:      item.digest,
 			})
 		}
-		for _, w := range tr.warnings {
-			p.warn(rec.start, w.code, w.message)
-		}
+		p.translationWarnings(rec, tr.warnings)
 	}
 	p.requests = append(p.requests, req)
 }
@@ -457,9 +463,7 @@ func (p *lmParser) response(rec *lmRecord, tail string) {
 	if e.Model == "" {
 		e.Model = model
 	}
-	for _, w := range warnings {
-		p.warn(rec.start, w.code, w.message)
-	}
+	p.translationWarnings(rec, warnings)
 	p.entries = append(p.entries, e)
 }
 

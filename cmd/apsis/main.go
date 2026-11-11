@@ -626,10 +626,18 @@ func execInput(in inputContext, threadID string) inputContext {
 }
 
 // lmStudioInput gives a directly converted LM Studio log the request and
-// session identifiers a listing would (requirement 3.4). The document keeps
-// the input's own identifier: a log holds many sessions, so it is not one.
+// session identifiers a listing would (requirement 3.4), and labels each
+// record warning with the file or stdin it came from (6.2). The document
+// keeps the input's own identifier: a log holds many sessions, so it is not
+// one.
 func lmStudioInput(in inputContext, res *transcript.ParseResult) {
 	sessions.AssignLMStudioInputIDs(res, in.path, in.lmStudioLogDir)
+	label := cmp.Or(in.path, "stdin")
+	for i := range res.Warnings {
+		if res.Warnings[i].Line > 0 {
+			res.Warnings[i].Message = label + ": " + res.Warnings[i].Message
+		}
+	}
 }
 
 // resolveInput determines the input source and returns a reader and its input context.

@@ -191,5 +191,7 @@ func TestLMStudioRender_SessionView(t *testing.T) {
 	}
 	assert.Contains(t, out.md, "`apsis -a lmstudio <file>`")
 	assert.Contains(t, out.fragment, "<code>apsis -a lmstudio &lt;file&gt;</code>")
+	assert.Contains(t, out.md, "`apsis --all-projects -s lmstudio <session-id>`", "the reopen route names scope and source (7.1)")
+	assert.Contains(t, out.fragment, "<code>apsis --all-projects -s lmstudio &lt;session-id&gt;</code>")
 	assert.Equal(t, strings.Count(out.md, "📄"), strings.Count(out.fragment, "📄"))
 }

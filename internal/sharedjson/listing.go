@@ -71,6 +71,7 @@ func listingRow(s sessions.SessionInfo) ListingRow {
 			Model:    s.Model,
 			Provider: s.Provider,
 			Origin:   s.Origin,
+			TimeZone: s.TimeZone,
 		},
 	}
 	if s.Source == sessions.SourceLMStudio {

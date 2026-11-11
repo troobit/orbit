@@ -301,6 +301,14 @@ a:hover {
     font-size: 0.95rem;
 }
 
+.session-details {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .session-date {
     color: var(--text-secondary);
     font-size: 0.85rem;

@@ -283,7 +283,7 @@ The existing patterns are the baseline; only differences are listed.
 
 | Content | Markdown | HTML |
 |---|---|---|
-| request boundary | a rule + meta line: endpoint, recorded/assumed time with zone label, thread correlation ID when present, `(extends prior request)` or `⚠ context discontinuity` | same parts via the existing group-header pattern |
+| request boundary | a rule + meta line: endpoint, recorded/assumed time with zone label, listed session and request identifiers once assigned (Q48), thread correlation ID when present, `(extends prior request)` or `⚠ context discontinuity` | same parts via the existing group-header pattern |
 | suppressed prefix | `⤷ repeats the first N items of the previous request` in place of those items | same text in the fragment markup |
 | unattributed event | collapsed block, `Unattributed · WARN` / `Unattributed · response` / `Unattributed · ERROR`; one leading notice per transcript explains the common state once (4.5, Q16) rather than repeating it per block | same collapsed-block pattern as `codex-exec`'s `event` kind |
 | `Parameters` | labelled collapsed `<details>` block: a one-line stream/tool-name summary, then the remaining fields as escaped JSON, values and truncation markers unchanged (Decision 9) | same block, same escaping rule as every other raw-JSON block |
@@ -314,6 +314,7 @@ Covered in [Components 1](#1-shared-representation-additions-transcript): one ne
 |---|---|---|
 | `request_count` | thread index entry count (7.2); replaces `size_bytes` for this source, since "size" in the requirements names a request count here, not a byte count, and overloading the existing byte-sized field would mislabel it in the schema | not an `lmstudio` row; `size_bytes` is omitted on `lmstudio` rows (Q32) |
 | `thread_id` | the recorded value (existing field, reused) | singleton |
+| `time_zone` | the zone label wall times were interpreted in (existing session-metadata field, reused, Q50) | not an `lmstudio` row |
 
 Text listing (`apsis -l`) prints `lmstudio` rows' count directly (e.g. `42 requests`) instead of calling `FormatSize`, which otherwise reads that column as a byte count.
 

@@ -126,7 +126,7 @@ func TestParseLMStudio_EndpointTranslation(t *testing.T) {
 	}
 
 	assert.Equal(t, []ParseWarning{
-		{Line: 125, Code: WarningUnrecognizedRecord, Message: "unrecognized input item type: image"},
+		{Line: 125, Code: WarningUnrecognizedRecord, Message: "unrecognized input item type: image (lines 125-138)"},
 	}, res.Warnings, "a native image item is kept as an event, with a warning")
 }
 
@@ -200,9 +200,9 @@ func TestParseLMStudio_ToolScoping(t *testing.T) {
 	}
 
 	assert.Equal(t, []ParseWarning{
-		{Line: 101, Code: WarningUnrecognizedRecord, Message: "unrecognized content block type: image"},
-		{Line: 173, Code: WarningUnrecognizedRecord, Message: "unrecognized input item type: web_search_call"},
-		{Line: 173, Code: WarningUnrecognizedRecord, Message: "unrecognized input content part type: input_image"},
+		{Line: 101, Code: WarningUnrecognizedRecord, Message: "unrecognized content block type: image (lines 101-172)"},
+		{Line: 173, Code: WarningUnrecognizedRecord, Message: "unrecognized input item type: web_search_call (lines 173-218)"},
+		{Line: 173, Code: WarningUnrecognizedRecord, Message: "unrecognized input content part type: input_image (lines 173-218)"},
 	}, res.Warnings)
 }
 

@@ -18,7 +18,7 @@ import (
 var templatesFS embed.FS
 
 // CSSVersion is used for cache busting. Bump when CSS changes.
-const CSSVersion = "4"
+const CSSVersion = "5"
 
 // Config holds web server configuration.
 type Config struct {
@@ -186,6 +186,7 @@ type SessionView struct {
 	URL         string
 	Project     string // recorded project; set in all-projects scope only
 	FileTime    bool   // CreatedAt is a codex-exec stream's file modification time
+	Details     string // second line under the identifier; LM Studio rows only
 }
 
 // TranscriptViewData is passed to transcript.html.

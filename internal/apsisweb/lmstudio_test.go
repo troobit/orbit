@@ -68,6 +68,9 @@ func TestLMStudioListingRows(t *testing.T) {
 	assert.Contains(t, fragment, `<span class="session-date">time unknown</span>`, "a nonexistent first wall time stays unknown")
 	assert.Contains(t, fragment, `datetime="2026-11-01T10:00:00Z"`)
 	assert.NotContains(t, fragment, "0001-01-01")
+	assert.Contains(t, fragment, `<span class="session-details">example-model · thread thread-a · time assumed in UTC</span>`,
+		"model, thread and assumed zone tell opaque identifiers apart")
+	assert.Contains(t, fragment, `<span class="session-details">example-model · time assumed in UTC</span>`, "a singleton has no thread")
 }
 
 // A session page shows the session's parse warnings and thread ID, and the
@@ -122,7 +125,7 @@ func TestLMStudioBadgeStyles(t *testing.T) {
 	css, err := os.ReadFile(filepath.Join("static", "style.css"))
 	require.NoError(t, err)
 	assert.Equal(t, 2, strings.Count(string(css), ".source-lmstudio {"), "light and dark badge rules")
-	assert.Equal(t, "4", CSSVersion, "the stylesheet changed, so its cache-busting version rises")
+	assert.Equal(t, "5", CSSVersion, "the stylesheet changed, so its cache-busting version rises")
 }
 
 // BenchmarkLMStudioListFragment renders the HTMX session list for a generated

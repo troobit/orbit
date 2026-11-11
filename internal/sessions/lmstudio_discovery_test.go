@@ -186,17 +186,17 @@ func TestListLMStudio_Grouping(t *testing.T) {
 	assert.Equal(t, []SessionInfo{
 		{
 			ID: lmRequestID(firstKey, 1), CreatedAt: time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC),
-			Size: int64(len(lines[0])), Source: SourceLMStudio, Model: "model-a", Provider: "lmstudio", RequestCount: 1,
+			Size: int64(len(lines[0])), Source: SourceLMStudio, Model: "model-a", Provider: "lmstudio", RequestCount: 1, TimeZone: "UTC",
 		},
 		{
 			ID: lmThreadSessionID("thread-alpha"), CreatedAt: time.Date(2026, 11, 10, 9, 1, 0, 0, time.UTC),
-			Size: threadSize, Source: SourceLMStudio, Model: "model-b", Provider: "lmstudio", ThreadID: "thread-alpha", RequestCount: 3,
+			Size: threadSize, Source: SourceLMStudio, Model: "model-b", Provider: "lmstudio", ThreadID: "thread-alpha", RequestCount: 3, TimeZone: "UTC",
 		},
 		{
 			ID: lmRequestID(secondKey, 2), CreatedAt: time.Date(2026, 11, 10, 10, 1, 0, 0, time.UTC),
-			Size: int64(len(strings.SplitAfter(second, "\n")[1])), Source: SourceLMStudio, Model: "model-d", Provider: "lmstudio", RequestCount: 1,
+			Size: int64(len(strings.SplitAfter(second, "\n")[1])), Source: SourceLMStudio, Model: "model-d", Provider: "lmstudio", RequestCount: 1, TimeZone: "UTC",
 		},
-	}, rows, "a thread groups across files with its first-known model; a truncated thread ID is a singleton; size counts only the session's records")
+	}, rows, "a thread groups across files with its first-known model; a truncated thread ID is a singleton; size counts only the session's records; every row names the assumed zone")
 }
 
 func TestListLMStudio_CreatedAtFromFirstRequestOnly(t *testing.T) {

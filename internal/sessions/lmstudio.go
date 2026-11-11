@@ -205,6 +205,7 @@ func findLMStudioFiles(root string) ([]lmLogFile, []ListWarning, error) {
 type lmFileSummary struct {
 	requests    []lmRequestSummary // source order
 	warnings    []ListWarning
+	timeZone    string // label of the zone wall times were interpreted in
 	zoneWarning string // the TZ override failed; reported once per pass
 }
 
@@ -237,7 +238,7 @@ func summarizeLMStudioFile(file lmLogFile) (lmFileSummary, error) {
 		return lmFileSummary{}, err
 	}
 
-	var s lmFileSummary
+	s := lmFileSummary{timeZone: res.Metadata.TimeZone}
 	for _, req := range res.LMStudioRequests {
 		s.requests = append(s.requests, lmRequestSummary{
 			id:        lmRequestID(file.key, req.StartLine),
@@ -317,6 +318,7 @@ type lmIndex struct {
 	summaries map[string]lmFileSummary // canonical path -> summary; absent when the file could not be read
 	sessions  map[string][]lmFileRef   // session ID -> the files holding it, in discovery order
 	order     []string                 // session IDs by first request, in discovery order
+	timeZone  string                   // label of the zone every row's time is assumed in
 }
 
 // buildLMStudioIndex reads every discovered file under a canonical root,
@@ -351,6 +353,7 @@ func buildLMStudioIndex(root string, cache *lmCache) (*lmIndex, []ListWarning, e
 		idx.summaries[file.path] = summary
 		warnings = append(warnings, summary.warnings...)
 		zoneWarning = cmp.Or(zoneWarning, summary.zoneWarning)
+		idx.timeZone = cmp.Or(idx.timeZone, summary.timeZone)
 		for _, req := range summary.requests {
 			id := lmSessionID(req.id, req.threadID)
 			refs := idx.sessions[id]
@@ -400,7 +403,9 @@ func (l *Lister) listLMStudio(projectPath string) ([]SessionInfo, []ListWarning)
 	}
 	sessions := make([]SessionInfo, 0, len(idx.order))
 	for _, id := range idx.order {
-		sessions = append(sessions, lmSessionInfo(id, idx.sessions[id]))
+		info := lmSessionInfo(id, idx.sessions[id])
+		info.TimeZone = idx.timeZone
+		sessions = append(sessions, info)
 	}
 	return sessions, warnings
 }

@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/arjenschwarz/orbit/internal/sessions"
@@ -122,6 +123,26 @@ func (s *Server) handleTranscriptCSS(w http.ResponseWriter, _ *http.Request) {
 	_, _ = fmt.Fprint(w, transcript.TranscriptCSS())
 }
 
+// lmStudioDetails is an LM Studio row's second line: the recorded model,
+// client thread and assumed zone, which tell its opaque identifiers apart
+// (requirement 7.2 of apsis-lmstudio-logs). Other sources have none.
+func lmStudioDetails(si sessions.SessionInfo) string {
+	if si.Source != sessions.SourceLMStudio {
+		return ""
+	}
+	var parts []string
+	if si.Model != "" {
+		parts = append(parts, si.Model)
+	}
+	if si.ThreadID != "" {
+		parts = append(parts, "thread "+si.ThreadID)
+	}
+	if si.TimeZone != "" {
+		parts = append(parts, "time assumed in "+si.TimeZone)
+	}
+	return strings.Join(parts, " · ")
+}
+
 // buildSessionListData builds the session list data shared by full page and HTMX fragment.
 func (s *Server) buildSessionListData() (SessionListData, error) {
 	sessionList, warnings, err := s.lister.ListAll(s.config.ProjectPath)
@@ -152,6 +173,7 @@ func (s *Server) buildSessionListData() (SessionListData, error) {
 			Size:        si.SizeLabel(),
 			URL:         fmt.Sprintf("/sessions/%s/%s", si.Source, si.ID),
 			FileTime:    si.Source == sessions.SourceCodexExec && si.TimeFromFilesystem,
+			Details:     lmStudioDetails(si),
 		}
 		// An LM Studio session whose first request has no unique time shows
 		// none (requirement 5.4 of apsis-lmstudio-logs).

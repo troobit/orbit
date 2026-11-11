@@ -159,9 +159,9 @@ func TestParseLMStudioRecords_Recovery(t *testing.T) {
 	assert.Equal(t, []ParseWarning{
 		{Line: 1, Code: WarningUnparsedText, Message: "text before the first log header (lines 1-2)"},
 		{Line: 4, Code: WarningInvalidRecord, Message: "request body is not valid JSON (lines 4-9)"},
-		{Line: 11, Code: WarningUnparsedText, Message: "malformed log header"},
+		{Line: 11, Code: WarningUnparsedText, Message: "malformed log header (line 11)"},
 		{Line: 12, Code: WarningInvalidRecord, Message: "request body is not valid JSON (lines 12-20)"},
-		{Line: 25, Code: WarningUnrecognizedRecord, Message: "/v1/completions request body is not a JSON object"},
+		{Line: 25, Code: WarningUnrecognizedRecord, Message: "/v1/completions request body is not a JSON object (lines 25-27)"},
 		{Line: 28, Code: WarningInvalidRecord, Message: "request body is incomplete at the end of the input (lines 28-30)"},
 	}, warnings, "an incomplete final body has a state and a body-free warning")
 }
@@ -272,7 +272,7 @@ func TestParseLMStudioRecords_Inputs(t *testing.T) {
 		"header-like line in a warning": {
 			input:    "[2026-03-02 09:00:00][WARN] Something\n[2026-03-02 09:00] broken\n",
 			kinds:    []lmEntrySummary{{Type: "log", Unattributed: true, SourceLine: 1, Kinds: []string{"text/WARN"}}},
-			warnings: []ParseWarning{{Line: 2, Code: WarningUnparsedText, Message: "malformed log header"}},
+			warnings: []ParseWarning{{Line: 2, Code: WarningUnparsedText, Message: "malformed log header (line 2)"}},
 		},
 	}
 	for name, tc := range tests {

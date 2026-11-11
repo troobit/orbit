@@ -128,6 +128,14 @@ func (v *LMStudioView) requestParts(req *LMStudioRequest) []lmPart {
 	if req.Model != "" {
 		parts = append(parts, lmPart{"model", req.Model})
 	}
+	// Identifiers the sessions layer assigned, which open the logical session
+	// and the request on their own; a singleton's session is its request.
+	if req.SessionID != "" {
+		parts = append(parts, lmPart{"session", req.SessionID})
+		if req.ID != req.SessionID {
+			parts = append(parts, lmPart{"request", req.ID})
+		}
+	}
 	if req.ThreadID != "" {
 		parts = append(parts, lmPart{"thread", req.ThreadID})
 	} else {
@@ -165,7 +173,7 @@ const (
 	lmEventsHeading = "Unattributed events in these log files"
 	lmEventsNotice  = "Logged responses, warnings and errors in the files holding this session's requests " +
 		"are counted here without content and are not claimed for this session. " +
-		"This view, opened by source and session identifier, shows only the session's requests; " +
+		"This view, opened by source and session identifier with `apsis --all-projects -s lmstudio <session-id>`, shows only the session's requests; " +
 		"converting a whole file with `apsis -a lmstudio <file>` shows every record it holds, from every client of the server, " +
 		"and needs CLI access to the server's log files. Paths are relative to the LM Studio log directory."
 )

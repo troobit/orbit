@@ -4,6 +4,8 @@ import (
 	stdhtml "html"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -258,6 +260,39 @@ func TestLMStudioRender_Times(t *testing.T) {
 		assert.Contains(t, out.md, "⚠️ **Time zone:**")
 		assert.Contains(t, out.fragment, `<p class="lm-note warning">⚠️ <strong>Time zone:</strong>`)
 	})
+}
+
+// Once the sessions layer assigns identifiers, each request names the logical
+// session that opens it and, inside a thread, its own identifier; before
+// that, temporary identifiers stay hidden (requirement 1.4).
+func TestLMStudioRender_ListedIdentifiers(t *testing.T) {
+	res := parseLMFixture(t, "threads.log")
+	assert.NotContains(t, renderLM(res).md, "session `", "unassigned identifiers are not shown")
+
+	AssignLMStudioIDs(res, func(req LMStudioRequest) (string, string) {
+		id := "req-" + strconv.Itoa(req.StartLine)
+		if req.ThreadID == "" {
+			return id, id
+		}
+		return id, "thread-session-" + req.ThreadID
+	})
+	threaded := slices.IndexFunc(res.LMStudioRequests, func(r LMStudioRequest) bool { return r.ThreadID != "" })
+	singleton := slices.IndexFunc(res.LMStudioRequests, func(r LMStudioRequest) bool { return r.ThreadID == "" })
+	require.True(t, threaded >= 0 && singleton >= 0, "the fixture holds both kinds")
+	th, si := res.LMStudioRequests[threaded], res.LMStudioRequests[singleton]
+
+	out := renderLM(res)
+	for name, tc := range map[string]struct{ got, open, close string }{
+		"markdown": {got: out.md, open: "`", close: "`"},
+		"html":     {got: out.fragment, open: "<code>", close: "</code>"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			code := func(s string) string { return tc.open + s + tc.close }
+			assert.Contains(t, tc.got, "session "+code(th.SessionID)+" · request "+code(th.ID))
+			assert.Contains(t, tc.got, "session "+code(si.ID))
+			assert.NotContains(t, tc.got, "request "+code(si.ID), "a singleton's session is its request")
+		})
+	}
 }
 
 // A request without translated content keeps its boundary and body state

@@ -86,6 +86,7 @@ type SessionInfo struct {
 	Origin             string // Claude entrypoint or Codex originator from the bounded head scan
 	ThreadID           string // Codex exec thread ID, or LM Studio client thread ID
 	RequestCount       int    // Requests in an LM Studio logical session; lmstudio only
+	TimeZone           string // Zone an LM Studio session's logged wall times are assumed to be in; lmstudio only
 }
 
 // SizeLabel is a listed session's size: its byte size, or an LM Studio

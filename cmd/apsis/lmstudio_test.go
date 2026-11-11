@@ -156,6 +156,59 @@ func TestLMStudioInput_OutOfRootIDsAreInputScoped(t *testing.T) {
 	assert.Equal(t, convert(&Config{}, lmLog), convert(&Config{}, lmLog), "stdin identifiers are reproducible")
 }
 
+// A direct view's request meta lines name the identifiers that open the
+// listed logical session and, inside a thread, the request (requirement 1.4).
+func TestLMStudioFile_MetaLineShowsListedIDs(t *testing.T) {
+	root, file := lmRoot(t, lmLog)
+	stdout, _, err := runCLI(t, &Config{Input: file, Format: "shared-json", LMStudioLogDir: &root}, "")
+	require.NoError(t, err)
+	ids, sessionIDs := requestIDs(decodeSession(t, stdout))
+	require.Len(t, ids, 2)
+
+	md, _, err := runCLI(t, &Config{Input: file, Format: "md", LMStudioLogDir: &root}, "")
+	require.NoError(t, err)
+	assert.Contains(t, md, "session `"+sessionIDs[0]+"` · request `"+ids[0]+"`")
+	assert.Contains(t, md, "session `"+ids[1]+"`")
+	assert.NotContains(t, md, "request `"+ids[1]+"`", "a singleton's session is its request")
+}
+
+// Record warnings name the file or stdin they came from, as well as their
+// lines; the time-zone warning has neither (requirement 6.2).
+func TestLMStudioInput_WarningsNameTheInput(t *testing.T) {
+	log := `[2026-11-01 10:00:00][INFO] Received request: POST to /v1/chat/completions with body {not json}` + "\n" +
+		lmRecord("2026-11-01 10:00:01", "")
+	_, file := lmRoot(t, log)
+	t.Setenv("TZ", "Example/Nowhere")
+
+	for name, tc := range map[string]struct {
+		cfg   Config
+		stdin string
+		label string
+	}{
+		"file":  {cfg: Config{Input: file}, label: file},
+		"stdin": {stdin: log, label: "stdin"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := tc.cfg
+			cfg.Format = "md"
+			_, stderr, err := runCLI(t, &cfg, tc.stdin)
+			require.NoError(t, err)
+			assert.Contains(t, stderr, "Warning: line 1: "+tc.label+": request body is not valid JSON (line 1)")
+			assert.Contains(t, stderr, `Warning: TZ="Example/Nowhere" could not be loaded`, "the zone warning names no input")
+
+			cfg = tc.cfg
+			cfg.Format = "shared-json"
+			stdout, _, err := runCLI(t, &cfg, tc.stdin)
+			require.NoError(t, err)
+			var messages []string
+			for _, w := range decodeSession(t, stdout).Warnings {
+				messages = append(messages, w.Message)
+			}
+			assert.Contains(t, messages, tc.label+": request body is not valid JSON (line 1)")
+		})
+	}
+}
+
 func TestLMStudioFile_ForcedFormat(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "internal", "transcript", "testdata", "lmstudio", "notice_only.log"))
 	require.NoError(t, err)
