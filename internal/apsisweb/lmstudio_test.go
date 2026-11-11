@@ -1,6 +1,7 @@
 package apsisweb
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -122,4 +123,59 @@ func TestLMStudioBadgeStyles(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, strings.Count(string(css), ".source-lmstudio {"), "light and dark badge rules")
 	assert.Equal(t, "4", CSSVersion, "the stylesheet changed, so its cache-busting version rises")
+}
+
+// BenchmarkLMStudioListFragment renders the HTMX session list for a generated
+// log directory of 30 files holding 30,000 unthreaded requests (one row each)
+// plus 3,000 threaded ones in 10 threads, and records the rendered fragment
+// size beside the workload (requirement 8.5): a cold server, then a refresh
+// of the unchanged directory through one server's cached lister.
+func BenchmarkLMStudioListFragment(b *testing.B) {
+	b.Setenv("HOME", b.TempDir())
+	b.Setenv("TZ", "")
+	root := b.TempDir()
+	var inputBytes int64
+	requests := 0
+	for f := range 30 {
+		var sb strings.Builder
+		for i := range 1100 {
+			meta := ""
+			if i%11 == 10 {
+				meta = fmt.Sprintf(`,"client_metadata":{"thread_id":"thread-%d"}`, (f+i)%10)
+			}
+			fmt.Fprintf(&sb, `[2026-11-%02d 09:%02d:%02d][INFO] Received request: POST to /v1/chat/completions with body {"model":"example-model","messages":[{"role":"user","content":"hi"}]%s}`+"\n",
+				1+f%28, i/60%60, i%60, meta)
+			requests++
+		}
+		inputBytes += int64(sb.Len())
+		path := filepath.Join(root, "2026-11", fmt.Sprintf("2026-11-%02d.%d.log", 1+f%28, f/28+1))
+		require.NoError(b, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(b, os.WriteFile(path, []byte(sb.String()), 0o600))
+	}
+	config := Config{AllProjects: true, LMStudioLogDir: root}
+	report := func(b *testing.B, fragment string) {
+		b.ReportMetric(float64(inputBytes), "input-bytes")
+		b.ReportMetric(float64(requests), "requests")
+		b.ReportMetric(float64(strings.Count(fragment, `href="/sessions/lmstudio/`)), "rows")
+		b.ReportMetric(float64(len(fragment)), "fragment-bytes")
+	}
+
+	b.Run("cold", func(b *testing.B) {
+		var fragment string
+		for b.Loop() {
+			srv, err := New(config)
+			require.NoError(b, err)
+			_, fragment = fetch(b, srv, "/api/sessions")
+		}
+		report(b, fragment)
+	})
+	b.Run("unchanged refresh", func(b *testing.B) {
+		srv, err := New(config)
+		require.NoError(b, err)
+		_, fragment := fetch(b, srv, "/api/sessions")
+		for b.Loop() {
+			_, fragment = fetch(b, srv, "/api/sessions")
+		}
+		report(b, fragment)
+	})
 }

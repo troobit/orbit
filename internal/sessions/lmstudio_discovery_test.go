@@ -68,7 +68,7 @@ func (r *lmReads) reset() {
 }
 
 // countLMReads replaces lmOpen and lmFingerprint with counting wrappers.
-func countLMReads(t *testing.T) *lmReads {
+func countLMReads(t testing.TB) *lmReads {
 	t.Helper()
 	reads := &lmReads{}
 	open, fingerprint := lmOpen, lmFingerprint
@@ -322,7 +322,7 @@ func TestLister_SourcesWithLMStudio(t *testing.T) {
 
 // requireUnixCache skips tests of the zero-read refresh on platforms whose
 // fingerprint is never cacheable (Q20).
-func requireUnixCache(t *testing.T) {
+func requireUnixCache(t testing.TB) {
 	t.Helper()
 	if runtime.GOOS == "windows" || runtime.GOOS == "plan9" || runtime.GOOS == "js" || runtime.GOOS == "wasip1" {
 		t.Skip("the LM Studio cache is Unix-only")
@@ -465,7 +465,9 @@ func TestBuildLMStudioIndex_OverlappingPasses(t *testing.T) {
 
 // BenchmarkListLMStudio lists a generated root of 30 files holding 30,000
 // unthreaded requests (one listing row each) plus 3,000 threaded ones in 10
-// threads: a cold pass with an empty cache, and a refresh of the unchanged tree.
+// threads: a cold pass with an empty cache, and a refresh of the unchanged
+// tree, which must read no log body (requirements 7.3, 8.5).
+// BenchmarkLMStudioListFragment in apsisweb records the rendered list size.
 func BenchmarkListLMStudio(b *testing.B) {
 	b.Setenv("TZ", "")
 	root, err := filepath.EvalSymlinks(b.TempDir())
@@ -505,12 +507,16 @@ func BenchmarkListLMStudio(b *testing.B) {
 		report(b, rows)
 	})
 	b.Run("unchanged refresh", func(b *testing.B) {
+		requireUnixCache(b)
 		l, err := NewLister(WithLMStudioLogDir(filepath.Join(root, "logs"), true))
 		require.NoError(b, err)
 		list, _ := l.listLMStudio("")
-		b.ResetTimer()
+		reads := countLMReads(b)
 		for b.Loop() {
 			list, _ = l.listLMStudio("")
+		}
+		if opened := reads.opens(); len(opened) != 0 {
+			b.Fatalf("unchanged refresh read %d log bodies, want 0", len(opened))
 		}
 		report(b, len(list))
 	})

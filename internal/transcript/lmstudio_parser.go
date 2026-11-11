@@ -525,8 +525,8 @@ func (p *lmParser) warnOversized(rec *lmRecord) {
 
 // decodeBody decodes the JSON value that starts after a request's ` with body`
 // or a response marker. A value unterminated at the end of the input is
-// incomplete and may still be growing (requirement 6.1), so it has no warning;
-// any other decode failure is malformed.
+// incomplete and may still be growing (requirement 6.1); any other decode
+// failure is malformed. Both warn with the record's lines (2.5, 6.2).
 func (p *lmParser) decodeBody(rec *lmRecord, tail, what string) (json.RawMessage, string) {
 	body := append([]byte(tail), rec.cont...)
 	dec := json.NewDecoder(bytes.NewReader(body))
@@ -535,6 +535,7 @@ func (p *lmParser) decodeBody(rec *lmRecord, tail, what string) (json.RawMessage
 	switch {
 	case err == nil:
 	case rec.last && (errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)):
+		p.warn(rec.start, WarningInvalidRecord, fmt.Sprintf("%s body is incomplete at the end of the input (%s)", what, rec.lines()))
 		return nil, BodyStateIncomplete
 	default:
 		p.warn(rec.start, WarningInvalidRecord, fmt.Sprintf("%s body is not valid JSON (%s)", what, rec.lines()))

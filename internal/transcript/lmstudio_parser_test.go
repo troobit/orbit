@@ -162,7 +162,8 @@ func TestParseLMStudioRecords_Recovery(t *testing.T) {
 		{Line: 11, Code: WarningUnparsedText, Message: "malformed log header"},
 		{Line: 12, Code: WarningInvalidRecord, Message: "request body is not valid JSON (lines 12-20)"},
 		{Line: 25, Code: WarningUnrecognizedRecord, Message: "/v1/completions request body is not a JSON object"},
-	}, warnings, "an incomplete final body has a state but no warning")
+		{Line: 28, Code: WarningInvalidRecord, Message: "request body is incomplete at the end of the input (lines 28-30)"},
+	}, warnings, "an incomplete final body has a state and a body-free warning")
 }
 
 func TestParseLMStudioRecords_Recovery_NoBodyText(t *testing.T) {
@@ -206,12 +207,14 @@ func TestParseLMStudioRecords_Inputs(t *testing.T) {
 			kinds:  []lmEntrySummary{{Type: "user", RequestID: "1", Kinds: []string{"text"}}},
 		},
 		"unterminated body at end of input": {
-			input:  header + ` with body {"prompt": "o`,
-			states: []string{BodyStateIncomplete},
+			input:    header + ` with body {"prompt": "o`,
+			states:   []string{BodyStateIncomplete},
+			warnings: []ParseWarning{{Line: 1, Code: WarningInvalidRecord, Message: "request body is incomplete at the end of the input (line 1)"}},
 		},
 		"empty body at end of input": {
-			input:  header + " with body\n",
-			states: []string{BodyStateIncomplete},
+			input:    header + " with body\n",
+			states:   []string{BodyStateIncomplete},
+			warnings: []ParseWarning{{Line: 1, Code: WarningInvalidRecord, Message: "request body is incomplete at the end of the input (line 1)"}},
 		},
 		"empty body before another record": {
 			input:    header + " with body\n" + valid,

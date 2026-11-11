@@ -40,7 +40,7 @@ func execWeb(t *testing.T) (stream, repo string) {
 	return stream, repo
 }
 
-func fetch(t *testing.T, srv *Server, path string) (int, string) {
+func fetch(t testing.TB, srv *Server, path string) (int, string) {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
