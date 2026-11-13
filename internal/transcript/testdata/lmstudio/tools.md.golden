@@ -1,0 +1,345 @@
+# Session Transcript
+
+**Session ID:** `example-log`
+
+---
+
+**Time zone:** UTC, assumed for every logged wall time; the log records no zone.
+
+**Request attribution unknown:** the log does not record which request produced a logged response, warning or error, so none is shown as a request's output.
+
+---
+
+## 📨 Request · `POST /v1/chat/completions`
+
+lines 1-48 · 2026-03-06T11:00:00Z (assumed UTC) · model `example-model-a` · singleton session (no valid thread ID)
+
+<details>
+<summary>🎛️ Request parameters · stream true · tools: list_files, read_file</summary>
+
+```json
+{
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "list_files"
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "read_file"
+      }
+    }
+  ],
+  "stream": true
+}
+```
+
+</details>
+
+### 👤 User
+
+List the files.
+
+### 🤖 Assistant · supplied context
+
+<details>
+<summary>💭 Thinking</summary>
+
+I should list the files.
+
+</details>
+
+<details>
+<summary>✅ 🔧 list_files</summary>
+
+**Input:**
+```json
+{
+  "path": "."
+}
+```
+
+**Result:**
+```
+a.txt
+b.txt
+```
+
+</details>
+
+### 👤 User
+
+Now read the first file and report every line of it from the ... \<Truncated in logs> ... to the end of the file.
+
+✂️ *(truncated in logs)*
+
+---
+
+## 📨 Request · `POST /v1/chat/completions`
+
+lines 49-75 · 2026-03-06T11:00:01Z (assumed UTC) · model `example-model-b` · singleton session (no valid thread ID)
+
+### 👤 User
+
+A different client.
+
+### 🤖 Assistant · supplied context
+
+<details>
+<summary>✅ 🔧 read_file</summary>
+
+**Input:**
+```
+not json
+```
+
+**Result:**
+```
+file contents
+```
+
+</details>
+
+---
+
+<details>
+<summary>🤖 Unattributed · response · line 76 · 2026-03-06T11:00:02Z (assumed UTC) · model <code>example-model-b</code></summary>
+
+<details>
+<summary>🔧 Tool call: read_file</summary>
+
+**Input:**
+```json
+{
+  "path": "a.txt"
+}
+```
+
+</details>
+
+</details>
+
+---
+
+## 📨 Request · `POST /v1/messages`
+
+lines 101-172 · 2026-03-06T11:00:03Z (assumed UTC) · model `example-model-a` · singleton session (no valid thread ID)
+
+<details>
+<summary>🎛️ Request parameters</summary>
+
+```json
+{
+  "max_tokens": 1024
+}
+```
+
+</details>
+
+### ⚙️ System
+
+System block.
+
+### 👤 User
+
+Check the build.
+
+### 🤖 Assistant · supplied context
+
+<details>
+<summary>💭 Thinking</summary>
+
+Plan the check.
+
+</details>
+
+Running it.
+
+<details>
+<summary>✅ 🔧 bash</summary>
+
+**Input:**
+```json
+{
+  "command": "make"
+}
+```
+
+**Result:**
+```
+ok
+```
+
+</details>
+
+<details>
+<summary>❌ Tool Error</summary>
+
+```
+[{"type":"text","text":"orphan"}]
+```
+
+</details>
+
+### 👤 User
+
+<details>
+<summary>📦 Event: image</summary>
+
+```json
+{
+  "type": "image",
+  "source": {
+    "type": "base64",
+    "media_type": "image/png",
+    "data": "AAAA"
+  }
+}
+```
+
+</details>
+
+---
+
+## 📨 Request · `POST /v1/responses`
+
+lines 173-218 · 2026-03-06T11:00:04Z (assumed UTC) · model `example-model-a` · singleton session (no valid thread ID)
+
+### ⚙️ Developer
+
+Developer note.
+
+### 🤖 Assistant · supplied context
+
+<details>
+<summary>💭 Thinking</summary>
+
+Thinking about it.
+
+</details>
+
+### 🤖 Assistant · supplied context
+
+<details>
+<summary>✅ 🔧 apply_patch</summary>
+
+**Input:**
+```
+*** Begin Patch
+```
+
+**Result:**
+```
+Done
+```
+
+</details>
+
+### 👤 User
+
+<details>
+<summary>📦 Event: web_search_call</summary>
+
+```json
+{
+  "type": "web_search_call",
+  "id": "ws_1",
+  "status": "completed"
+}
+```
+
+</details>
+
+### 👤 User
+
+<details>
+<summary>📦 Event: input_image</summary>
+
+```json
+{
+  "type": "input_image",
+  "image_url": "data:image/png;base64,AAAA"
+}
+```
+
+</details>
+
+---
+
+<details>
+<summary>🤖 Unattributed · response · line 219 · 2026-03-06T11:00:05Z (assumed UTC) · model <code>example-model-b</code></summary>
+
+<details>
+<summary>💭 Thinking</summary>
+
+Look up the weather.
+
+</details>
+
+<details>
+<summary>✅ 🔧 get_weather</summary>
+
+**Input:**
+```json
+{
+  "city": "Example City"
+}
+```
+
+**Result:**
+```
+Sunny
+```
+
+</details>
+
+It is sunny.
+
+<details>
+<summary>📦 Event: invalid_tool_call</summary>
+
+```json
+{
+  "type": "invalid_tool_call",
+  "reason": "Unknown tool",
+  "metadata": {
+    "type": "invalid_name",
+    "tool_name": "get_time"
+  }
+}
+```
+
+</details>
+
+**Token usage (stats):** input_tokens 40 · total_output_tokens 12 · reasoning_output_tokens 4 · tokens_per_second 30.5 · time_to_first_token_seconds 0.2
+
+</details>
+
+---
+
+<details>
+<summary>🤖 Unattributed · response · line 260 · 2026-03-06T11:00:06Z (assumed UTC) · model <code>example-model-a</code></summary>
+
+The build passes.
+
+<details>
+<summary>🔧 Tool call: bash</summary>
+
+**Input:**
+```json
+{
+  "command": "make test"
+}
+```
+
+</details>
+
+**Token usage:** input_tokens 50 · output_tokens 9
+
+</details>
+
+---
+

@@ -80,9 +80,9 @@
     {{range .Sessions}}
     <a href="{{.URL}}" class="session-card" data-source="{{.Source}}" data-id="{{.ID}}">
         <span class="source-badge source-{{.Source}}">{{.Source}}</span>
-        <span class="session-id" title="{{.ID}}">{{.DisplayID}}</span>
+        <span class="session-id" title="{{.ID}}">{{.DisplayID}}{{if .Details}}<span class="session-details">{{.Details}}</span>{{end}}</span>
         {{if $.AllProjects}}{{if .Project}}<span class="session-project" title="{{.Project}}">{{.Project}}</span>{{else}}<span class="session-project">-</span>{{end}}{{end}}
-        {{if .FileTime}}<span class="session-date"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time> <span class="session-file-time">file modified</span></span>{{else}}<time class="session-date" datetime="{{.CreatedAt}}">{{.CreatedAt}}</time>{{end}}
+        {{if .FileTime}}<span class="session-date"><time datetime="{{.CreatedAt}}">{{.CreatedAt}}</time> <span class="session-file-time">file modified</span></span>{{else if .CreatedAt}}<time class="session-date" datetime="{{.CreatedAt}}">{{.CreatedAt}}</time>{{else}}<span class="session-date">time unknown</span>{{end}}
         <span class="session-size">{{.Size}}</span>
     </a>
     {{end}}

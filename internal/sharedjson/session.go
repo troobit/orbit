@@ -26,7 +26,13 @@ var formatSources = map[transcript.Format]string{
 	transcript.FormatKiro:      sessions.SourceKiroCLI,
 	transcript.FormatKiroIDE:   sessions.SourceKiroIDE,
 	transcript.FormatCodexExec: sessions.SourceCodexExec,
+	transcript.FormatLMStudio:  sessions.SourceLMStudio,
 }
+
+// responseAttributionUnknown is every LM Studio request's response
+// attribution: the supported log grammar records no field tying a logged
+// response to its request (requirements 2.4, 4.1).
+const responseAttributionUnknown = "unknown"
 
 // Session projects a parse result into a session document. It reads parsed
 // data only and never calls renderer helpers, so content keeps its full length.
@@ -38,11 +44,22 @@ func Session(res *transcript.ParseResult, ctx SessionContext) SessionDocument {
 		Entries:       make([]Entry, 0, len(res.Entries)),
 		Warnings:      make([]Warning, 0, len(res.Warnings)),
 	}
+	for _, req := range res.LMStudioRequests {
+		doc.Requests = append(doc.Requests, request(req))
+	}
 	for _, e := range res.Entries {
 		doc.Entries = append(doc.Entries, entry(e))
 	}
 	for _, w := range res.Warnings {
 		doc.Warnings = append(doc.Warnings, warning(w))
+	}
+	for _, s := range res.LMStudioEvents {
+		doc.UnattributedSummary = append(doc.UnattributedSummary, UnattributedSummary{
+			File:     s.File,
+			NextFile: s.NextFile,
+			Counts:   EventCounts{Response: s.Counts.Response, Warn: s.Counts.Warn, Error: s.Counts.Error},
+			Lines:    append([]int{}, s.Lines...),
+		})
 	}
 	return doc
 }
@@ -59,11 +76,18 @@ func sessionMetadata(res *transcript.ParseResult, ctx SessionContext) Metadata {
 		resolved = *ctx.Resolved
 	}
 
+	entries := res.Entries
+	if res.Format == transcript.FormatLMStudio {
+		// Creation time is the first request's own time or absent, never a
+		// later entry's (requirement 5.4).
+		entries = nil
+	}
 	m := Metadata{
 		Source:    cmp.Or(ctx.Source, resolved.Source, formatSources[res.Format]),
 		ID:        cmp.Or(ctx.ID, resolved.ID),
 		ThreadID:  parsed.ThreadID,
-		CreatedAt: createdAt(res.Entries, parsed.StartedAt, resolved),
+		CreatedAt: createdAt(entries, parsed.StartedAt, resolved),
+		TimeZone:  parsed.TimeZone,
 		Project:   cmp.Or(parsed.Project, ctx.Project, resolved.Project),
 		Model:     cmp.Or(parsed.FirstModel, firstEntryValue(res.Entries, func(e transcript.Entry) string { return e.Model })),
 		Provider:  cmp.Or(parsed.FirstProvider, firstEntryValue(res.Entries, func(e transcript.Entry) string { return e.Provider })),
@@ -120,6 +144,12 @@ func entry(e transcript.Entry) Entry {
 		Provider: e.Provider,
 		Turn:     e.Turn,
 		Content:  []any{},
+
+		RequestID:       e.RequestID,
+		SuppliedContext: e.SuppliedContext,
+		Unattributed:    e.Unattributed,
+		SourceLine:      e.SourceLine,
+		WallTime:        e.WallTime,
 	}
 	if validTime(e.Timestamp) {
 		out.Timestamp = e.Timestamp
@@ -133,8 +163,34 @@ func entry(e transcript.Entry) Entry {
 	return out
 }
 
+// request projects an LM Studio request record. Parameters stay as logged.
+func request(req transcript.LMStudioRequest) Request {
+	out := Request{
+		ID:                   req.ID,
+		SessionID:            req.SessionID,
+		File:                 req.File,
+		StartLine:            req.StartLine,
+		EndLine:              req.EndLine,
+		Endpoint:             req.Endpoint,
+		ThreadID:             req.ThreadID,
+		ParentThreadID:       req.ParentThreadID,
+		RequestKind:          req.RequestKind,
+		Model:                req.Model,
+		WallTime:             req.Timestamp,
+		BodyState:            req.BodyState,
+		Parameters:           req.Parameters,
+		ContextDiscontinuity: req.ContextDiscontinuity,
+		PriorPrefixCount:     req.PriorPrefixCount,
+		ResponseAttribution:  responseAttributionUnknown,
+	}
+	if !req.ResolvedTime.IsZero() {
+		out.Timestamp = req.ResolvedTime.Format(time.RFC3339)
+	}
+	return out
+}
+
 func block(item transcript.ContentItem) any {
-	common := BlockCommon{ItemID: item.ItemID, Status: item.Status, Incomplete: item.Incomplete}
+	common := BlockCommon{ItemID: item.ItemID, Status: item.Status, Incomplete: item.Incomplete, Truncated: item.Truncated}
 	switch item.Type {
 	case "text":
 		return TextBlock{Type: "text", BlockCommon: common, Text: item.Text}

@@ -21,7 +21,11 @@ The handler calls `sessions.ParseResolved(resolved)` with default options: it th
 
 ## Codex Exec Streams
 
-`Config.CodexExecRoots` (`apsis serve --codex-exec-dir`, or `APSIS_CODEX_EXEC_DIRS`) goes to both the Lister and the Resolver. The filter pills come from `lister.Sources()`, so the `codex-exec` pill appears only with roots (Q46). Exec rows set `SessionView.FileTime`; the template then wraps the `<time>` and a `file modified` label in a `.session-date` span. The label must stay outside `<time>` because the layout script replaces `<time>` text (Q117). Exec transcript views add `TranscriptViewData.ThreadID`, `FileTime` and `Warnings` (`line N: message`); other sources never set them (Q47). `.source-codex-exec` has light and dark badge rules; `CSSVersion` is 3.
+`Config.CodexExecRoots` (`apsis serve --codex-exec-dir`, or `APSIS_CODEX_EXEC_DIRS`) goes to both the Lister and the Resolver. The filter pills come from `lister.Sources()`, so the `codex-exec` pill appears only with roots (Q46). Exec rows set `SessionView.FileTime`; the template then wraps the `<time>` and a `file modified` label in a `.session-date` span. The label must stay outside `<time>` because the layout script replaces `<time>` text (Q117). Exec transcript views add `TranscriptViewData.ThreadID`, `FileTime` and `Warnings` (`line N: message`); other sources never set them (Q47). `.source-codex-exec` has light and dark badge rules.
+
+## LM Studio Server Logs
+
+`Config.LMStudioLogDir`/`LMStudioLogDirExplicit` go to the Lister and Resolver only when `AllProjects` is set; project scope never lists the source, so passing the directory there would only add an empty filter pill. `Config.NetworkWarning()` is the `0.0.0.0` warning and adds the server-log disclosure when the source is listed; `serveCommand` prints it. LM Studio transcript views get `ThreadID` and `Warnings` like exec streams (warnings without a line print the message alone). Listing rows use `SessionInfo.SizeLabel()` (request counts for LM Studio) and show `time unknown` for a zero time. `.source-lmstudio` has light and dark rules; `CSSVersion` is 4.
 
 The listing warning banner lives inside the `sessions_list` fragment, so HTMX polls refresh it and the full page shows it once (Q54).
 

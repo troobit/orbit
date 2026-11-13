@@ -1,0 +1,413 @@
+{
+  "schema_version": 1,
+  "kind": "session",
+  "session": {
+    "source": "lmstudio",
+    "created_at": "2026-03-05T14:00:00+11:00",
+    "time_zone": "Australia/Melbourne",
+    "model": "example-model-a",
+    "provider": "lmstudio"
+  },
+  "requests": [
+    {
+      "id": "1",
+      "start_line": 1,
+      "end_line": 42,
+      "endpoint": "/v1/responses",
+      "thread_id": "thread-alpha",
+      "request_kind": "turn",
+      "model": "example-model-a",
+      "wall_time": "2026-03-05 14:00:00",
+      "timestamp": "2026-03-05T14:00:00+11:00",
+      "parameters": {
+        "tools": [
+          {
+            "type": "function",
+            "name": "shell",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "tool_choice": "auto",
+        "stream": true,
+        "store": false,
+        "prompt_cache_key": "thread-alpha",
+        "client_metadata": {
+          "x-codex-installation-id": "install-example",
+          "session_id": "session-example",
+          "thread_id": "thread-alpha",
+          "x-codex-window-id": "window-example",
+          "turn_id": "turn-1",
+          "x-codex-turn-metadata": "{\"request_kind\":\"turn\",\"thread_id\":\"thread-alpha\",\"turn_id\":\"turn-1\"}"
+        }
+      },
+      "response_attribution": "unknown"
+    },
+    {
+      "id": "44",
+      "start_line": 44,
+      "end_line": 48,
+      "endpoint": "/v1/responses",
+      "model": "example-model-a",
+      "wall_time": "2026-03-05 14:00:02",
+      "timestamp": "2026-03-05T14:00:02+11:00",
+      "parameters": {
+        "max_output_tokens": 64
+      },
+      "response_attribution": "unknown"
+    },
+    {
+      "id": "49",
+      "start_line": 49,
+      "end_line": 86,
+      "endpoint": "/v1/responses",
+      "thread_id": "thread-alpha",
+      "request_kind": "turn",
+      "model": "example-model-a",
+      "wall_time": "2026-03-05 14:00:03",
+      "timestamp": "2026-03-05T14:00:03+11:00",
+      "parameters": {
+        "stream": true,
+        "store": false,
+        "prompt_cache_key": "thread-alpha",
+        "client_metadata": {
+          "x-codex-installation-id": "install-example",
+          "session_id": "session-example",
+          "thread_id": "thread-alpha",
+          "x-codex-window-id": "window-example",
+          "turn_id": "turn-1",
+          "x-codex-turn-metadata": "{\"request_kind\":\"turn\",\"thread_id\":\"thread-alpha\",\"turn_id\":\"turn-1\"}"
+        }
+      },
+      "prior_prefix_count": 2,
+      "response_attribution": "unknown"
+    },
+    {
+      "id": "100",
+      "start_line": 100,
+      "end_line": 120,
+      "endpoint": "/v1/responses",
+      "thread_id": "thread-alpha",
+      "request_kind": "compaction",
+      "model": "example-model-a",
+      "wall_time": "2026-03-05 14:00:05",
+      "timestamp": "2026-03-05T14:00:05+11:00",
+      "parameters": {
+        "client_metadata": {
+          "thread_id": "thread-alpha",
+          "turn_id": "turn-2",
+          "x-codex-turn-metadata": "{\"request_kind\":\"compaction\",\"thread_id\":\"thread-alpha\",\"turn_id\":\"turn-2\"}"
+        }
+      },
+      "context_discontinuity": true,
+      "response_attribution": "unknown"
+    },
+    {
+      "id": "122",
+      "start_line": 122,
+      "end_line": 129,
+      "endpoint": "/v1/responses",
+      "thread_id": "thread-alpha",
+      "request_kind": "memory",
+      "model": "example-model-b",
+      "wall_time": "2026-03-05 14:00:07",
+      "timestamp": "2026-03-05T14:00:07+11:00",
+      "parameters": {
+        "client_metadata": {
+          "thread_id": "thread-alpha",
+          "x-codex-turn-metadata": "{\"request_kind\":\"memory\"}"
+        }
+      },
+      "context_discontinuity": true,
+      "response_attribution": "unknown"
+    },
+    {
+      "id": "130",
+      "start_line": 130,
+      "end_line": 138,
+      "endpoint": "/v1/responses",
+      "thread_id": "thread-beta",
+      "parent_thread_id": "thread-alpha",
+      "model": "example-model-a",
+      "wall_time": "2026-03-05 14:00:08",
+      "timestamp": "2026-03-05T14:00:08+11:00",
+      "parameters": {
+        "client_metadata": {
+          "thread_id": "thread-beta",
+          "x-codex-parent-thread-id": "thread-alpha",
+          "x-codex-turn-metadata": "{\"request_kind\":\"turn\",\"thread_id\":\"thread-beta\",\"sandbox\":\"wor ... <Truncated in logs> ... \"}"
+        }
+      },
+      "response_attribution": "unknown"
+    },
+    {
+      "id": "139",
+      "start_line": 139,
+      "end_line": 145,
+      "endpoint": "/v1/responses",
+      "model": "example-model-a",
+      "wall_time": "2026-03-05 14:00:09",
+      "timestamp": "2026-03-05T14:00:09+11:00",
+      "parameters": {
+        "client_metadata": {
+          "thread_id": "thread-gam ... <Truncated in logs> ... mma-long"
+        }
+      },
+      "response_attribution": "unknown"
+    },
+    {
+      "id": "146",
+      "start_line": 146,
+      "end_line": 152,
+      "endpoint": "/v1/responses",
+      "model": "example-model-a",
+      "wall_time": "2026-03-05 14:00:10",
+      "timestamp": "2026-03-05T14:00:10+11:00",
+      "parameters": {
+        "client_metadata": {
+          "thread_id": ""
+        }
+      },
+      "response_attribution": "unknown"
+    }
+  ],
+  "entries": [
+    {
+      "role": "system",
+      "timestamp": "2026-03-05T14:00:00+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "text": "You are a coding agent."
+        }
+      ],
+      "request_id": "1"
+    },
+    {
+      "role": "user",
+      "timestamp": "2026-03-05T14:00:00+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "text": "Fix the failing test."
+        }
+      ],
+      "request_id": "1"
+    },
+    {
+      "role": "log",
+      "timestamp": "2026-03-05T14:00:01+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "status": "WARN",
+          "text": "Field 'tool_choice' is not supported and will be ignored."
+        }
+      ],
+      "unattributed": true,
+      "source_line": 43,
+      "wall_time": "2026-03-05 14:00:01"
+    },
+    {
+      "role": "user",
+      "timestamp": "2026-03-05T14:00:02+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "text": "An unrelated question."
+        }
+      ],
+      "request_id": "44"
+    },
+    {
+      "role": "system",
+      "timestamp": "2026-03-05T14:00:03+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "text": "You are a coding agent."
+        }
+      ],
+      "request_id": "49"
+    },
+    {
+      "role": "user",
+      "timestamp": "2026-03-05T14:00:03+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "text": "Fix the failing test."
+        }
+      ],
+      "request_id": "49"
+    },
+    {
+      "role": "assistant",
+      "timestamp": "2026-03-05T14:00:03+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "tool_use",
+          "item_id": "call_shell_1",
+          "id": "req:49:call_shell_1",
+          "name": "shell",
+          "input": {
+            "command": "make test"
+          }
+        }
+      ],
+      "request_id": "49",
+      "supplied_context": true
+    },
+    {
+      "role": "tool",
+      "timestamp": "2026-03-05T14:00:03+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "tool_result",
+          "item_id": "call_shell_1",
+          "tool_use_id": "req:49:call_shell_1",
+          "content": "FAIL example_test",
+          "is_error": false
+        }
+      ],
+      "request_id": "49"
+    },
+    {
+      "role": "assistant",
+      "timestamp": "2026-03-05T14:00:04+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "tool_use",
+          "item_id": "call_shell_1",
+          "id": "evt:87:call_shell_1",
+          "name": "shell",
+          "input": {
+            "command": "make test"
+          }
+        }
+      ],
+      "unattributed": true,
+      "source_line": 87,
+      "wall_time": "2026-03-05 14:00:04"
+    },
+    {
+      "role": "system",
+      "timestamp": "2026-03-05T14:00:05+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "text": "You are a coding agent."
+        }
+      ],
+      "request_id": "100"
+    },
+    {
+      "role": "user",
+      "timestamp": "2026-03-05T14:00:05+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "text": "Summary of the earlier work."
+        }
+      ],
+      "request_id": "100"
+    },
+    {
+      "role": "log",
+      "timestamp": "2026-03-05T14:00:06+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "error",
+          "status": "ERROR",
+          "message": "Generation failed: context length exceeded"
+        }
+      ],
+      "unattributed": true,
+      "source_line": 121,
+      "wall_time": "2026-03-05 14:00:06"
+    },
+    {
+      "role": "user",
+      "timestamp": "2026-03-05T14:00:07+11:00",
+      "model": "example-model-b",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "text": "Record a memory about the work."
+        }
+      ],
+      "request_id": "122"
+    },
+    {
+      "role": "user",
+      "timestamp": "2026-03-05T14:00:08+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "text": "Review the change as a sub-agent."
+        }
+      ],
+      "request_id": "130"
+    },
+    {
+      "role": "user",
+      "timestamp": "2026-03-05T14:00:09+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "text": "A request whose thread identifier was cut."
+        }
+      ],
+      "request_id": "139"
+    },
+    {
+      "role": "user",
+      "timestamp": "2026-03-05T14:00:10+11:00",
+      "model": "example-model-a",
+      "provider": "lmstudio",
+      "content": [
+        {
+          "type": "text",
+          "text": "A request with an empty thread identifier."
+        }
+      ],
+      "request_id": "146"
+    }
+  ],
+  "warnings": []
+}

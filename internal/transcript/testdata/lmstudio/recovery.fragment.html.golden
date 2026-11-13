@@ -1,0 +1,81 @@
+        <p class="lm-note"><strong>Time zone:</strong> UTC, assumed for every logged wall time; the log records no zone.</p>
+        <p class="lm-note"><strong>Request attribution unknown:</strong> the log does not record which request produced a logged response, warning or error, so none is shown as a request&#39;s output.</p>
+        <section class="message lm-request">
+            <div class="message-header">
+                <span class="icon">📨</span>
+                <span class="message-role">Request <code>POST /v1/chat/completions</code></span>
+            </div>
+            <div class="message-content">
+                <p class="lm-meta">line 3 · 2026-03-04T08:00:00Z (assumed UTC) · singleton session (no valid thread ID) · body not logged</p>
+            </div>
+        </section>
+        <section class="message lm-request">
+            <div class="message-header">
+                <span class="icon">📨</span>
+                <span class="message-role">Request <code>POST /v1/chat/completions</code></span>
+            </div>
+            <div class="message-content">
+                <p class="lm-meta">lines 4-9 · 2026-03-04T08:00:01Z (assumed UTC) · singleton session (no valid thread ID) · ⚠ body malformed</p>
+            </div>
+        </section>
+        <section class="message lm-request">
+            <div class="message-header">
+                <span class="icon">📨</span>
+                <span class="message-role">Request <code>POST /v1/messages</code></span>
+            </div>
+            <div class="message-content">
+                <p class="lm-meta">lines 12-20 · 2026-03-04T08:00:03Z (assumed UTC) · singleton session (no valid thread ID) · ⚠ body malformed</p>
+            </div>
+        </section>
+        <section class="message lm-request">
+            <div class="message-header">
+                <span class="icon">📨</span>
+                <span class="message-role">Request <code>POST /v1/completions</code></span>
+            </div>
+            <div class="message-content">
+                <p class="lm-meta">lines 21-24 · 2026-03-04T08:00:04Z (assumed UTC) · model <code>example-model-b</code> · singleton session (no valid thread ID)</p>
+            </div>
+        </section>
+        <section class="message user">
+            <div class="message-header">
+                <span class="icon">👤</span>
+                <span class="message-role">User</span>
+            </div>
+            <div class="message-content">
+                <p>Recovered.</p>
+            </div>
+        </section>
+        <section class="message lm-request">
+            <div class="message-header">
+                <span class="icon">📨</span>
+                <span class="message-role">Request <code>POST /v1/completions</code></span>
+            </div>
+            <div class="message-content">
+                <p class="lm-meta">lines 25-27 · 2026-03-04T08:00:05Z (assumed UTC) · singleton session (no valid thread ID)</p>
+            </div>
+        </section>
+        <section class="message user">
+            <div class="message-header">
+                <span class="icon">👤</span>
+                <span class="message-role">User</span>
+            </div>
+            <div class="message-content">
+                <details class="tool-collapsible">
+                    <summary><span class="icon">📦</span> Event: request_body</summary>
+                    <div class="tool-content">
+                        <pre><code>[
+  &#34;not an object&#34;
+]</code></pre>
+                    </div>
+                </details>
+            </div>
+        </section>
+        <section class="message lm-request">
+            <div class="message-header">
+                <span class="icon">📨</span>
+                <span class="message-role">Request <code>POST /v1/responses</code></span>
+            </div>
+            <div class="message-content">
+                <p class="lm-meta">lines 28-30 · 2026-03-04T08:00:06Z (assumed UTC) · singleton session (no valid thread ID) · ⏳ body incomplete</p>
+            </div>
+        </section>

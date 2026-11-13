@@ -1,0 +1,30 @@
+text copied before the first log header
+a second line of that text
+[2026-03-04 08:00:00][DEBUG] Received request: POST to /v1/chat/completions
+[2026-03-04 08:00:01][DEBUG] Received request: POST to /v1/chat/completions with body {
+  "model": "example-model-a",
+  "messages": [
+    {
+      "role": "user",
+      "content": "this body stops before its end
+[2026-03-04 08:00:02][INFO][LM STUDIO SERVER] Server restarted
+[2026-03-04 08:00] header-like text without a level
+[2026-03-04 08:00:03][DEBUG] Received request: POST to /v1/messages with body {
+  "model": "example-model-a",
+  "messages": [
+    {
+      "role": "user",
+      "content": "valid"
+    },
+  ]
+}
+[2026-03-04 08:00:04][DEBUG] Received request: POST to /v1/completions with body {
+  "model": "example-model-b",
+  "prompt": "Recovered."
+}
+[2026-03-04 08:00:05][DEBUG] Received request: POST to /v1/completions with body [
+  "not an object"
+]
+[2026-03-04 08:00:06][DEBUG] Received request: POST to /v1/responses with body {
+  "model": "example-model-b",
+  "input": "this body is still being written

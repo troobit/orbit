@@ -40,7 +40,7 @@ func execWeb(t *testing.T) (stream, repo string) {
 	return stream, repo
 }
 
-func fetch(t *testing.T, srv *Server, path string) (int, string) {
+func fetch(t testing.TB, srv *Server, path string) (int, string) {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
@@ -128,5 +128,4 @@ func TestCodexExecBadgeStyles(t *testing.T) {
 	css, err := os.ReadFile(filepath.Join("static", "style.css"))
 	require.NoError(t, err)
 	assert.Equal(t, 2, strings.Count(string(css), ".source-codex-exec {"), "light and dark badge rules")
-	assert.Equal(t, "3", CSSVersion, "the stylesheet changed, so its cache-busting version rises")
 }

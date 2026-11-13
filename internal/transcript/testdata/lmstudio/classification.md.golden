@@ -1,0 +1,80 @@
+# Session Transcript
+
+**Session ID:** `example-log`
+
+---
+
+**Time zone:** UTC, assumed for every logged wall time; the log records no zone.
+
+**Request attribution unknown:** the log does not record which request produced a logged response, warning or error, so none is shown as a request's output.
+
+---
+
+## 📨 Request · `POST /v1/chat/completions`
+
+lines 12-20 · 2026-03-03T10:00:03Z (assumed UTC) · model `example-model-a` · singleton session (no valid thread ID)
+
+### 👤 User
+
+First question.
+
+---
+
+<details>
+<summary>🤖 Unattributed · response · line 21 · 2026-03-03T10:00:04Z (assumed UTC) · model <code>example-model-a</code></summary>
+
+First answer.
+
+</details>
+
+---
+
+⚠️ **Unsupported endpoint** · `POST /v1/decisions` · line 36 · 2026-03-03T10:00:05Z (assumed UTC)
+
+---
+
+⚠️ **Unsupported endpoint** · `POST /v2/future/endpoint` · line 40 · 2026-03-03T10:00:06Z (assumed UTC)
+
+---
+
+⚠️ **Unsupported endpoint** · `POST /v1/decisions` · line 41 · 2026-03-03T10:00:07Z (assumed UTC)
+
+---
+
+<details>
+<summary>⚠️ Unattributed · WARN · line 46 · 2026-03-03T10:00:09Z (assumed UTC)</summary>
+
+```
+Received request: POST to /v1/responses/input_tokens with body {
+  "model": "example-model-a",
+  "input": "Count these."
+}
+```
+
+</details>
+
+---
+
+<details>
+<summary>⚠️ Unattributed · WARN · line 54 · 2026-03-03T10:00:11Z (assumed UTC) · model <code>example-model-a</code></summary>
+
+```
+Field 'logprobs' is not supported and will be ignored.
+```
+
+</details>
+
+---
+
+<details>
+<summary>❌ Unattributed · ERROR · line 55 · 2026-03-03T10:00:12Z (assumed UTC) · model <code>example-model-a</code></summary>
+
+```
+Model crashed while generating.
+Continuation of the error report.
+```
+
+</details>
+
+---
+

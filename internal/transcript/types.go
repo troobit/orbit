@@ -16,6 +16,7 @@ const (
 	FormatCopilot
 	FormatKiroIDE
 	FormatCodexExec // Codex CLI `codex exec --json` event stream
+	FormatLMStudio  // LM Studio disk server log (header-delimited text grammar)
 )
 
 // Entry represents a single line in the Claude session JSONL.
@@ -35,6 +36,12 @@ type Entry struct {
 	ParentUUID      string         `json:"parentUuid,omitempty"`      // Links to parent entry's UUID
 	SourceToolUseID string         `json:"sourceToolUseID,omitempty"` // Links meta entry to originating tool_use
 	ToolUseResult   *ToolUseResult `json:"toolUseResult,omitempty"`   // Result metadata for tool calls
+	RequestID       string         `json:"-"`                         // The owning LMStudioRequest ID; empty on an unattributed entry
+	SuppliedContext bool           `json:"-"`                         // An assistant message resent as request input, not a new completion
+	Unattributed    bool           `json:"-"`                         // A logged response/WARN/ERROR event; request attribution unknown
+	SourceLine      int            `json:"-"`                         // LM Studio log-level entries only: physical start line, for event-scoped tool IDs
+	WallTime        string         `json:"-"`                         // LM Studio log-level entries only: the record's wall time as logged, without a zone
+	ItemDigest      [32]byte       `json:"-"`                         // LM Studio request entries only: digest of the logged item, for history-prefix comparison
 }
 
 // ToolUseResult contains metadata about a tool execution result.
@@ -161,6 +168,7 @@ type ContentItem struct {
 	EventType  string          `json:"-"` // Type "event": the source event or item type
 	Payload    json.RawMessage `json:"-"` // Type "event" and "error": the source JSON, compact
 	Usage      *Usage          `json:"-"` // Type "usage"
+	Truncated  bool            `json:"-"` // the source cut some of this content (LM Studio's <Truncated in logs>)
 }
 
 // PlanItem is one step of a plan, such as a Codex exec to-do list.
@@ -172,6 +180,14 @@ type PlanItem struct {
 // UsageBasisThreadTotal labels Codex 0.166.0 `turn.completed` usage: reported
 // thread totals at the turn's completion, not per-turn deltas.
 const UsageBasisThreadTotal = "thread_total_at_turn_completion"
+
+// UsageBasisStats labels an LM Studio response's `stats` object: token counts
+// and generation speed as the server reports them, beside any `usage` object.
+const UsageBasisStats = "stats"
+
+// UsageBasisResponse labels an LM Studio response's `usage` object: token
+// counts for that one response as the server reports them.
+const UsageBasisResponse = "response"
 
 // Usage is token usage as a source reports it.
 type Usage struct {
@@ -252,4 +268,5 @@ type RenderOptions struct {
 	Navigation *NavigationContext // Optional navigation context for prev/next/back links
 	TotalCost  *float64           // nil = don't display, pointer = display if > 0.005
 	CostUnit   string             // e.g., "credits" (default if empty)
+	LMStudio   *LMStudioView      // LM Studio log transcripts: requests and assumed zone; nil for other formats
 }

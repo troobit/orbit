@@ -6,10 +6,14 @@ import (
 
 // ParseResolved parses a resolved session for the CLI and the web. It copies
 // the caller's options and overlays the resolved Kiro IDE cost path, so the
-// Codex flags survive. Kiro IDE and codex-exec sessions use their own parser;
-// other sources are detected from content. Callers that force a format (apsis
-// -a) parse directly instead.
+// Codex flags survive. An LM Studio session arrives already assembled; Kiro
+// IDE and codex-exec sessions use their own parser; other sources are
+// detected from content. Callers that force a format (apsis -a) parse
+// directly instead.
 func ParseResolved(rs *ResolvedSession, opts ...transcript.ParseOptions) (*transcript.ParseResult, error) {
+	if rs.Metadata.PreParsed != nil {
+		return rs.Metadata.PreParsed, nil
+	}
 	var o transcript.ParseOptions
 	if len(opts) > 0 {
 		o = opts[0]

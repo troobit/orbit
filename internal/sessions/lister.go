@@ -36,6 +36,7 @@ type Lister struct {
 	opts            Options
 	kiroDiscover    kiroDiscoverFunc    // nil → logs.DiscoverForDirectory
 	kiroIDEBasePath kiroIDEBasePathFunc // nil → transcript.KiroIDEBasePath
+	lmCache         *lmCache            // LM Studio file summaries kept across ListAll calls; nil → none
 }
 
 // NewLister creates a Lister.
@@ -45,7 +46,7 @@ func NewLister(opts ...Option) (*Lister, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
-	return &Lister{homeDir: homeDir, opts: applyOptions(opts)}, nil
+	return &Lister{homeDir: homeDir, opts: applyOptions(opts), lmCache: &lmCache{}}, nil
 }
 
 // ListAll returns all sessions for the given project path, or for every
@@ -77,6 +78,10 @@ func (l *Lister) ListAll(projectPath string) ([]SessionInfo, []ListWarning, erro
 		{SourceKiroIDE, func() ([]SessionInfo, []ListWarning, error) { return l.listKiroIDE(projectPath) }},
 		{SourceCodexExec, func() ([]SessionInfo, []ListWarning, error) {
 			sessions, warnings := l.listCodexExec(projectPath, rolloutThreads)
+			return sessions, warnings, nil
+		}},
+		{SourceLMStudio, func() ([]SessionInfo, []ListWarning, error) {
+			sessions, warnings := l.listLMStudio(projectPath)
 			return sessions, warnings, nil
 		}},
 	}
@@ -218,12 +223,13 @@ func (l *Lister) listClaudeDir(projectDir string) ([]SessionInfo, error) {
 }
 
 // Sources returns the sources this Lister can list: every source, except
-// codex-exec when no exec roots are configured.
+// codex-exec when no exec roots are configured and lmstudio when its log root
+// is disabled.
 func (l *Lister) Sources() []string {
-	if len(l.opts.CodexExecRoots) > 0 {
-		return AllSources()
-	}
-	return slices.DeleteFunc(AllSources(), func(s string) bool { return s == SourceCodexExec })
+	return slices.DeleteFunc(AllSources(), func(s string) bool {
+		return s == SourceCodexExec && len(l.opts.CodexExecRoots) == 0 ||
+			s == SourceLMStudio && l.opts.LMStudioLogDir == ""
+	})
 }
 
 // listCodex returns Codex sessions from ~/.codex/sessions/. Project scope
@@ -797,6 +803,7 @@ var sourcePriority = map[string]int{
 	SourceKiroCLI:   3,
 	SourceKiroIDE:   4,
 	SourceCodexExec: 5,
+	SourceLMStudio:  6,
 }
 
 // sortSessionsByTimestamp sorts sessions by creation time (oldest first).

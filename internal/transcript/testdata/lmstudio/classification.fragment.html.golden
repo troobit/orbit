@@ -1,0 +1,53 @@
+        <p class="lm-note"><strong>Time zone:</strong> UTC, assumed for every logged wall time; the log records no zone.</p>
+        <p class="lm-note"><strong>Request attribution unknown:</strong> the log does not record which request produced a logged response, warning or error, so none is shown as a request&#39;s output.</p>
+        <section class="message lm-request">
+            <div class="message-header">
+                <span class="icon">📨</span>
+                <span class="message-role">Request <code>POST /v1/chat/completions</code></span>
+            </div>
+            <div class="message-content">
+                <p class="lm-meta">lines 12-20 · 2026-03-03T10:00:03Z (assumed UTC) · model <code>example-model-a</code> · singleton session (no valid thread ID)</p>
+            </div>
+        </section>
+        <section class="message user">
+            <div class="message-header">
+                <span class="icon">👤</span>
+                <span class="message-role">User</span>
+            </div>
+            <div class="message-content">
+                <p>First question.</p>
+            </div>
+        </section>
+        <details class="tool-collapsible lm-event">
+            <summary><span class="icon">🤖</span> Unattributed · response · line 21 · 2026-03-03T10:00:04Z (assumed UTC) · model <code>example-model-a</code></summary>
+            <div class="tool-content">
+                <div class="markdown-content">
+<p>First answer.</p>
+                </div>
+            </div>
+        </details>
+        <p class="lm-note">⚠️ <strong>Unsupported endpoint</strong> · <code>POST /v1/decisions</code> · line 36 · 2026-03-03T10:00:05Z (assumed UTC)</p>
+        <p class="lm-note">⚠️ <strong>Unsupported endpoint</strong> · <code>POST /v2/future/endpoint</code> · line 40 · 2026-03-03T10:00:06Z (assumed UTC)</p>
+        <p class="lm-note">⚠️ <strong>Unsupported endpoint</strong> · <code>POST /v1/decisions</code> · line 41 · 2026-03-03T10:00:07Z (assumed UTC)</p>
+        <details class="tool-collapsible lm-event">
+            <summary><span class="icon">⚠️</span> Unattributed · WARN · line 46 · 2026-03-03T10:00:09Z (assumed UTC)</summary>
+            <div class="tool-content">
+                <pre><code>Received request: POST to /v1/responses/input_tokens with body {
+  &#34;model&#34;: &#34;example-model-a&#34;,
+  &#34;input&#34;: &#34;Count these.&#34;
+}</code></pre>
+            </div>
+        </details>
+        <details class="tool-collapsible lm-event">
+            <summary><span class="icon">⚠️</span> Unattributed · WARN · line 54 · 2026-03-03T10:00:11Z (assumed UTC) · model <code>example-model-a</code></summary>
+            <div class="tool-content">
+                <pre><code>Field &#39;logprobs&#39; is not supported and will be ignored.</code></pre>
+            </div>
+        </details>
+        <details class="tool-collapsible lm-event error">
+            <summary><span class="icon">❌</span> Unattributed · ERROR · line 55 · 2026-03-03T10:00:12Z (assumed UTC) · model <code>example-model-a</code></summary>
+            <div class="tool-content">
+                <pre><code>Model crashed while generating.
+Continuation of the error report.</code></pre>
+            </div>
+        </details>

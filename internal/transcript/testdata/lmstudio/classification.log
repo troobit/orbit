@@ -1,0 +1,58 @@
+[2026-03-03 10:00:00][INFO][LM STUDIO SERVER] Success! HTTP server listening on port 1234
+[2026-03-03 10:00:01][INFO] Received request: POST to /api/v1/models/unload with body {}
+[2026-03-03 10:00:02][INFO][example-model-a] Returning {
+  "data": [
+    {
+      "id": "example-model-a",
+      "object": "model"
+    }
+  ],
+  "object": "list"
+}
+[2026-03-03 10:00:03][WARN] Received request: POST to /v1/chat/completions with body {
+  "model": "example-model-a",
+  "messages": [
+    {
+      "role": "user",
+      "content": "First question."
+    }
+  ]
+}
+[2026-03-03 10:00:04][INFO][example-model-a] Generated prediction: {
+  "id": "chatcmpl-example2",
+  "object": "chat.completion",
+  "model": "example-model-a",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "First answer."
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}
+[2026-03-03 10:00:05][DEBUG] Received request: POST to /v1/decisions with body {
+  "model": "example-model-a",
+  "question": "Proceed?"
+}
+[2026-03-03 10:00:06][ERROR] Received request: POST to /v2/future/endpoint with body {}
+[2026-03-03 10:00:07][DEBUG] Received request: POST to /v1/decisions with body {}
+[2026-03-03 10:00:08][INFO] Received request: POST to /v1/embeddings with body {
+  "model": "example-embedder",
+  "input": "Embed this."
+}
+[2026-03-03 10:00:09][WARN] Received request: POST to /v1/responses/input_tokens with body {
+  "model": "example-model-a",
+  "input": "Count these."
+}
+[2026-03-03 10:00:10][DEBUG] Received request: POST to /v1/messages/count_tokens with body {
+  "model": "example-model-a",
+  "messages": []
+}
+[2026-03-03 10:00:11][WARN][example-model-a] Field 'logprobs' is not supported and will be ignored.
+[2026-03-03 10:00:12][ERROR][example-model-a] Model crashed while generating.
+Continuation of the error report.
+[2026-03-03 10:00:13][INFO][LM STUDIO SERVER] Unloaded model example-model-b
+[2026-03-03 10:00:14][DEBUG] Received request: GET to /v1/models

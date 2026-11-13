@@ -19,16 +19,23 @@ type SessionDocument struct {
 	SchemaVersion int       `json:"schema_version"`
 	Kind          string    `json:"kind"`
 	Session       Metadata  `json:"session"`
+	Requests      []Request `json:"requests,omitempty"` // LM Studio request boundaries, in source or discovery order
 	Entries       []Entry   `json:"entries"`
 	Warnings      []Warning `json:"warnings"`
+
+	// UnattributedSummary stands in for the unattributed events of the files
+	// an LM Studio logical-session view draws on; direct views keep the
+	// events as entries instead.
+	UnattributedSummary []UnattributedSummary `json:"unattributed_summary,omitempty"`
 }
 
 // Metadata describes a session. Unavailable values are omitted.
 type Metadata struct {
 	Source    string `json:"source,omitempty"`
 	ID        string `json:"id,omitempty"`
-	ThreadID  string `json:"thread_id,omitempty"` // Codex exec streams only
+	ThreadID  string `json:"thread_id,omitempty"` // Codex exec thread, or LM Studio client thread on listing rows
 	CreatedAt string `json:"created_at,omitempty"`
+	TimeZone  string `json:"time_zone,omitempty"` // LM Studio: zone the logged wall times are assumed to be in
 	Project   string `json:"project,omitempty"`
 	Model     string `json:"model,omitempty"`
 	Provider  string `json:"provider,omitempty"`
@@ -51,6 +58,52 @@ type Entry struct {
 	Provider  string `json:"provider,omitempty"`
 	Turn      int    `json:"turn,omitempty"` // 1-based Codex exec turn
 	Content   []any  `json:"content"`        // one of the *Block types
+
+	// LM Studio only.
+	RequestID       string `json:"request_id,omitempty"`       // the request the entry was logged in; empty on a log-level entry
+	SuppliedContext bool   `json:"supplied_context,omitempty"` // an assistant message resent as request input, not a new completion
+	Unattributed    bool   `json:"unattributed,omitempty"`     // a logged response, WARN or ERROR whose request is unknown
+	SourceLine      int    `json:"source_line,omitempty"`      // a log-level entry's physical start line
+	WallTime        string `json:"wall_time,omitempty"`        // a log-level entry's wall time as logged, without a zone
+}
+
+// Request is one LM Studio request record. Entries translated from its body
+// name it through request_id; a request whose body was not translated has
+// none.
+type Request struct {
+	ID                   string          `json:"id"`
+	SessionID            string          `json:"session_id,omitempty"` // listed logical session; the request's own ID for a singleton
+	File                 string          `json:"file,omitempty"`       // logical-session views: root-relative file holding the record
+	StartLine            int             `json:"start_line"`
+	EndLine              int             `json:"end_line"`
+	Endpoint             string          `json:"endpoint"`
+	ThreadID             string          `json:"thread_id,omitempty"`
+	ParentThreadID       string          `json:"parent_thread_id,omitempty"`
+	RequestKind          string          `json:"request_kind,omitempty"`
+	Model                string          `json:"model,omitempty"`
+	WallTime             string          `json:"wall_time"`
+	Timestamp            string          `json:"timestamp,omitempty"` // the wall time's one interpretation in the assumed zone, with its offset
+	BodyState            string          `json:"body_state,omitempty"`
+	Parameters           json.RawMessage `json:"parameters,omitempty"`
+	ContextDiscontinuity bool            `json:"context_discontinuity,omitempty"`
+	PriorPrefixCount     int             `json:"prior_prefix_count,omitempty"`
+	ResponseAttribution  string          `json:"response_attribution"`
+}
+
+// UnattributedSummary is a body-free reference to one contributing file's
+// unattributed events.
+type UnattributedSummary struct {
+	File     string      `json:"file"`
+	NextFile string      `json:"next_file,omitempty"`
+	Counts   EventCounts `json:"counts"`
+	Lines    []int       `json:"lines"`
+}
+
+// EventCounts counts unattributed events by kind.
+type EventCounts struct {
+	Response int `json:"response"`
+	Warn     int `json:"warn"`
+	Error    int `json:"error"`
 }
 
 // BlockCommon holds the fields any block may carry.
@@ -58,6 +111,7 @@ type BlockCommon struct {
 	ItemID     string `json:"item_id,omitempty"`
 	Status     string `json:"status,omitempty"`
 	Incomplete bool   `json:"incomplete,omitempty"`
+	Truncated  bool   `json:"truncated,omitempty"` // the source cut some of this content
 }
 
 // TextBlock is a text or thinking block.

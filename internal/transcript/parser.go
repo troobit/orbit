@@ -61,19 +61,22 @@ var infrastructureTypes = map[string]bool{
 // Detection strategy:
 //  1. Read a chunk of content (up to 64KB to handle long JSONL lines)
 //  2. Try parsing as complete JSON with Kiro markers - if successful, it's Kiro format
-//  3. Probe for a Codex exec stream by whole lines, reading past the chunk when
+//  3. Look for an LM Studio header recording an included request within the
+//     chunk; its signature wins over other formats' body-marker heuristics
+//  4. Probe for a Codex exec stream by whole lines, reading past the chunk when
 //     its first JSON object is longer (Decision 21); only a valid thread.started
 //     selects FormatCodexExec
-//  4. Otherwise, use a substring-only Kiro match, then detect JSONL based on the
+//  5. Otherwise, use a substring-only Kiro match, then detect JSONL based on the
 //     first format-defining line of the chunk
 //
 // The returned bytes are everything read from r, so callers replay them before
-// the rest of r.
+// the rest of r. When the chunk holds LM Studio headers but no included
+// request, the error is errLMStudioWithoutRequest.
 //
 // Note: Cannot use first-byte check alone because both JSON and JSONL start with '{'
 func DetectFormat(r io.Reader) (Format, []byte, error) {
 	// Read up to 64KB for format detection (handles long JSONL lines)
-	chunk := make([]byte, 65536)
+	chunk := make([]byte, detectChunkBytes)
 	n, err := io.ReadFull(r, chunk)
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return FormatUnknown, nil, err
@@ -92,6 +95,13 @@ func DetectFormat(r io.Reader) (Format, []byte, error) {
 		return kiroFormat, chunk, nil
 	}
 
+	// A full chunk may end inside a line, so its last line counts only when
+	// the request path visibly ends before the read limit.
+	lmRequest, lmHeaders := probeLMStudio(chunk, n < detectChunkBytes)
+	if lmRequest {
+		return FormatLMStudio, chunk, nil
+	}
+
 	// The exec probe may read beyond the chunk; keep every byte it consumes.
 	var more bytes.Buffer
 	probe, err := ProbeExecStream(io.MultiReader(bytes.NewReader(chunk), io.TeeReader(r, &more)))
@@ -105,14 +115,29 @@ func DetectFormat(r io.Reader) (Format, []byte, error) {
 	if probe.Outcome == ExecProbeExec {
 		return FormatCodexExec, consumed, nil
 	}
-	if kiroFormat != FormatUnknown {
+	// LM Studio headers cannot occur in Kiro JSON, so they rule out a guess
+	// from Kiro key names inside a log body.
+	if kiroFormat != FormatUnknown && !lmHeaders {
 		return kiroFormat, consumed, nil
 	}
 
 	// Fall back to JSONL detection based on first line
 	format, _, err := detectJSONLFormat(chunk)
+	if err != nil && lmHeaders {
+		err = errLMStudioWithoutRequest
+	}
 	return format, consumed, err
 }
+
+// detectChunkBytes bounds the content format detection examines up front.
+const detectChunkBytes = 65536
+
+// errLMStudioWithoutRequest reports LM Studio log headers without an included
+// request inside the detection bound: a header alone does not identify the
+// format, so parsing it must be forced (requirement 1.1).
+var errLMStudioWithoutRequest = fmt.Errorf(
+	"LM Studio log headers found, but no included inference request in the first %d bytes; force a parser with -a lmstudio or another -a format",
+	detectChunkBytes)
 
 // detectKiroFormat checks if content is Kiro plain JSON format (CLI or IDE).
 // Kiro CLI format is a single JSON object with conversation_id and non-empty history fields.
@@ -287,6 +312,7 @@ type ParseResultMetadata struct {
 	FirstProvider string   // First known source provider
 	Origin        string   // First recorded client entry point or originator, as recorded
 	ThreadID      string   // Codex exec thread identifier from the first valid thread.started
+	TimeZone      string   // LM Studio: the zone logged wall times are assumed to be in; the log records none
 }
 
 // ParseResult contains the parsed entries and any warnings encountered.
@@ -295,6 +321,16 @@ type ParseResult struct {
 	Warnings []ParseWarning
 	Metadata *ParseResultMetadata // May be non-nil without cost information
 	Format   Format               // FormatUnknown when Parse uses the Claude fallback
+
+	// LMStudioRequests is parallel to Entries, in source order; empty for every
+	// other format. It carries per-request boundary metadata written once rather
+	// than duplicated on every message item the request produced.
+	LMStudioRequests []LMStudioRequest
+
+	// LMStudioEvents replaces the unattributed entries of the files a
+	// logical-session view draws on, one summary per contributing file in
+	// discovery order. Session assembly sets it; nil for direct views.
+	LMStudioEvents []LMStudioEventSummary
 }
 
 // ParseWarning represents a non-fatal parsing issue.
@@ -320,6 +356,10 @@ const (
 	WarningUnmatchedToolResult = "unmatched_tool_result" // a tool output without its call
 	WarningThreadMismatch      = "thread_mismatch"       // a Codex exec thread.started records a different thread ID
 	WarningItemDecodeFailed    = "item_decode_failed"    // a known Codex exec item lacks a valid ID or typed fields
+	WarningOversizedRecord     = "oversized_record"      // an LM Studio log record exceeds the parser byte limit
+	WarningUnsupportedEndpoint = "unsupported_endpoint"  // LM Studio records report a POST path that is neither translated nor excluded
+	WarningUnparsedText        = "unparsed_text"         // LM Studio log text outside every recognised record or body
+	WarningTimeZone            = "time_zone"             // the TZ override could not be loaded; wall times are not interpreted
 )
 
 // Parse reads a transcript file and automatically detects its format.
@@ -333,8 +373,9 @@ func Parse(r io.Reader, opts ...ParseOptions) (*ParseResult, error) {
 	if err != nil {
 		// When no recognized format is found (e.g., only unknown entry types),
 		// fall back to Claude parser which skips unknown types gracefully.
-		// This produces 0 entries rather than a hard error.
-		if chunk != nil {
+		// This produces 0 entries rather than a hard error. LM Studio log
+		// headers instead report that the format must be forced.
+		if chunk != nil && !errors.Is(err, errLMStudioWithoutRequest) {
 			combined := io.MultiReader(bytes.NewReader(chunk), r)
 			result, parseErr := parseClaudeJSONL(combined)
 			if result != nil {
@@ -378,6 +419,8 @@ func ParseJSONLWithFormat(r io.Reader, format Format, opts ...ParseOptions) (*Pa
 		return ParseKiroIDE(r)
 	case FormatCodexExec:
 		return ParseCodexExec(r)
+	case FormatLMStudio:
+		return ParseLMStudio(r)
 	default:
 		return nil, fmt.Errorf("unsupported format: %d", format)
 	}

@@ -21,6 +21,10 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.7.2
+      - name: Vet other release platforms
+        run: |
+          GOOS=darwin go vet ./internal/sessions/...
+          GOOS=windows go vet ./internal/sessions/...
       - name: Build binaries
         run: |
           go build -o orbit ./cmd/orbit

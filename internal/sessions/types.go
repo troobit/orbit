@@ -5,6 +5,8 @@ import (
 	"io"
 	"slices"
 	"time"
+
+	"github.com/arjenschwarz/orbit/internal/transcript"
 )
 
 // Source constants — canonical identifiers used in URLs, code, and storage.
@@ -16,10 +18,12 @@ const (
 	SourceKiroIDE = "kiro-ide"
 	// SourceCodexExec is a Codex CLI `codex exec --json` event stream.
 	SourceCodexExec = "codex-exec"
+	// SourceLMStudio is a logical session in LM Studio's disk server logs.
+	SourceLMStudio = "lmstudio"
 )
 
 // allSources is the ordered list of all known agent sources.
-var allSources = []string{SourceClaude, SourceCodex, SourceCopilot, SourceKiroCLI, SourceKiroIDE, SourceCodexExec}
+var allSources = []string{SourceClaude, SourceCodex, SourceCopilot, SourceKiroCLI, SourceKiroIDE, SourceCodexExec, SourceLMStudio}
 
 // displayNames maps source constants to their display strings.
 var displayNames = map[string]string{
@@ -29,6 +33,7 @@ var displayNames = map[string]string{
 	SourceKiroCLI:   "kiro-cli",
 	SourceKiroIDE:   "kiro ide",
 	SourceCodexExec: "codex-exec",
+	SourceLMStudio:  "lmstudio",
 }
 
 // AllSources returns all known source identifiers.
@@ -79,7 +84,22 @@ type SessionInfo struct {
 	Model              string // First recorded model, when the listing read yields it
 	Provider           string // First recorded model provider, when the listing read yields it
 	Origin             string // Claude entrypoint or Codex originator from the bounded head scan
-	ThreadID           string // Codex exec thread ID; codex-exec only
+	ThreadID           string // Codex exec thread ID, or LM Studio client thread ID
+	RequestCount       int    // Requests in an LM Studio logical session; lmstudio only
+	TimeZone           string // Zone an LM Studio session's logged wall times are assumed to be in; lmstudio only
+}
+
+// SizeLabel is a listed session's size: its byte size, or an LM Studio
+// logical session's request count, since its records share log files with
+// other sessions (Q19).
+func (s SessionInfo) SizeLabel() string {
+	switch {
+	case s.Source != SourceLMStudio:
+		return FormatSize(s.Size)
+	case s.RequestCount == 1:
+		return "1 request"
+	}
+	return fmt.Sprintf("%d requests", s.RequestCount)
 }
 
 // SessionMetadata is returned by the Resolver alongside the reader.
@@ -92,8 +112,13 @@ type SessionMetadata struct {
 	Size               int64
 	CostPath           string // Non-empty only for Kiro IDE sessions
 	Project            string // Recorded project outside the transcript, such as Copilot's workspace.yaml git_root
-	Path               string // Path of the resolved transcript file
-	ThreadID           string // Codex exec thread ID; codex-exec only
+	Path               string // Path of the resolved transcript file; empty for sources without one file
+	ThreadID           string // Codex exec thread ID, or an LM Studio session's client thread ID
+
+	// PreParsed is an LM Studio session view assembled from the log files
+	// holding it. No single reader backs such a session, so ParseResolved
+	// returns this instead of reading Reader, which is then empty.
+	PreParsed *transcript.ParseResult
 }
 
 // ResolvedSession is the result of resolving a session by source and ID.
@@ -124,6 +149,12 @@ type ListWarning struct {
 type Options struct {
 	ExtendedOrdering bool     // sort by time, then source, then identifier (requirement 4.4)
 	CodexExecRoots   []string // directories searched for Codex exec streams; none by default
+
+	// LMStudioLogDir is the LM Studio server-log root; "" disables the
+	// source. LMStudioLogDirExplicit records that the user chose it, so a
+	// missing root is a warning rather than silence (requirement 7.4).
+	LMStudioLogDir         string
+	LMStudioLogDirExplicit bool
 }
 
 // Option changes Options. NewLister and NewResolver apply the same functions.
@@ -140,6 +171,13 @@ func WithExtendedOrdering(enabled bool) Option {
 // by file modification time beside recorded times.
 func WithCodexExecRoots(roots []string) Option {
 	return func(o *Options) { o.CodexExecRoots = slices.Clone(roots) }
+}
+
+// WithLMStudioLogDir sets the LM Studio server-log root, or disables the
+// source when dir is empty. explicit is false for the default root, whose
+// absence is not reported.
+func WithLMStudioLogDir(dir string, explicit bool) Option {
+	return func(o *Options) { o.LMStudioLogDir, o.LMStudioLogDirExplicit = dir, explicit }
 }
 
 // applyOptions returns the Options that opts produce.
