@@ -86,8 +86,14 @@ func cached[T any](c *fileCache, key string, files []string, compute func() (T, 
 func (c *fileCache) fingerprints(files []string) ([]fileFingerprint, bool) {
 	fps := make([]fileFingerprint, len(files))
 	for i, path := range files {
-		fp, cacheable, err := fingerprintFile(path)
-		if i > 0 {
+		var (
+			fp        fileFingerprint
+			cacheable bool
+			err       error
+		)
+		if i == 0 {
+			fp, cacheable, err = fingerprintFile(path)
+		} else {
 			fp, cacheable, err = companionFingerprint(path)
 		}
 		if err != nil || !cacheable {

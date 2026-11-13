@@ -224,6 +224,11 @@ func (l *Lister) listClaudeDir(projectDir string) ([]SessionInfo, error) {
 		})
 		session.CreatedAt, session.Project, session.Origin = head.created, head.project, head.origin
 		session.TimeFromFilesystem = head.fromFilesystem
+		if head.fromFilesystem {
+			// The fallback is the entry's own mtime, which the cache key does not
+			// cover, so it is never served from the cache.
+			session.CreatedAt = info.ModTime()
+		}
 
 		sessions = append(sessions, session)
 	}
@@ -252,6 +257,8 @@ func extractClaudeHead(path string, info fs.FileInfo) (claudeHead, error) {
 		head.created, err = transcript.ParseFirstTimestamp(f)
 		if _, seekErr := f.Seek(0, io.SeekStart); seekErr == nil {
 			head.project, head.origin = readClaudeHead(f)
+		} else if err == nil {
+			err = seekErr
 		}
 		_ = f.Close()
 	}
@@ -541,9 +548,7 @@ func (l *Lister) listKiro(cwd string) ([]SessionInfo, error) {
 		}
 		// SQLite keeps -wal and -journal beside the real file, not beside a
 		// symlink to it.
-		if resolved, err := filepath.EvalSymlinks(dbPath); err == nil {
-			dbPath = resolved
-		}
+		dbPath = normalizePath(dbPath)
 		kiroSessions, err = cached(l.cache, key, []string{dbPath, dbPath + "-wal", dbPath + "-journal"}, run)
 	}
 

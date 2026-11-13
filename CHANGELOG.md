@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Apsis listing cache: a Claude transcript with no recorded timestamp takes its fallback time from the entry's current modification time instead of a cached value, a `Seek` failure while reading Claude metadata is no longer cached, and companion files are fingerprinted once per lookup.
 - The apsisweb end-to-end test no longer times out on shutdown when the HTTP client holds an unused keep-alive connection.
 - Local Codex runs exclude connected ChatGPT app namespaces that appear under normal authentication despite ignored user configuration.
 - Restarting a run in an existing log directory clears the previous error and completion timestamp while preserving session history.

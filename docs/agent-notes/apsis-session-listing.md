@@ -139,6 +139,7 @@ Key details:
 - The Kiro CLI key names the project directory and its symlink-resolved target, because discovery queries both; re-pointing a project symlink misses. It is cached only with the real database path, or with `kiroDBPath` injected; injected discovery alone never is, so tests do not fingerprint a developer's real database.
 - The database path is symlink-resolved before the `-wal` and `-journal` names are built, because SQLite writes them beside the real file.
 - A compute that fails with a filesystem error (`transientIOError`: an `fs.PathError` from open or read) returns that error, so `cached` does not store the result. The Claude mtime fallback, a Codex head read error and an unreadable Kiro IDE `.chat` file are shown or skipped for the pass and retried on the next, since the file's fingerprint would not change when it stops failing. Content outcomes (no timestamp, over-long line, undecodable header) are still cached.
+- The Claude mtime fallback is applied from the entry's own `FileInfo` after the cache lookup, never taken from the cached `claudeHead`: the entry's mtime (a symlink's own, for links) is not part of the fingerprint, so a cached value could be stale.
 - `fingerprintFile` is a var; tests replace it. `fileCache.onCompute` reports each extraction, which is how `cache_test.go` asserts a zero-read pass. The Resolver does not use the cache.
 - `fingerprint_other.go` reports every file as not cacheable, so non-Unix platforms never hit.
 
