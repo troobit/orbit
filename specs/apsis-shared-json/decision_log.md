@@ -892,7 +892,7 @@ The indexed rollout must be the one that source/identifier opening reaches. Keep
 
 **ID**: 23
 **Date**: 2026-11-05
-**Status**: proposed; human scoped to Unix and macOS 2026-11-13; implemented 2026-11-13, awaiting verification by an agent other than its author
+**Status**: accepted; human scoped to Unix and macOS 2026-11-13; implemented and verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -1001,7 +1001,7 @@ Later slices do not invalidate consumers holding the first schema, and malformed
 
 **ID**: 26
 **Date**: 2026-11-05
-**Status**: proposed; implemented 2026-11-13, awaiting verification by an agent other than its author
+**Status**: accepted; implemented and verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
