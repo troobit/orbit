@@ -59,29 +59,31 @@ func bestKiroIDECandidate(candidates []kiroIDECandidate) kiroIDECandidate {
 }
 
 // kiroIDEHead is what a .chat file's header yields. An empty executionID marks
-// a file that cannot be read, cannot be decoded or records no execution; it is
-// skipped, and that outcome is as cacheable as any other.
+// a file that cannot be decoded or records no execution; it is skipped, and
+// that outcome is as cacheable as any other. A file that cannot be read is
+// skipped too, but not cached.
 type kiroIDEHead struct {
 	executionID string
 	entryCount  int
 	metadata    kiroIDEMetadata
 }
 
-// readKiroIDEHead decodes the whole .chat file, as listing always has.
-func readKiroIDEHead(path string) kiroIDEHead {
+// readKiroIDEHead decodes the whole .chat file, as listing always has. A read
+// failure is returned so the empty head is not cached.
+func readKiroIDEHead(path string) (kiroIDEHead, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return kiroIDEHead{}
+		return kiroIDEHead{}, err
 	}
 	var header kiroIDEChatHeader
 	if err := json.Unmarshal(data, &header); err != nil || header.ExecutionID == "" {
-		return kiroIDEHead{}
+		return kiroIDEHead{}, nil
 	}
 	head := kiroIDEHead{executionID: header.ExecutionID, entryCount: len(header.Chat)}
 	if header.Metadata != nil {
 		head.metadata = *header.Metadata
 	}
-	return head
+	return head, nil
 }
 
 // kiroIDEWorkspaceCandidates reads the .chat files of one workspace and keeps
@@ -113,7 +115,7 @@ func kiroIDEWorkspaceCandidates(cache *fileCache, workspaceDir string) (map[stri
 			continue
 		}
 		head, err := cached(cache, "kiro-ide:"+path, []string{path}, func() (kiroIDEHead, error) {
-			return readKiroIDEHead(path), nil
+			return readKiroIDEHead(path)
 		})
 		if err != nil || head.executionID == "" {
 			continue

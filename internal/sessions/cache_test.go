@@ -631,3 +631,51 @@ func TestLister_KiroCLIProjectScopeCache(t *testing.T) {
 	ids()
 	assert.Len(t, asked, 3, "a companion appearing re-runs the query")
 }
+
+// An unreadable file is listed (or skipped) for the pass but never cached: the
+// failure may not repeat, and the file's fingerprint would not change when it
+// stops failing.
+func TestLister_TransientReadFailureIsNotCached(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads files whatever their mode")
+	}
+	tests := map[string]struct {
+		file func(*cacheFixture) string
+		key  string
+	}{
+		"claude":     {func(f *cacheFixture) string { return f.claude }, "claude:"},
+		"codex":      {func(f *cacheFixture) string { return f.rollout }, "codex:"},
+		"kiro ide":   {func(f *cacheFixture) string { return f.chat }, "kiro-ide:"},
+		"codex-exec": {func(f *cacheFixture) string { return f.stream }, "codex-exec:"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			f := newCacheFixture(t)
+			path := tc.file(f)
+			require.NoError(t, os.Chmod(path, 0))
+			t.Cleanup(func() { _ = os.Chmod(path, 0o644) })
+
+			f.list()
+			assert.NotContains(t, f.lister.cache.entries, tc.key+path, "the failed extraction is not stored")
+			_, _, computes := f.list()
+			assert.Contains(t, computes, tc.key+path, "the next pass reads the file again")
+		})
+	}
+}
+
+// SQLite writes -wal and -journal beside the real database, so a symlinked
+// database must be keyed by its target.
+func TestLister_KiroCLISymlinkedDatabaseWatchesTheTargetsWAL(t *testing.T) {
+	f := newCacheFixture(t)
+	target := f.kiroDB
+	f.kiroDB = filepath.Join(filepath.Dir(target), "link.sqlite3")
+	require.NoError(t, os.Symlink(target, f.kiroDB))
+
+	f.list()
+	f.list()
+	require.Equal(t, 1, f.kiroCalls, "an unchanged database is queried once")
+
+	writeFile(t, target+"-wal", "w")
+	f.list()
+	assert.Equal(t, 2, f.kiroCalls, "a -wal beside the target re-runs the query")
+}

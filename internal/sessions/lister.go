@@ -220,7 +220,7 @@ func (l *Lister) listClaudeDir(projectDir string) ([]SessionInfo, error) {
 			Source: SourceClaude,
 		}
 		head, _ := cached(l.cache, "claude:"+filePath, []string{filePath}, func() (claudeHead, error) {
-			return extractClaudeHead(filePath, info), nil
+			return extractClaudeHead(filePath, info)
 		})
 		session.CreatedAt, session.Project, session.Origin = head.created, head.project, head.origin
 		session.TimeFromFilesystem = head.fromFilesystem
@@ -242,8 +242,10 @@ type claudeHead struct {
 
 // extractClaudeHead reads the timestamp, project and origin of a Claude
 // transcript. An unreadable or timestamp-less file falls back to its
-// modification time, which is a successful outcome, not a failure.
-func extractClaudeHead(path string, info fs.FileInfo) claudeHead {
+// modification time, which is a usable row. When the fallback follows a
+// filesystem failure the error is returned with it, so the row is shown but
+// not cached (see transientIOError).
+func extractClaudeHead(path string, info fs.FileInfo) (claudeHead, error) {
 	var head claudeHead
 	f, err := os.Open(path)
 	if err == nil {
@@ -257,7 +259,19 @@ func extractClaudeHead(path string, info fs.FileInfo) claudeHead {
 		head.created = info.ModTime()
 		head.fromFilesystem = true
 	}
-	return head
+	return head, transientIOError(err)
+}
+
+// transientIOError returns err when it is a filesystem failure (open or read)
+// that a later attempt may not repeat, and nil for outcomes decided by the
+// file's content. The cache stores a result only when its compute returns nil,
+// so a transient failure is shown for one pass and retried on the next.
+func transientIOError(err error) error {
+	var pathErr *fs.PathError
+	if errors.As(err, &pathErr) {
+		return err
+	}
+	return nil
 }
 
 // Sources returns the sources this Lister can list: every source, except
@@ -308,7 +322,7 @@ func (l *Lister) listCodexIndexed(projectPath string) ([]SessionInfo, []ListWarn
 
 		scan, _ := cached(l.cache, "codex:"+path, []string{path}, func() (codexScan, error) {
 			head, err := readCodexHead(path)
-			return codexScan{head: head, err: err}, nil
+			return codexScan{head: head, err: err}, transientIOError(err)
 		})
 		head, headErr := scan.head, scan.err
 		var headWarning *ListWarning
@@ -350,9 +364,9 @@ func (l *Lister) listCodexIndexed(projectPath string) ([]SessionInfo, []ListWarn
 	return sessions, warnings, threads, nil
 }
 
-// codexScan is one bounded scan of a rollout's head with its outcome. An
-// outcome that is an error is as repeatable as one that is not, so the cache
-// keeps both.
+// codexScan is one bounded scan of a rollout's head with its outcome. A
+// content error (an over-long line) repeats as reliably as a clean read, so the
+// cache keeps both; a filesystem error is not cached (transientIOError).
 type codexScan struct {
 	head codexHead
 	err  error
@@ -524,6 +538,11 @@ func (l *Lister) listKiro(cwd string) ([]SessionInfo, error) {
 		key := "kiro-cli:" + cwd
 		if cwd != "" {
 			key += "\x00" + normalizePath(cwd)
+		}
+		// SQLite keeps -wal and -journal beside the real file, not beside a
+		// symlink to it.
+		if resolved, err := filepath.EvalSymlinks(dbPath); err == nil {
+			dbPath = resolved
 		}
 		kiroSessions, err = cached(l.cache, key, []string{dbPath, dbPath + "-wal", dbPath + "-journal"}, run)
 	}
