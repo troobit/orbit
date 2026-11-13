@@ -322,3 +322,28 @@ func TestLMStudioRender_Truncation(t *testing.T) {
 	rendered := markdownToHTML(lmMarkdownSource("cut ... " + lmTruncationMarker + " ... here"))
 	assert.Contains(t, rendered, "cut ... &lt;Truncated in logs&gt; ... here")
 }
+
+func TestLMStudioMarkdownFencesSurviveBackticks(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		in        string
+		wantSpan  string
+		wantFence string
+	}{
+		"no backticks":      {"abc", "`abc`", "```"},
+		"inner backtick":    {"t`1", "``t`1``", "```"},
+		"edge backtick":     {"`x", "`` `x ``", "```"},
+		"triple-fence line": {"a\n```\nb", "````a\n```\nb````", "````"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := lmCodeSpan(tc.in); got != tc.wantSpan {
+				t.Errorf("lmCodeSpan(%q) = %q, want %q", tc.in, got, tc.wantSpan)
+			}
+			if got := lmFence(tc.in); got != tc.wantFence {
+				t.Errorf("lmFence(%q) = %q, want %q", tc.in, got, tc.wantFence)
+			}
+		})
+	}
+}

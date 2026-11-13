@@ -93,11 +93,40 @@ func lmPartsMarkdown(parts []lmPart) string {
 	for _, p := range parts {
 		s := p.text
 		if p.code != "" {
-			s = strings.TrimSpace(s + " `" + p.code + "`")
+			s = strings.TrimSpace(s + " " + lmCodeSpan(p.code))
 		}
 		out = append(out, s)
 	}
 	return strings.Join(out, " · ")
+}
+
+// lmCodeSpan wraps s in a Markdown code span whose delimiter is longer than
+// any backtick run in s, so recorded text cannot end the span early.
+func lmCodeSpan(s string) string {
+	d := strings.Repeat("`", lmLongestBacktickRun(s)+1)
+	if strings.HasPrefix(s, "`") || strings.HasSuffix(s, "`") {
+		s = " " + s + " "
+	}
+	return d + s + d
+}
+
+// lmFence returns a code-fence marker longer than any backtick run in s, so
+// recorded text cannot close the fence early.
+func lmFence(s string) string {
+	return strings.Repeat("`", max(3, lmLongestBacktickRun(s)+1))
+}
+
+func lmLongestBacktickRun(s string) int {
+	longest, run := 0, 0
+	for _, r := range s {
+		if r == '`' {
+			run++
+			longest = max(longest, run)
+		} else {
+			run = 0
+		}
+	}
+	return longest
 }
 
 // lmPartsHTML escapes every part, for HTML and for Markdown summary lines.
@@ -420,8 +449,10 @@ func (r *lmRenderer) requestMarkdown(sb *strings.Builder, seg lmSegment) {
 		sb.WriteString(lmPrefixText(repeated) + "\n\n")
 	}
 	if len(req.Parameters) > 0 {
-		fmt.Fprintf(sb, "<details>\n<summary>🎛️ %s</summary>\n\n```json\n%s\n```\n\n</details>\n\n",
-			escapeSummary(lmParameterSummary(req.Parameters)), indentedPayload(req.Parameters))
+		payload := indentedPayload(req.Parameters)
+		fence := lmFence(payload)
+		fmt.Fprintf(sb, "<details>\n<summary>🎛️ %s</summary>\n\n%sjson\n%s\n%s\n\n</details>\n\n",
+			escapeSummary(lmParameterSummary(req.Parameters)), fence, payload, fence)
 	}
 	for i := range shown {
 		e := &shown[i]
@@ -452,7 +483,8 @@ func (r *lmRenderer) eventMarkdown(sb *strings.Builder, e *Entry) {
 		// Log text as logged, not as Markdown.
 		for _, item := range e.Message.Content {
 			if item.Text != "" {
-				fmt.Fprintf(sb, "```\n%s\n```\n\n", item.Text)
+				fence := lmFence(item.Text)
+				fmt.Fprintf(sb, "%s\n%s\n%s\n\n", fence, item.Text, fence)
 			}
 			if item.Truncated {
 				sb.WriteString(lmTruncatedMarkdown)

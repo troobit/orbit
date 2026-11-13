@@ -73,24 +73,6 @@ func lmDigest(s string) string {
 	return hex.EncodeToString(sum[:])[:lmDigestLength]
 }
 
-// parseLMRequestID decodes a path-form request identifier into the file key
-// and start line it was derived from. Every other form reports false, and so
-// does any spelling lmRequestID would not produce, so each request has one
-// identifier.
-func parseLMRequestID(id string) (fileKey string, startLine int, ok bool) {
-	rest, ok := strings.CutPrefix(id, lmRequestPathPrefix)
-	sep := strings.LastIndexByte(rest, '-')
-	if !ok || sep < 0 {
-		return "", 0, false
-	}
-	line, lineErr := strconv.Atoi(rest[sep+1:])
-	key, keyErr := base64.RawURLEncoding.DecodeString(rest[:sep])
-	if lineErr != nil || keyErr != nil || len(key) == 0 || line < 1 || lmRequestID(string(key), line) != id {
-		return "", 0, false
-	}
-	return string(key), line, true
-}
-
 var (
 	lmMonthDirPattern = regexp.MustCompile(`^\d{4}-\d{2}$`)
 	lmLogFilePattern  = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})\.(\d+)\.log$`)

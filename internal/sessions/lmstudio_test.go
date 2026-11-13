@@ -1,10 +1,12 @@
 package sessions
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -244,4 +246,22 @@ func TestPropertyLMStudioIdentityStability(t *testing.T) {
 			}
 		}
 	})
+}
+
+// parseLMRequestID decodes a path-form request identifier into the file key
+// and start line it was derived from, to check that lmRequestID round-trips. Every other form reports false, and so
+// does any spelling lmRequestID would not produce, so each request has one
+// identifier.
+func parseLMRequestID(id string) (fileKey string, startLine int, ok bool) {
+	rest, ok := strings.CutPrefix(id, lmRequestPathPrefix)
+	sep := strings.LastIndexByte(rest, '-')
+	if !ok || sep < 0 {
+		return "", 0, false
+	}
+	line, lineErr := strconv.Atoi(rest[sep+1:])
+	key, keyErr := base64.RawURLEncoding.DecodeString(rest[:sep])
+	if lineErr != nil || keyErr != nil || len(key) == 0 || line < 1 || lmRequestID(string(key), line) != id {
+		return "", 0, false
+	}
+	return string(key), line, true
 }

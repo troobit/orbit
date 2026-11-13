@@ -1105,6 +1105,9 @@ func convert(input io.Reader, output io.Writer, in inputContext, format string, 
 	var err error
 	switch {
 	case in.resolved != nil && in.resolved.PreParsed != nil:
+		if agent != "" && agent != "lmstudio" {
+			return fmt.Errorf("an assembled LM Studio session cannot be parsed as %s; use -a lmstudio or omit -a", agent)
+		}
 		result, err = sessions.ParseResolved(&sessions.ResolvedSession{Reader: io.NopCloser(input), Metadata: *in.resolved}, parseOpts)
 	case agent != "":
 		result, err = transcript.ParseJSONLWithFormat(input, agentToFormat(agent), parseOpts)
