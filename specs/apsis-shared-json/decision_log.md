@@ -892,7 +892,7 @@ The indexed rollout must be the one that source/identifier opening reaches. Keep
 
 **ID**: 23
 **Date**: 2026-11-05
-**Status**: proposed; supersedes Decision 13
+**Status**: superseded by Decision 34
 
 ### Context
 
@@ -926,7 +926,7 @@ Platform-specific metadata can preserve the no-body-read outcome without pretend
 
 ### Verification gap (2026-11-13)
 
-Left proposed. No code implements it: `internal/fileidentity` does not exist, the all-sources Lister has no stat-keyed cache (only the LM Studio file cache in `internal/sessions/lmstudio_cache_unix.go:13`, Unix only), and tasks 15 and 16 in `tasks-cache.md` are unchecked. Native Windows evidence is also still missing.
+Not implemented when verified; superseded by Decision 34. No code implements it: `internal/fileidentity` does not exist, the all-sources Lister has no stat-keyed cache (only the LM Studio file cache in `internal/sessions/lmstudio_cache_unix.go:13`, Unix only), and tasks 15 and 16 in `tasks-cache.md` are unchecked. Native Windows evidence is also still missing.
 
 ---
 
@@ -1006,7 +1006,7 @@ Later slices do not invalidate consumers holding the first schema, and malformed
 
 **ID**: 26
 **Date**: 2026-11-05
-**Status**: proposed; local technical admission
+**Status**: superseded by Decision 34
 
 ### Context
 
@@ -1034,7 +1034,7 @@ This reviewed package placement keeps platform ownership disjoint and makes the 
 
 ### Verification gap (2026-11-13)
 
-Left proposed. `internal/fileidentity` does not exist and task 15 in `tasks-cache.md` is unchecked, so there is no code to verify.
+Not implemented when verified; superseded by Decision 34. `internal/fileidentity` does not exist and task 15 in `tasks-cache.md` is unchecked, so there is no code to verify.
 
 ---
 
@@ -1042,7 +1042,7 @@ Left proposed. `internal/fileidentity` does not exist and task 15 in `tasks-cach
 
 **ID**: 27
 **Date**: 2026-11-05
-**Status**: proposed; local planning admission, not human approval
+**Status**: accepted; human-approved 2026-11-13 with one amendment: the native Windows gate is dropped (Decision 34)
 
 ### Context
 
@@ -1118,7 +1118,7 @@ Decision 28 split Codex assistant entries when `session_meta.payload.model` chan
 
 ### Decision
 
-The active Codex model is the latest nonempty `turn_context.payload.model`, else `session_meta.payload.model` for older files. `FirstModel` and the Codex listing model take the first nonempty value in transcript order; the listing reads it within the existing `codexMetaScanLimit`. With `ParseOptions.PreserveModelChanges`, set only by shared-JSON callers, assistant entries take the active model when created, and a change without an intervening user boundary starts a new entry at the next model-produced item (Q82). Without the option, `Entry.Model` keeps its legacy session_meta-only value, so default Markdown, HTML and web output change only by the provider label (5.1). Provider handling, identical-metadata consolidation, first-known summaries and `AllowEmptyCodex` stay as Decision 28 described. Whether headers also show the Codex model is user question U4 (Q85).
+The active Codex model is the latest nonempty `turn_context.payload.model`, else `session_meta.payload.model` for older files. `FirstModel` and the Codex listing model take the first nonempty `turn_context.payload.model`, else `session_meta.payload.model` (human-confirmed 2026-11-13); the listing reads it within the existing `codexMetaScanLimit`. With `ParseOptions.PreserveModelChanges`, set only by shared-JSON callers, assistant entries take the active model when created, and a change without an intervening user boundary starts a new entry at the next model-produced item (Q82). Without the option, `Entry.Model` keeps its legacy session_meta-only value, so default Markdown, HTML and web output change only by the provider label (5.1). Provider handling, identical-metadata consolidation, first-known summaries and `AllowEmptyCodex` stay as Decision 28 described. Whether headers also show the Codex model is user question U4 (Q85).
 
 ### Rationale
 
@@ -1142,8 +1142,7 @@ The active Codex model is the latest nonempty `turn_context.payload.model`, else
 
 ### Verification gap (2026-11-13)
 
-Left proposed. The parser matches (`internal/transcript/codex_parser.go:122,160-172,414-420`; `cmd/apsis/main.go:1099`), but the listing does not follow the Decision text "first nonempty value in transcript order". `readCodexHead` uses `cmp.Or(turnModel, metaModel)` (`internal/sessions/lister.go:658`), so `turn_context` wins even when `session_meta.model` comes first, while the parser's `FirstModel` (`codex_parser.go:148`) takes the `session_meta` value. The test `internal/sessions/lister_metadata_test.go:149` pins the listing behaviour. For a rollout with both, the listing row and the session document disagree. Either the Decision text or the listing needs to change.
-
+Left proposed pending one code change. The listing already prefers `turn_context` (`internal/sessions/lister.go:658`, pinned by `lister_metadata_test.go:149`), but the parser's `FirstModel` takes `session_meta` when it is first (`internal/transcript/codex_parser.go:148`), so the listing row and session document disagree for a rollout with both. The human chose turn_context (2026-11-13); the parser must record the first `turn_context` model for `FirstModel`, with a test, before this is accepted.
 ---
 
 ## Decision 30: Prefer Recorded Creation Records Over First-Message Times
@@ -1256,7 +1255,7 @@ An identifier from one of several merged records would mislabel the rest of the 
 ## Decision 33: Validate Every Selected Codex Rollout in All-Projects Listings
 
 **Date**: 2026-11-06
-**Status**: proposed (agent decision during task 7; not human-approved)
+**Status**: accepted; human-approved 2026-11-13 as implemented
 
 ### Context
 
@@ -1286,3 +1285,38 @@ One rule for every identifier keeps listing, opening and the later suppression i
 - A rollout whose recorded ID differs from its filename appears in its project's listing but not across projects.
 
 ---
+
+## Decision 34: Limit the Unchanged-Refresh Cache to Unix and macOS
+
+**Date**: 2026-11-13
+**Status**: accepted; human decision
+
+### Context
+
+Decisions 23 and 26 required metadata-only file fingerprints on Unix and Windows, with native Windows tests gating the cache (tasks 15 and 16). No Windows host is available, so requirement 5.9 could not be completed. Decision 27 carried the same gate.
+
+### Decision
+
+Windows is out of scope for the cache. The cache fingerprints files by size, mtime, ctime, inode and device through the Unix adapter, and macOS and Linux are the supported platforms. The native Windows gate, the Windows adapter and the Windows fingerprint tests are dropped. Where required metadata is unavailable the cache is not used for that file rather than falling back to size and mtime.
+
+### Rationale
+
+Apsis is used on macOS and Linux, and a gate that cannot be satisfied blocks a feature that works on those platforms.
+
+### Alternatives Considered
+
+- **Keep the gate and wait for a Windows host**: Full coverage - Rejected: no host exists and the feature is blocked indefinitely.
+- **Fall back to size and mtime on Windows**: Cache everywhere - Rejected: it would miss same-size rewrites that preserve mtime, which 5.9 requires detecting.
+
+### Consequences
+
+**Positive:**
+- Tasks 15 and 16 can finish on Unix without external evidence.
+- Task 15 needs no `internal/fileidentity` Windows adapter or native test run.
+
+**Negative:**
+- Windows users get no unchanged-refresh cache.
+- `design.md`, `prerequisites.md` and `tasks-cache.md` still describe the Windows gate until updated.
+
+---
+
