@@ -510,7 +510,7 @@ These are testable boundaries and caching outcomes without a machine-specific co
 ## Decision 12: Extend the Shared Entry and Project It to JSON Separately
 
 **Date**: 2026-11-05
-**Status**: proposed
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -581,7 +581,7 @@ Opening by identifier in a new CLI process then reads only that session, rather 
 ## Decision 14: Exec Identifier From a Thread Prefix and a Full Path Digest
 
 **Date**: 2026-11-05
-**Status**: proposed
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -617,7 +617,7 @@ The identifier depends only on facts about the stream itself, so no other file c
 ## Decision 15: Resolve the Exec Lifecycle per Turn and Item at End of Stream
 
 **Date**: 2026-11-05
-**Status**: proposed
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -652,7 +652,7 @@ Per-turn keys survive ID reuse in the parser, and turn-qualified tool IDs carry 
 ## Decision 16: Show the Provider Wherever the Model Is Shown
 
 **Date**: 2026-11-05
-**Status**: proposed
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -816,7 +816,7 @@ One rule gives the same answer for direct conversion and discovery at any prefix
 
 **ID**: 21
 **Date**: 2026-11-05
-**Status**: proposed; supersedes Decision 20
+**Status**: accepted; supersedes Decision 20; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -854,7 +854,7 @@ A heuristic is insufficient to override the approved exec signature. Restricting
 
 **ID**: 22
 **Date**: 2026-11-05
-**Status**: proposed; supersedes Decision 17
+**Status**: accepted; supersedes Decision 17; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -924,6 +924,10 @@ Platform-specific metadata can preserve the no-body-read outcome without pretend
 - Platform adapters and native Windows checks are required before cache admission.
 - An unsupported storage environment remains a real dependency rather than an approved exception.
 
+### Verification gap (2026-11-13)
+
+Left proposed. No code implements it: `internal/fileidentity` does not exist, the all-sources Lister has no stat-keyed cache (only the LM Studio file cache in `internal/sessions/lmstudio_cache_unix.go:13`, Unix only), and tasks 15 and 16 in `tasks-cache.md` are unchecked. Native Windows evidence is also still missing.
+
 ---
 
 ## Decision 24: Preserve First-Known Parsed Summaries Without Requiring Assistant Content
@@ -968,7 +972,7 @@ Summary metadata exists independently of assistant content. Keeping it in the co
 
 **ID**: 25
 **Date**: 2026-11-05
-**Status**: proposed; local technical admission, supersedes Decision 18
+**Status**: accepted; local technical admission, supersedes Decision 18; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -1027,6 +1031,10 @@ This reviewed package placement keeps platform ownership disjoint and makes the 
 **Positive:** native verification has a small target; cache consumers share one adapter; sessions and fingerprint implementation can progress separately.
 
 **Negative:** one additional internal package is introduced; module mutation is serialized; cache completion still requires unavailable external native evidence.
+
+### Verification gap (2026-11-13)
+
+Left proposed. `internal/fileidentity` does not exist and task 15 in `tasks-cache.md` is unchecked, so there is no code to verify.
 
 ---
 
@@ -1132,13 +1140,17 @@ The active Codex model is the latest nonempty `turn_context.payload.model`, else
 - Until U4 is answered, shared JSON shows a Codex model that Markdown/HTML headers do not.
 - The completed task 2 is reopened for a follow-up pair.
 
+### Verification gap (2026-11-13)
+
+Left proposed. The parser matches (`internal/transcript/codex_parser.go:122,160-172,414-420`; `cmd/apsis/main.go:1099`), but the listing does not follow the Decision text "first nonempty value in transcript order". `readCodexHead` uses `cmp.Or(turnModel, metaModel)` (`internal/sessions/lister.go:658`), so `turn_context` wins even when `session_meta.model` comes first, while the parser's `FirstModel` (`codex_parser.go:148`) takes the `session_meta` value. The test `internal/sessions/lister_metadata_test.go:149` pins the listing behaviour. For a rollout with both, the listing row and the session document disagree. Either the Decision text or the listing needs to change.
+
 ---
 
 ## Decision 30: Prefer Recorded Creation Records Over First-Message Times
 
 **ID**: 30
 **Date**: 2026-11-05
-**Status**: proposed; supersedes Decision 24; reversible local technical choice awaiting verification by an agent other than its author
+**Status**: accepted; supersedes Decision 24; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -1208,7 +1220,7 @@ Both fields are recorded by the source, so they follow Q3 and Decision 6: apsis 
 ## Decision 32: Entry Identifiers Come From the Single Record an Entry Is Built From
 
 **Date**: 2026-11-05
-**Status**: proposed; reversible local technical choice implementing approved 1.8, awaiting verification by an agent other than its author
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
