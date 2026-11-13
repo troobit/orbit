@@ -67,8 +67,8 @@
 | Q61 | 2026-11-05 | Agent proposal: Lister and Resolver apply the same Option functions to a shared Options value rather than a Lister-specific closure | The design's earlier Option func(*Lister) cannot directly configure a Resolver; one settings type keeps root precedence consistent without coupling their runtime state |
 | Q62 | 2026-11-05 | Clarify Decision 22's listing scope: the global selected winner governs suppression in every scope and all-projects row deduplication; project-scope rollout rows keep existing per-file cwd filtering under Q49 | The final revision check found ambiguous global-listing wording that could remove a later duplicate from its legacy project list, violating 5.1; this does not change human-approved global stream suppression |
 | Q63 | 2026-11-05 | Correct the freeze attribution: it was the dispatching coordinator's ownership instruction, not a human decision | Checked 19:00Z note and current SPEC-DRIVE authorisation permit reviewed local planning and implementation; preserve human decisions and existing owners, and never infer human approval |
-| Q64 | 2026-11-05 | Keep current Claude-model and Kiro-IDE-provider omission inside approved scope | U1/U2 remain unanswered possible scope expansions, not prerequisites or answered choices |
-| Q65 | 2026-11-05 | Admit the test-only schema validator as a reversible local technical choice | Both design drafts and non-author reviews support it; U3 remains unanswered and no human approval is implied |
+| Q64 | 2026-11-05 | Keep current Claude-model and Kiro-IDE-provider omission inside approved scope | Possible scope expansions, later answered as U1 (Q92) and U2 (Q93) |
+| Q65 | 2026-11-05 | Admit the test-only schema validator as a reversible local technical choice | Both design drafts and non-author reviews support it; the user approved it as U3 (Q94) |
 | Q66 | 2026-11-05 | Publish the complete known v1 schema initially, with an unknown-block extension branch (Decision 25) | Initial-schema validation must keep accepting later producers; a mutable upstream $id cannot update a cached validator |
 | Q67 | 2026-11-05 | Isolate metadata fingerprints in internal/fileidentity (Decision 26) | Separate native tests and disjoint package ownership let the cache capability gate run without blocking sessions work |
 | Q68 | 2026-11-05 | Four PR slices and three streams; module writes serialized after task 3.2 (Decision 27) | Native Windows blocks cache only, and go.mod/go.sum have one writer at a time |
@@ -88,7 +88,7 @@
 | Q82 | 2026-11-05 | A Codex metadata transition starts a new assistant entry only at a model-produced item (message, reasoning, function call, agent message or reasoning); a function call output joins the current entry | Keeps a tool result in the same entry as its call (peer m4) |
 | Q83 | 2026-11-05 | Shared JSON listings keep extended ordering in every scope; the README states that no-flag `apsis latest` keeps the legacy tie order, and task 6.1 tests the documented difference | Changing no-flag `latest` would break 5.1, and selecting by output format would surprise users (peer m3) |
 | Q84 | 2026-11-05 | Reopen task 2 for one red/green follow-up pair, reset tasks 3/3.1 and 9/9.1 to pending, and release the owners of 3, 3.1, 3.2, 9, 9.1 and 9.2 | Their claims were released at 22:49Z with no output; both now depend on the reopened task 2 (peer m1). Task 2 keeps its recorded owner for provenance; the new subtasks are unowned |
-| Q85 | 2026-11-05 | Ask the user U4: should Markdown and HTML assistant headers show the Codex model? Until answered, the Codex model appears only in shared JSON documents and listings | Showing it in headers changes existing output beyond the provider exception in 5.1; the user's direction asks for Markdown/HTML parity, so this is the user's choice (peer M1) |
+| Q85 | 2026-11-05 | The Codex model appears only in shared JSON documents and listings; whether Markdown and HTML headers show it is U4 (answered in Q95) | Showing it in headers changes existing output beyond the provider exception in 5.1; the user's direction asks for Markdown/HTML parity, so this is the user's choice (peer M1) |
 | Q86 | 2026-11-05 | The user approved requirements revision 4, adding 1.7 (recorded session origin) and 1.8 (recorded entry identifiers) in shared JSON only | Decision 31; design and tasks must absorb both before task 3 publishes the schema |
 | Q87 | 2026-11-05 | Session origin is Claude Code's first nonempty `entrypoint` and Codex's first nonempty `session_meta.payload.originator`; no other source field is mapped to origin. Copilot's `session.start` `data.producer` stays unmapped until the user answers U5, and Codex `session_meta.payload.source`/`thread_source` are not used | 1.7 names these two fields. Pinned rust-v0.166.0 `SessionMeta.originator` is a required string, set to `codex_exec` by `codex exec` and defaulting to `codex_cli_rs`. `producer` names the program that wrote the log rather than a client entry point (one value across six local sessions), and Codex `source`/`thread_source` are classifications, which Decision 31 rejects. Adding a mapping later is additive under 1.3 |
 | Q88 | 2026-11-05 | Shared JSON names the fields `origin` in the shared session-metadata definition (so listing rows inherit it) and `id` on the entry | 4.3 names origin; the entry `id` sits at entry level, apart from the block-level tool `id` and `tool_use_id`, and is never a tool-linking identifier (1.8) |
@@ -977,7 +977,7 @@ Both task cross-reviews identify a compatibility hole: adding a new discriminato
 
 Publish both session/listing kinds and every known v1 field/block in PR 1. Known block types use disjoint branches; an open extension branch excludes those known discriminators and accepts other type strings. Consumers ignore unsupported block types as well as unknown fields. Current unknown source content still projects as `other`. Preserve an exact initial-schema test fixture; later listing and exec output must validate against it. Removing a field or changing its meaning still raises the version.
 
-Retain Decision 18's test-only local validator and dual validation. The closed test copy closes known apsis-owned structural objects, while input, payload, counters and unknown extension objects stay open. U3 remains unanswered; the dependency is admitted as a reversible agent technical choice.
+Retain Decision 18's test-only local validator and dual validation. The closed test copy closes known apsis-owned structural objects, while input, payload, counters and unknown extension objects stay open. The user approved the dependency (U3, Q94).
 
 ### Rationale
 
@@ -1108,7 +1108,7 @@ Decision 28 split Codex assistant entries when `session_meta.payload.model` chan
 
 ### Decision
 
-The active Codex model is the latest nonempty `turn_context.payload.model`, else `session_meta.payload.model` for older files. `FirstModel` and the Codex listing model take the first nonempty `turn_context.payload.model`, else `session_meta.payload.model` (human-confirmed 2026-11-13); the listing reads it within the existing `codexMetaScanLimit`. With `ParseOptions.PreserveModelChanges`, set only by shared-JSON callers, assistant entries take the active model when created, and a change without an intervening user boundary starts a new entry at the next model-produced item (Q82). Without the option, `Entry.Model` keeps its legacy session_meta-only value, so default Markdown, HTML and web output change only by the provider label (5.1). Provider handling, identical-metadata consolidation, first-known summaries and `AllowEmptyCodex` stay as Decision 28 described. Whether headers also show the Codex model is user question U4 (Q85).
+The active Codex model is the latest nonempty `turn_context.payload.model`, else `session_meta.payload.model` for older files. `FirstModel` and the Codex listing model take the first nonempty `turn_context.payload.model`, else `session_meta.payload.model` (human-confirmed 2026-11-13); the listing reads it within the existing `codexMetaScanLimit`. With `ParseOptions.PreserveModelChanges`, set only by shared-JSON callers, assistant entries take the active model when created, and a change without an intervening user boundary starts a new entry at the next model-produced item (Q82). Without the option, `Entry.Model` keeps its legacy session_meta-only value, so default Markdown, HTML and web output change only by the provider label (5.1). Provider handling, identical-metadata consolidation, first-known summaries and `AllowEmptyCodex` stay as Decision 28 described. Headers do not show the Codex model (U4, Q95).
 
 ### Rationale
 
@@ -1117,7 +1117,7 @@ The active Codex model is the latest nonempty `turn_context.payload.model`, else
 ### Alternatives Considered
 
 - **Keep session_meta as the only model source:** rejected because Codex 0.166.0 never writes it there, so shared JSON and listings would never carry a Codex model.
-- **Apply turn_context models to every entry by default:** rejected for now because Codex Markdown/HTML headers would gain a model label, beyond 5.1's provider exception; offered to the user as U4.
+- **Apply turn_context models to every entry by default:** rejected for now because Codex Markdown/HTML headers would gain a model label, beyond 5.1's provider exception; the user kept headers unchanged (U4, Q95).
 - **Add a separate model-history field to the schema:** rejected because entry-level `model` already expresses changes.
 
 ### Consequences
@@ -1127,7 +1127,7 @@ The active Codex model is the latest nonempty `turn_context.payload.model`, else
 - Default rendering stays unchanged apart from the approved provider label.
 
 **Negative:**
-- Until U4 is answered, shared JSON shows a Codex model that Markdown/HTML headers do not.
+- Shared JSON shows a Codex model that Markdown/HTML headers do not (U4, Q95).
 - The completed task 2 is reopened for a follow-up pair.
 ---
 
