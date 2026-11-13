@@ -519,7 +519,13 @@ func (l *Lister) listKiro(cwd string) ([]SessionInfo, error) {
 	if dbPath == "" {
 		kiroSessions, err = run()
 	} else {
-		kiroSessions, err = cached(l.cache, "kiro-cli:"+cwd, []string{dbPath, dbPath + "-wal", dbPath + "-journal"}, run)
+		// Discovery queries the symlink-resolved directory too, so the key
+		// names it: re-pointing a project symlink must not hit.
+		key := "kiro-cli:" + cwd
+		if cwd != "" {
+			key += "\x00" + normalizePath(cwd)
+		}
+		kiroSessions, err = cached(l.cache, key, []string{dbPath, dbPath + "-wal", dbPath + "-journal"}, run)
 	}
 
 	if err != nil {

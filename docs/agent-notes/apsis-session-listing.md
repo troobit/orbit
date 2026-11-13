@@ -136,7 +136,7 @@ Key details:
 - Directory walks, stats, duplicate selection, exec identifiers and repository roots are recomputed every pass. Only extraction is cached, so new, removed and moved files show at once.
 - A result is stored only when `compute` succeeds and no fingerprint changed during it. Errors are never stored, except outcomes the extractor returns as values (Codex head scan errors, the Claude mtime fallback, a `.chat` file that decodes to no execution).
 - `endPass` drops entries the pass did not use. A project-scope pass therefore sweeps entries only an all-projects pass visits.
-- Kiro CLI is cached only with the real database path, or with `kiroDBPath` injected; injected discovery alone never is, so tests do not fingerprint a developer's real database.
+- The Kiro CLI key names the project directory and its symlink-resolved target, because discovery queries both; re-pointing a project symlink misses. It is cached only with the real database path, or with `kiroDBPath` injected; injected discovery alone never is, so tests do not fingerprint a developer's real database.
 - `fingerprintFile` is a var; tests replace it. `fileCache.onCompute` reports each extraction, which is how `cache_test.go` asserts a zero-read pass. The Resolver does not use the cache.
 - `fingerprint_other.go` reports every file as not cacheable, so non-Unix platforms never hit.
 

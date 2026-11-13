@@ -581,3 +581,53 @@ func BenchmarkListAll_KiroIDE(b *testing.B) {
 		}
 	})
 }
+
+// Project-scope Kiro CLI discovery is cached like the all-projects branch, and
+// its key follows the symlink target the discovery query resolves.
+func TestLister_KiroCLIProjectScopeCache(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	projectA, projectB := filepath.Join(root, "a"), filepath.Join(root, "b")
+	require.NoError(t, os.Mkdir(projectA, 0o755))
+	require.NoError(t, os.Mkdir(projectB, 0o755))
+	link := filepath.Join(root, "link")
+	require.NoError(t, os.Symlink(projectA, link))
+	dbPath := filepath.Join(root, "data.sqlite3")
+	writeFile(t, dbPath, "db")
+
+	var asked []string
+	lister := &Lister{
+		homeDir:    filepath.Join(root, "home"),
+		cache:      &fileCache{},
+		kiroDBPath: func() (string, error) { return dbPath, nil },
+		kiroDiscover: func(_ context.Context, dir string) ([]logs.SessionMetadata, error) {
+			asked = append(asked, dir)
+			// Like the real query, answer for the resolved directory.
+			resolved, err := filepath.EvalSymlinks(dir)
+			require.NoError(t, err)
+			return []logs.SessionMetadata{{ConversationID: "kiro-in-" + filepath.Base(resolved), Directory: resolved}}, nil
+		},
+	}
+	ids := func() []string {
+		rows, _, err := lister.ListAll(link)
+		require.NoError(t, err)
+		var got []string
+		for _, r := range rows {
+			got = append(got, r.ID)
+		}
+		return got
+	}
+
+	assert.Equal(t, []string{"kiro-in-a"}, ids())
+	assert.Equal(t, []string{"kiro-in-a"}, ids())
+	assert.Len(t, asked, 1, "an unchanged database is not queried again")
+
+	require.NoError(t, os.Remove(link))
+	require.NoError(t, os.Symlink(projectB, link))
+	assert.Equal(t, []string{"kiro-in-b"}, ids(), "a re-pointed project symlink does not serve the old target's sessions")
+	assert.Len(t, asked, 2)
+
+	writeFile(t, dbPath+"-wal", "wal")
+	ids()
+	assert.Len(t, asked, 3, "a companion appearing re-runs the query")
+}
