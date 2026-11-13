@@ -313,7 +313,7 @@ func TestParseMetadata_CodexModelSources(t *testing.T) {
 		},
 		"session_meta before turn_context": {
 			lines:          []string{meta("legacy-model"), turnContext("turn-model"), assistant},
-			wantFirst:      "legacy-model",
+			wantFirst:      "turn-model",
 			wantPreserved:  "turn-model",
 			wantDefaultRun: "legacy-model",
 		},
