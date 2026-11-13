@@ -892,42 +892,37 @@ The indexed rollout must be the one that source/identifier opening reaches. Keep
 
 **ID**: 23
 **Date**: 2026-11-05
-**Status**: superseded by Decision 34
+**Status**: proposed; human scoped to Unix and macOS 2026-11-13; unimplemented
 
 ### Context
 
-Requirement 5.9 requires zero body reads on unchanged refreshes and detection of changed inputs. Size/mtime alone can miss equal-size replacements preserving modification time. The existing x/sys module exposes Windows metadata-handle queries; their storage-specific behaviour still needs implementation verification.
+Requirement 5.9 requires zero body reads on unchanged refreshes and detection of changed inputs. Size/mtime alone can miss equal-size replacements preserving modification time. Windows is out of scope (human decision 2026-11-13); macOS and Linux are the supported platforms.
 
 ### Decision
 
-Keep the long-lived mutex-guarded Lister cache, companion absence keys and fresh result slices. Require Unix identity/change stat fields and Windows volume/file identity plus last-write/change times through a platform adapter. Use metadata-only handles; never silently downgrade to size/mtime. Gate cache consumers on early adapter and native Windows replacement tests. If required metadata is unavailable, block admission and record the platform limitation for a requirements decision.
+Keep the long-lived mutex-guarded Lister cache, companion absence keys and fresh result slices. Fingerprint files with Unix identity/change stat fields (size, mtime, ctime, inode, device) through a platform adapter, using metadata only; never silently downgrade to size/mtime. Gate cache consumers on early adapter tests, including equal-size replacement on a real Unix filesystem. If required metadata is unavailable, the file is not cached.
 
 ### Rationale
 
-Platform-specific metadata can preserve the no-body-read outcome without pretending that a weak key detects replacements. Microsoft's [file identity](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info) and [basic file information](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_basic_info) define the Windows fields; [GetFileInformationByHandleEx](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex) documents the query and driver dependence. This research establishes the interface, not successful runtime verification.
+Unix stat metadata preserves the no-body-read outcome without pretending that a weak key detects replacements. Windows is not a supported platform, so no Windows adapter or native evidence is required.
 
 ### Alternatives Considered
 
-- **Use size/mtime on Windows:** rejected because the design would knowingly miss required changes.
+- **Use size/mtime only:** rejected because the design would knowingly miss required changes.
 - **Hash every transcript on each refresh:** rejected because it violates zero body reads.
-- **Assume API support without an early gate:** rejected because filesystem capabilities and errors must not become hidden correctness exceptions.
+- **Assume filesystem support without an early gate:** rejected because filesystem capabilities and errors must not become hidden correctness exceptions.
 
 ### Consequences
 
 **Positive:**
 
-- The cache contract has a concrete cross-platform verification path.
+- The cache contract has a concrete verification path on Unix.
 - Identity replacement is distinct from content modification and companion changes.
 
 **Negative:**
 
-- Platform adapters and native Windows checks are required before cache admission.
+- Windows gets no unchanged-refresh cache.
 - An unsupported storage environment remains a real dependency rather than an approved exception.
-
-### Verification gap (2026-11-13)
-
-Not implemented when verified; superseded by Decision 34. No code implements it: `internal/fileidentity` does not exist, the all-sources Lister has no stat-keyed cache (only the LM Studio file cache in `internal/sessions/lmstudio_cache_unix.go:13`, Unix only), and tasks 15 and 16 in `tasks-cache.md` are unchecked. Native Windows evidence is also still missing.
-
 ---
 
 ## Decision 24: Preserve First-Known Parsed Summaries Without Requiring Assistant Content
@@ -1006,43 +1001,38 @@ Later slices do not invalidate consumers holding the first schema, and malformed
 
 **ID**: 26
 **Date**: 2026-11-05
-**Status**: superseded by Decision 34
+**Status**: proposed; local technical admission
 
 ### Context
 
-Decision 23 requires native Windows identity/change evidence before cache admission. The design originally put adapters inside sessions, where parallel list/open work also compiles and edits files. The existing x/sys module exposes Windows queries but lacks the matching result structs.
+Decision 23 requires Unix identity/change evidence before cache admission. The design originally put the adapter inside sessions, where parallel list/open work also compiles and edits files.
 
 ### Decision
 
-Place the metadata-only interface and Unix/Windows adapters in internal/fileidentity; the sessions cache consumes it. Define the required Windows ABI structs locally, use metadata-only handles and preserve unsupported/error outcomes. Test equal-size replacement and in-place rewrite with restored mtime on native Windows as well as Unix and injected adapters. Cross-compilation cannot satisfy the native gate. Task 15.2 waits for schema task 3.2 before editing go.mod/go.sum, promotes x/sys to direct, and stays incomplete without native evidence.
+Place the metadata-only interface and Unix adapter in internal/fileidentity; the sessions cache consumes it. Preserve unsupported/error outcomes. Test equal-size replacement and in-place rewrite with restored mtime on Unix as well as through injected adapters. Task 15.2 waits for schema task 3.2 before editing go.mod/go.sum and promotes x/sys to direct.
 
 ### Rationale
 
-This reviewed package placement keeps platform ownership disjoint and makes the native prerequisite runnable without the full sessions stack. It changes placement, not Decision 23's fingerprint or cache contract.
+This reviewed package placement keeps ownership disjoint and makes the fingerprint check runnable without the full sessions stack. It changes placement, not Decision 23's fingerprint or cache contract.
 
 ### Alternatives Considered
 
 - **Keep the adapters in sessions:** rejected because the independent capability stream then shares a changing package and heavier native test dependencies with listing work.
 - **Reuse transcript follow-mode file info:** rejected because its Windows identity is absent and it has different lifecycle needs.
-- **Use size/mtime or mocked Windows evidence:** rejected because preserved-mtime replacement/rewrite is the reason for the capability gate.
+- **Use size/mtime only:** rejected because preserved-mtime replacement/rewrite is the reason for the capability gate.
 
 ### Consequences
 
-**Positive:** native verification has a small target; cache consumers share one adapter; sessions and fingerprint implementation can progress separately.
+**Positive:** verification has a small target; cache consumers share one adapter; sessions and fingerprint implementation can progress separately.
 
-**Negative:** one additional internal package is introduced; module mutation is serialized; cache completion still requires unavailable external native evidence.
-
-### Verification gap (2026-11-13)
-
-Not implemented when verified; superseded by Decision 34. `internal/fileidentity` does not exist and task 15 in `tasks-cache.md` is unchecked, so there is no code to verify.
-
+**Negative:** one additional internal package is introduced; module mutation is serialized.
 ---
 
 ## Decision 27: Separate Delivery Slices and Preserve Canonical Task Identity
 
 **ID**: 27
 **Date**: 2026-11-05
-**Status**: accepted; human-approved 2026-11-13 with one amendment: the native Windows gate is dropped (Decision 34)
+**Status**: accepted; human-approved 2026-11-13 with one amendment: Windows is out of scope and no native Windows gate applies (Decision 23)
 
 ### Context
 
@@ -1050,7 +1040,7 @@ The Codex draft's predecessor chain blocks listing and exec work on unavailable 
 
 ### Decision
 
-Merge four PR phases: shared JSON/provider, cross-project listing, exec streams, then cache. Keep fifteen adjacent red/green child pairs under sixteen parents. Preserve canonical numbered/stable IDs 1–11 and every status/owner; retain the byte-exact earlier file and scope map. Streams cover transcript/projection, sessions/CLI/web, and isolated fingerprints. Block shared-file consumers explicitly; task 15.2's module writes wait for task 3.2. Native Windows gates only fingerprint completion and cache consumers. Requirement 5.9 stays unfinished until the cache slice passes.
+Merge four PR phases: shared JSON/provider, cross-project listing, exec streams, then cache. Keep fifteen adjacent red/green child pairs under sixteen parents. Preserve canonical numbered/stable IDs 1–11 and every status/owner; retain the byte-exact earlier file and scope map. Streams cover transcript/projection, sessions/CLI/web, and isolated fingerprints. Block shared-file consumers explicitly; task 15.2's module writes wait for task 3.2. Requirement 5.9 stays unfinished until the cache slice passes.
 
 Each PR's last green task includes its README/CHANGELOG changes and Makefile checks. Benchmarks record fixture dimensions, platform/filesystem and cold/warm measurements; any 1.5 s local budget prompts investigation only. Zero unchanged transcript-body bytes remains a hard assertion. No commits, pushes, CI changes or policy relaxations are admitted here.
 
@@ -1110,7 +1100,7 @@ One parser and the existing common Entry model can express the new-format fideli
 
 **ID**: 29
 **Date**: 2026-11-05
-**Status**: proposed; supersedes Decision 28; reversible local technical choice awaiting verification by an agent other than its author
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -1139,10 +1129,6 @@ The active Codex model is the latest nonempty `turn_context.payload.model`, else
 **Negative:**
 - Until U4 is answered, shared JSON shows a Codex model that Markdown/HTML headers do not.
 - The completed task 2 is reopened for a follow-up pair.
-
-### Verification gap (2026-11-13)
-
-Left proposed pending one code change. The listing already prefers `turn_context` (`internal/sessions/lister.go:658`, pinned by `lister_metadata_test.go:149`), but the parser's `FirstModel` takes `session_meta` when it is first (`internal/transcript/codex_parser.go:148`), so the listing row and session document disagree for a rollout with both. The human chose turn_context (2026-11-13); the parser must record the first `turn_context` model for `FirstModel`, with a test, before this is accepted.
 ---
 
 ## Decision 30: Prefer Recorded Creation Records Over First-Message Times
@@ -1285,38 +1271,3 @@ One rule for every identifier keeps listing, opening and the later suppression i
 - A rollout whose recorded ID differs from its filename appears in its project's listing but not across projects.
 
 ---
-
-## Decision 34: Limit the Unchanged-Refresh Cache to Unix and macOS
-
-**Date**: 2026-11-13
-**Status**: accepted; human decision
-
-### Context
-
-Decisions 23 and 26 required metadata-only file fingerprints on Unix and Windows, with native Windows tests gating the cache (tasks 15 and 16). No Windows host is available, so requirement 5.9 could not be completed. Decision 27 carried the same gate.
-
-### Decision
-
-Windows is out of scope for the cache. The cache fingerprints files by size, mtime, ctime, inode and device through the Unix adapter, and macOS and Linux are the supported platforms. The native Windows gate, the Windows adapter and the Windows fingerprint tests are dropped. Where required metadata is unavailable the cache is not used for that file rather than falling back to size and mtime.
-
-### Rationale
-
-Apsis is used on macOS and Linux, and a gate that cannot be satisfied blocks a feature that works on those platforms.
-
-### Alternatives Considered
-
-- **Keep the gate and wait for a Windows host**: Full coverage - Rejected: no host exists and the feature is blocked indefinitely.
-- **Fall back to size and mtime on Windows**: Cache everywhere - Rejected: it would miss same-size rewrites that preserve mtime, which 5.9 requires detecting.
-
-### Consequences
-
-**Positive:**
-- Tasks 15 and 16 can finish on Unix without external evidence.
-- Task 15 needs no `internal/fileidentity` Windows adapter or native test run.
-
-**Negative:**
-- Windows users get no unchanged-refresh cache.
-- `design.md`, `prerequisites.md` and `tasks-cache.md` still describe the Windows gate until updated.
-
----
-
