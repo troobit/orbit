@@ -26,8 +26,8 @@ harness files ──parse──▶ transcript.ParseResult (Entries, Warnings, Me
 | `internal/sharedjson/` (new) | Document types, `Session`, `Listing`, `Write`, `SchemaVersion`; imports `transcript` and `sessions`, so neither imports it |
 | `docs/schemas/apsis-shared-json.v1.schema.json` (new) | Published JSON Schema (draft 2020-12) for both document kinds |
 | `internal/sessions/codexexec.go` (new) | Root canonicalisation, walk, qualification, identifier, repository root, suppression |
-| `internal/sessions/cache.go` (new) | Stat-keyed listing-metadata cache |
-| `internal/fileidentity/` (new) | Metadata-only Unix identity/change fingerprints behind one injectable interface; the cache consumes this isolated package (Decision 26) |
+| `internal/sessions/cache.go` (new) | Fingerprint-keyed cache of per-file extraction results |
+| `internal/sessions/fingerprint*.go` | The Unix file fingerprint (size, mtime, ctime, inode, device) shared by every cached source, moved out of the LM Studio cache (Decision 26) |
 | `internal/sessions/lister.go`, `resolver.go`, `types.go` | New source, listing fields, all-projects resolution, de-duplication, ordering |
 | `internal/sessions/parse.go` (new) | `ParseResolved`, shared by CLI and web |
 | `internal/agents/kiro/logs/session.go`, `discover.go` | `GetSessionByID`; deterministic tie order in `DiscoverAll` |
@@ -419,7 +419,7 @@ Warning codes: `malformed_line`, `oversized_line`, `thread_mismatch`, `item_deco
 
 The rune plan has four PR phases: shared JSON sessions/provider (tasks 1–4), listing across projects (5–8), exec streams (9–14), then unchanged-refresh caching (15–16). Requirement 5.9 remains unfinished until the fourth slice passes.
 
-Streams split transcript/projection work, sessions/CLI/web work, and the isolated fingerprint package. Dependencies serialize shared files: listing follows the session CLI, exec rendering follows listing projection, direct exec CLI follows scope wiring, and fingerprint module mutations follow the validator's go.mod/go.sum changes. README/CHANGELOG updates and Makefile checks ride with each slice's last implementation task. Documents and local implementation admissions are agent decisions; no design/tasks human approval is recorded.
+Streams split transcript/projection work, sessions/CLI/web work, and the fingerprint tests. Dependencies serialize shared files: listing follows the session CLI, exec rendering follows listing projection and direct exec CLI follows scope wiring. README/CHANGELOG updates and Makefile checks ride with each slice's last implementation task. Documents and local implementation admissions are agent decisions; no design/tasks human approval is recorded.
 
 ## Error Handling
 

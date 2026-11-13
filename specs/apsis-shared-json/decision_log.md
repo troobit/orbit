@@ -70,7 +70,7 @@
 | Q64 | 2026-11-05 | Keep current Claude-model and Kiro-IDE-provider omission inside approved scope | Possible scope expansions, later answered as U1 (Q92) and U2 (Q93) |
 | Q65 | 2026-11-05 | Admit the test-only schema validator as a reversible local technical choice | Both design drafts and non-author reviews support it; the user approved it as U3 (Q94) |
 | Q66 | 2026-11-05 | Publish the complete known v1 schema initially, with an unknown-block extension branch (Decision 25) | Initial-schema validation must keep accepting later producers; a mutable upstream $id cannot update a cached validator |
-| Q67 | 2026-11-05 | Isolate metadata fingerprints in internal/fileidentity (Decision 26) | Separate native tests and disjoint package ownership let the cache capability gate run without blocking sessions work |
+| Q67 | 2026-11-05 | Share the existing Unix fingerprint across every cached source instead of a new package (Decision 26) | With Windows out of scope a separate package duplicates the LM Studio fingerprint |
 | Q68 | 2026-11-05 | Four PR slices and three streams; module writes serialized after task 3.2 (Decision 27) | Native Windows blocks cache only, and go.mod/go.sum have one writer at a time |
 | Q69 | 2026-11-05 | Record reproducible synthetic benchmark dimensions and cold/warm measurements; 1.5 s is only an investigation budget | No evidence supports a host-independent timing acceptance test; zero unchanged body reads stays mandatory |
 | Q70 | 2026-11-05 | Report Kiro CLI's actual matched database key in project scope and inject all-project discovery too | Current GetSession returns only a reader; listKiro's all-projects path bypasses its discover injection, so both need explicit coverage |
@@ -892,7 +892,7 @@ The indexed rollout must be the one that source/identifier opening reaches. Keep
 
 **ID**: 23
 **Date**: 2026-11-05
-**Status**: proposed; human scoped to Unix and macOS 2026-11-13; unimplemented
+**Status**: proposed; human scoped to Unix and macOS 2026-11-13; implemented 2026-11-13, awaiting verification by an agent other than its author
 
 ### Context
 
@@ -900,7 +900,7 @@ Requirement 5.9 requires zero body reads on unchanged refreshes and detection of
 
 ### Decision
 
-Keep the long-lived mutex-guarded Lister cache, companion absence keys and fresh result slices. Fingerprint files with Unix identity/change stat fields (size, mtime, ctime, inode, device) through a platform adapter, using metadata only; never silently downgrade to size/mtime. Gate cache consumers on early adapter tests, including equal-size replacement on a real Unix filesystem. If required metadata is unavailable, the file is not cached.
+Keep the long-lived mutex-guarded Lister cache, companion absence keys and fresh result slices. Fingerprint files with Unix identity/change stat fields (size, mtime, ctime, inode, device) using metadata only; never silently downgrade to size/mtime. Gate cache consumers on early adapter tests, including equal-size replacement on a real Unix filesystem. If required metadata is unavailable, the file is not cached.
 
 ### Rationale
 
@@ -997,35 +997,36 @@ Later slices do not invalidate consumers holding the first schema, and malformed
 
 ---
 
-## Decision 26: Isolate Fingerprint Adapters for Independent Native Verification
+## Decision 26: Reuse the Existing Unix Fingerprint for the Listing Cache
 
 **ID**: 26
 **Date**: 2026-11-05
-**Status**: proposed; local technical admission
+**Status**: proposed; implemented 2026-11-13, awaiting verification by an agent other than its author
 
 ### Context
 
-Decision 23 requires Unix identity/change evidence before cache admission. The design originally put the adapter inside sessions, where parallel list/open work also compiles and edits files.
+Decision 23 requires Unix identity/change fingerprints before cache admission. The LM Studio cache already fingerprints files by size, mtime, ctime, inode and device (`statFingerprint`), and `golang.org/x/sys` is already a direct requirement. A separate `internal/fileidentity` package was planned to keep parallel work apart, but with Windows out of scope it would duplicate that function.
 
 ### Decision
 
-Place the metadata-only interface and Unix adapter in internal/fileidentity; the sessions cache consumes it. Preserve unsupported/error outcomes. Test equal-size replacement and in-place rewrite with restored mtime on Unix as well as through injected adapters. Task 15.2 waits for schema task 3.2 before editing go.mod/go.sum and promotes x/sys to direct.
+Move the LM Studio cache's fingerprint into shared files in `internal/sessions` (`fingerprint.go`, `fingerprint_unix.go`, `fingerprint_other.go`) and use it for every source. Add a companion fingerprint that records a missing file as absent. Platforms without the stat fields report files as not cacheable, so nothing is cached there. Test equal-size replacement and in-place rewrite with restored mtime on a real Unix filesystem.
 
 ### Rationale
 
-This reviewed package placement keeps ownership disjoint and makes the fingerprint check runnable without the full sessions stack. It changes placement, not Decision 23's fingerprint or cache contract.
+One fingerprint means one definition of "unchanged" for all sources, and no new package or module change is needed.
 
 ### Alternatives Considered
 
-- **Keep the adapters in sessions:** rejected because the independent capability stream then shares a changing package and heavier native test dependencies with listing work.
-- **Reuse transcript follow-mode file info:** rejected because its Windows identity is absent and it has different lifecycle needs.
+- **A new `internal/fileidentity` package:** rejected because it would duplicate the existing fingerprint for no remaining benefit.
+- **Reuse transcript follow-mode file info:** rejected because it has different lifecycle needs.
 - **Use size/mtime only:** rejected because preserved-mtime replacement/rewrite is the reason for the capability gate.
 
 ### Consequences
 
-**Positive:** verification has a small target; cache consumers share one adapter; sessions and fingerprint implementation can progress separately.
+**Positive:** every source shares one tested fingerprint; the LM Studio cache and the listing cache cannot disagree about change detection.
 
-**Negative:** one additional internal package is introduced; module mutation is serialized.
+**Negative:** the LM Studio cache's types are renamed, so its tests changed with them.
+
 ---
 
 ## Decision 27: Separate Delivery Slices and Preserve Canonical Task Identity
