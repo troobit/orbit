@@ -71,7 +71,7 @@
 | Q65 | 2026-11-05 | Admit the test-only schema validator as a reversible local technical choice | Both design drafts and non-author reviews support it; the user approved it as U3 (Q94) |
 | Q66 | 2026-11-05 | Publish the complete known v1 schema initially, with an unknown-block extension branch (Decision 25) | Initial-schema validation must keep accepting later producers; a mutable upstream $id cannot update a cached validator |
 | Q67 | 2026-11-05 | Share the existing Unix fingerprint across every cached source instead of a new package (Decision 26) | With Windows out of scope a separate package duplicates the LM Studio fingerprint |
-| Q68 | 2026-11-05 | Four PR slices and three streams; module writes serialized after task 3.2 (Decision 27) | Native Windows blocks cache only, and go.mod/go.sum have one writer at a time |
+| Q68 | 2026-11-05 | Four PR slices and three streams; module writes serialized after task 3.2 (Decision 27) | go.mod/go.sum have one writer at a time, and the cache slice comes last |
 | Q69 | 2026-11-05 | Record reproducible synthetic benchmark dimensions and cold/warm measurements; 1.5 s is only an investigation budget | No evidence supports a host-independent timing acceptance test; zero unchanged body reads stays mandatory |
 | Q70 | 2026-11-05 | Report Kiro CLI's actual matched database key in project scope and inject all-project discovery too | Current GetSession returns only a reader; listKiro's all-projects path bypasses its discover injection, so both need explicit coverage |
 | Q71 | 2026-11-05 | Shared JSON alone enables ParseOptions.AllowEmptyCodex through backward-compatible parser options | Header-only Codex currently errors; retain legacy acceptance/errors while the new format preserves header metadata with entries: [] |
@@ -100,7 +100,7 @@
 | Q94 | 2026-11-05 | U3 answered by the user: add `github.com/santhosh-tekuri/jsonschema/v6`, imported only from `_test.go` files | A maintained Draft 2020-12 validator checks fixtures; it stays out of the binaries (Decision 25) |
 | Q95 | 2026-11-05 | U4 answered by the user: the Codex model appears in shared JSON and listings only; Markdown and HTML headers show the provider without it until a follow-up amends 5.1 | Meets approved 1.6 without changing protected Codex output |
 | Q96 | 2026-11-05 | U5 answered by the user: Copilot's `producer` is not mapped to origin | It records the program that wrote the log rather than a client entry point, and does not tell sessions apart |
-| Q97 | 2026-11-05 | The user approved design and tasks; PR 4 (unchanged-refresh cache, former tasks 15–16) moves to `tasks-cache.md`, and orbit drives `tasks.md` (PR 1–3) with local commits | `orbit run` re-runs a phase whose tasks cannot complete (orbit `specs/run-termination/`), and task 15.2 needs native Windows evidence; a separate file lets PR 1–3 run unattended and PR 4 run once that evidence exists |
+| Q97 | 2026-11-05 | The user approved design and tasks; PR 4 (unchanged-refresh cache, former tasks 15–16) moves to `tasks-cache.md`, and orbit drives `tasks.md` (PR 1–3) with local commits | `orbit run` re-runs a phase whose tasks cannot complete (orbit `specs/run-termination/`), so a separate file keeps PR 4 apart from PR 1–3, which orbit runs unattended |
 | Q98 | 2026-11-05 | Agent decision (task 3): the closed test copy of the schema adds `unevaluatedProperties: false`, not `additionalProperties: false`, to the apsis-owned definitions | Listing rows and blocks reuse shared definitions through `$ref`, which `additionalProperties` cannot see, so it would reject valid rows; `unevaluatedProperties` closes composed objects correctly |
 | Q99 | 2026-11-05 | Agent decision (task 3): `sharedjson.SessionContext` carries `Source`, `ID` and `Resolved` only; the canonical input path joins it with its first consumer, exec-stream project assignment | superseded by Q110 |
 | Q100 | 2026-11-05 | Agent decision (task 3): `other` blocks carry `source_type` only when the parsed item records a type | Avoids inventing a value for an untyped item; the field stays defined for every recorded kind |
@@ -1032,32 +1032,32 @@ One fingerprint means one definition of "unchanged" for all sources, and no new 
 ## Decision 27: Separate Delivery Slices and Preserve Canonical Task Identity
 
 **ID**: 27
-**Date**: 2026-11-05
+**Date**: 2026-11-14
 **Status**: accepted; human-approved 2026-11-13 with one amendment: Windows is out of scope and no native Windows gate applies (Decision 23)
 
 ### Context
 
-The Codex draft's predecessor chain blocks listing and exec work on unavailable Windows evidence and groups too many behaviours together. The Claude draft has useful PR boundaries and red/green pairs, but its independent module writers conflict. Existing canonical tasks carry stable identities and one live baseline owner.
+The Codex draft's single predecessor chain makes listing and exec work wait on the cache slice and groups too many behaviours together. The Claude draft has useful PR boundaries and red/green pairs, but its independent module writers conflict. Existing canonical tasks carry stable identities and one live baseline owner.
 
 ### Decision
 
-Merge four PR phases: shared JSON/provider, cross-project listing, exec streams, then cache. Keep fifteen adjacent red/green child pairs under sixteen parents. Preserve canonical numbered/stable IDs 1–11 and every status/owner; retain the byte-exact earlier file and scope map. Streams cover transcript/projection, sessions/CLI/web, and isolated fingerprints. Block shared-file consumers explicitly; task 15.2's module writes wait for task 3.2. Requirement 5.9 stays unfinished until the cache slice passes.
+Merge four PR phases: shared JSON/provider, cross-project listing, exec streams, then cache. Keep adjacent red/green child pairs under their parents. Preserve canonical numbered/stable IDs 1–11 and every status/owner; retain the byte-exact earlier file and scope map. Streams cover transcript/projection, sessions/CLI/web, and the shared fingerprint and cache. Block shared-file consumers explicitly; the cache slice's module writes wait for task 3.2. Requirement 5.9 stays unfinished until the cache slice passes.
 
 Each PR's last green task includes its README/CHANGELOG changes and Makefile checks. Benchmarks record fixture dimensions, platform/filesystem and cold/warm measurements; any 1.5 s local budget prompts investigation only. Zero unchanged transcript-body bytes remains a hard assertion. No commits, pushes, CI changes or policy relaxations are admitted here.
 
 ### Rationale
 
-The task list can advance reviewed local implementation without destroying provenance or making unrelated work depend on absent native evidence. Both non-author task cross-reviews supply the corrective evidence; a fresh critique and peer review must assess this merged revision before implementation admission beyond the separately verified baseline repair.
+The task list can advance reviewed local implementation without destroying provenance or making unrelated work depend on the cache slice. Both non-author task cross-reviews supply the corrective evidence; a fresh critique and peer review must assess this merged revision before implementation admission beyond the separately verified baseline repair.
 
 ### Alternatives Considered
 
-- **Keep the single predecessor chain:** rejected because it makes Windows a prerequisite for work the design leaves ungated.
+- **Keep the single predecessor chain:** rejected because it makes listing and exec work depend on the cache slice.
 - **Replace canonical tasks with the draft:** rejected because generated draft IDs/pending status would erase original ownership and identity.
 - **One stream per PR with independent module writes:** rejected because the CLI/schema/module files overlap across PR boundaries.
 
 ### Consequences
 
-**Positive:** first three slices progress independently of native Windows; small paired work units and preserved provenance support review; shared module writes are ordered.
+**Positive:** first three slices progress independently of the cache slice; small paired work units and preserved provenance support review; shared module writes are ordered.
 
 **Negative:** the feature remains incomplete after PR 3 because 5.9 waits for PR 4; cross-stream test runs need compile coordination; four slices require more integration checkpoints.
 

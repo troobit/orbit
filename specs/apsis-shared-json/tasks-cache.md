@@ -21,7 +21,7 @@ references:
     - References: internal/sessions/cache_test.go
   - [x] 1.2. Move the fingerprint out of the LM Studio cache <!-- id:9kwhrpb -->
     - `fileFingerprint`, `fingerprintFile` and `statFingerprint` move to `fingerprint.go`, `fingerprint_unix.go` and `fingerprint_other.go`; add a companion fingerprint that records absence
-    - Run the tests on a real Unix filesystem. If the WAL test fails, record the fallback for task 16: run the Kiro discover query on every refresh and count its page reads against 5.9
+    - Run the tests on a real Unix filesystem. If the WAL test fails, record the fallback for task 2: run the Kiro discover query on every refresh and count its page reads against 5.9
     - Blocked-by: 9kwhrpa (Write failing fingerprint and WAL-change tests), 9kwhron
     - Stream: 3
     - Requirements: [5.9](requirements.md#5.9)
@@ -46,9 +46,9 @@ references:
   - [x] 2.2. Implement the fingerprint-keyed cache in the Lister <!-- id:9kwhrpd -->
     - internal/sessions/cache.go: one mutex held for the whole pass; enumerate and fingerprint without opening bodies; entries keyed by path with companion fingerprints including absence; restat after extraction; sweep unseen entries; return fresh slices
     - The long-lived Lister in apsis serve carries the cache; CLI commands keep a per-command Lister
-    - Apply the recorded fallbacks if the task 13 or task 16 benchmarks or the task 15 WAL test require them
+    - Apply the recorded fallbacks if the task 13 benchmark in `tasks.md` or the task 1 WAL test require them
     - CHANGELOG `[Unreleased]`: unchanged serve refreshes no longer re-read transcripts
-    - Do not claim 5.9 until task 15.2 passes. If the WAL assumption fails, audit metadata-only discover queries/page reads and preserve the zero transcript-body-byte assertion; any relaxation requires a requirements decision. Run make test, make lint and make build; use -race for the concurrent cache test.
+    - Do not claim 5.9 until the task 1 tests and the zero-read assertions pass. If the WAL assumption fails, audit metadata-only discover queries/page reads and preserve the zero transcript-body-byte assertion; any relaxation requires a requirements decision. Run make test, make lint and make build; use -race for the concurrent cache test.
     - Blocked-by: 9kwhrpc (Write failing zero-read refresh tests)
     - Stream: 2
     - Requirements: [5.1](requirements.md#5.1), [5.9](requirements.md#5.9)
