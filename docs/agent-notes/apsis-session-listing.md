@@ -128,3 +128,16 @@ Key details:
 - Action states: Success, Accepted, Rejected, Error, Canceled, Running
 - `runCommand` actions have `output.output` (string) and `output.exitCode` (number)
 - File modification actions (`replace`, `create`, `append`) use `kiro-diff://` URIs — actual diff content is stored separately
+
+## Listing cache (Decision 23, 26)
+
+`Lister` holds a `fileCache` (`internal/sessions/cache.go`) and a mutex taken for each whole `ListAll` pass. `cached(cache, key, files, compute)` returns the stored result while every file's fingerprint (`fingerprint*.go`: size, mtime, ctime, inode, device; a missing companion is recorded as absent) is unchanged. Only per-file body reads go through it: Claude head, Codex head, Copilot `workspace.yaml`, Kiro IDE `.chat` header, Codex exec probe, and the Kiro CLI discover result (keyed by `data.sqlite3`, `-wal`, `-journal`; per project directory).
+
+- Directory walks, stats, duplicate selection, exec identifiers and repository roots are recomputed every pass. Only extraction is cached, so new, removed and moved files show at once.
+- A result is stored only when `compute` succeeds and no fingerprint changed during it. Errors are never stored, except outcomes the extractor returns as values (Codex head scan errors, the Claude mtime fallback, a `.chat` file that decodes to no execution).
+- `endPass` drops entries the pass did not use. A project-scope pass therefore sweeps entries only an all-projects pass visits.
+- Kiro CLI is cached only with the real database path, or with `kiroDBPath` injected; injected discovery alone never is, so tests do not fingerprint a developer's real database.
+- `fingerprintFile` is a var; tests replace it. `fileCache.onCompute` reports each extraction, which is how `cache_test.go` asserts a zero-read pass. The Resolver does not use the cache.
+- `fingerprint_other.go` reports every file as not cacheable, so non-Unix platforms never hit.
+
+Benchmark evidence (`BenchmarkListAll_KiroIDE`, 2026-11-13, darwin/arm64 Apple M5 Pro, APFS): 500 generated `.chat` files in 10 workspaces, 201 messages each (about 85 KB), all-projects scope. Cold cache 47 ms/op, 99 MB allocated; warm cache 1.6 ms/op, 1 MB. This is far inside the 1.5 s local budget, so no streaming decoder was needed. Run with `go test ./internal/sessions/ -run '^$' -bench BenchmarkListAll_KiroIDE -benchmem`.

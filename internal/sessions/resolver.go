@@ -298,7 +298,7 @@ func (r *Resolver) locateKiroIDE(sessionID string) (string, error) {
 	if err != nil {
 		return "", notFound
 	}
-	all, err := kiroIDEAllCandidates(base)
+	all, err := kiroIDEAllCandidates(nil, base)
 	if err != nil || len(all[sessionID]) == 0 {
 		return "", notFound
 	}
@@ -309,7 +309,7 @@ func (r *Resolver) locateKiroIDE(sessionID string) (string, error) {
 // one workspace. Symlinks resolving outside the workspace are skipped inside
 // the scan, so they cannot shadow legitimate files.
 func (r *Resolver) findKiroIDEPath(workspaceDir, sessionID string) (string, error) {
-	best, err := kiroIDEWorkspaceCandidates(workspaceDir)
+	best, err := kiroIDEWorkspaceCandidates(nil, workspaceDir)
 	if err != nil {
 		return "", err
 	}

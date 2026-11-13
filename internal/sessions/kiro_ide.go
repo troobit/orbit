@@ -58,11 +58,37 @@ func bestKiroIDECandidate(candidates []kiroIDECandidate) kiroIDECandidate {
 	return best
 }
 
+// kiroIDEHead is what a .chat file's header yields. An empty executionID marks
+// a file that cannot be read, cannot be decoded or records no execution; it is
+// skipped, and that outcome is as cacheable as any other.
+type kiroIDEHead struct {
+	executionID string
+	entryCount  int
+	metadata    kiroIDEMetadata
+}
+
+// readKiroIDEHead decodes the whole .chat file, as listing always has.
+func readKiroIDEHead(path string) kiroIDEHead {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return kiroIDEHead{}
+	}
+	var header kiroIDEChatHeader
+	if err := json.Unmarshal(data, &header); err != nil || header.ExecutionID == "" {
+		return kiroIDEHead{}
+	}
+	head := kiroIDEHead{executionID: header.ExecutionID, entryCount: len(header.Chat)}
+	if header.Metadata != nil {
+		head.metadata = *header.Metadata
+	}
+	return head
+}
+
 // kiroIDEWorkspaceCandidates reads the .chat files of one workspace and keeps
 // the best candidate per execution ID. Files that cannot be read or decoded,
 // that record no execution ID, or that are symlinks escaping the workspace are
 // skipped.
-func kiroIDEWorkspaceCandidates(workspaceDir string) (map[string]kiroIDECandidate, error) {
+func kiroIDEWorkspaceCandidates(cache *fileCache, workspaceDir string) (map[string]kiroIDECandidate, error) {
 	entries, err := os.ReadDir(workspaceDir)
 	if err != nil {
 		return nil, fmt.Errorf("read kiro ide workspace: %w", err)
@@ -82,30 +108,26 @@ func kiroIDEWorkspaceCandidates(workspaceDir string) (map[string]kiroIDECandidat
 			}
 		}
 
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		var header kiroIDEChatHeader
-		if err := json.Unmarshal(data, &header); err != nil || header.ExecutionID == "" {
-			continue
-		}
 		info, err := entry.Info()
 		if err != nil {
+			continue
+		}
+		head, err := cached(cache, "kiro-ide:"+path, []string{path}, func() (kiroIDEHead, error) {
+			return readKiroIDEHead(path), nil
+		})
+		if err != nil || head.executionID == "" {
 			continue
 		}
 
 		candidate := kiroIDECandidate{
 			path:       path,
-			entryCount: len(header.Chat),
+			entryCount: head.entryCount,
 			mtime:      info.ModTime(),
 			size:       info.Size(),
+			metadata:   head.metadata,
 		}
-		if header.Metadata != nil {
-			candidate.metadata = *header.Metadata
-		}
-		if existing, ok := best[header.ExecutionID]; !ok || betterKiroIDECandidate(candidate, existing) {
-			best[header.ExecutionID] = candidate
+		if existing, ok := best[head.executionID]; !ok || betterKiroIDECandidate(candidate, existing) {
+			best[head.executionID] = candidate
 		}
 	}
 	return best, nil
@@ -113,7 +135,7 @@ func kiroIDEWorkspaceCandidates(workspaceDir string) (map[string]kiroIDECandidat
 
 // kiroIDEAllCandidates returns, per execution ID, the best candidate of each
 // workspace under base, in workspace order. Unreadable workspaces are skipped.
-func kiroIDEAllCandidates(base string) (map[string][]kiroIDECandidate, error) {
+func kiroIDEAllCandidates(cache *fileCache, base string) (map[string][]kiroIDECandidate, error) {
 	entries, err := os.ReadDir(base)
 	if err != nil {
 		return nil, fmt.Errorf("read kiro ide base: %w", err)
@@ -124,7 +146,7 @@ func kiroIDEAllCandidates(base string) (map[string][]kiroIDECandidate, error) {
 		if !entry.IsDir() {
 			continue
 		}
-		best, err := kiroIDEWorkspaceCandidates(filepath.Join(base, entry.Name()))
+		best, err := kiroIDEWorkspaceCandidates(cache, filepath.Join(base, entry.Name()))
 		if err != nil {
 			continue
 		}
