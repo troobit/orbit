@@ -1,7 +1,11 @@
 package transcript
 
 import (
+	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -394,4 +398,34 @@ func TestParseLMStudioRecords_WallTimes(t *testing.T) {
 func TestParseLMStudioRecords_ReadError(t *testing.T) {
 	_, _, _, err := ParseLMStudioRecords(failingReader{strings.NewReader("[2026-03-02 09:00:00][INFO] x\n")}, utcZone)
 	require.Error(t, err)
+}
+
+// Listing reads files through SummarizeLMStudio, so it must report what the
+// full parse reports for every fixture.
+func TestSummarizeLMStudioMatchesFullParse(t *testing.T) {
+	t.Parallel()
+	paths, err := filepath.Glob("testdata/lmstudio/*.log")
+	require.NoError(t, err)
+	require.NotEmpty(t, paths)
+	for _, path := range paths {
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			t.Parallel()
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+			full, err := ParseLMStudio(bytes.NewReader(data))
+			require.NoError(t, err)
+			got, err := SummarizeLMStudio(bytes.NewReader(data))
+			require.NoError(t, err)
+
+			var want []LMStudioRequestSummary
+			for _, req := range full.LMStudioRequests {
+				want = append(want, LMStudioRequestSummary{
+					StartLine: req.StartLine, Size: req.Size, ResolvedTime: req.ResolvedTime, Model: req.Model, ThreadID: req.ThreadID,
+				})
+			}
+			assert.Equal(t, want, got.Requests)
+			assert.Equal(t, slices.ContainsFunc(full.Entries, func(e Entry) bool { return e.Unattributed }), got.HasLogEntries)
+			assert.Equal(t, full.Metadata.TimeZone, got.TimeZone)
+		})
+	}
 }

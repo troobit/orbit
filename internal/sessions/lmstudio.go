@@ -215,13 +215,13 @@ func summarizeLMStudioFile(file lmLogFile) (lmFileSummary, error) {
 		return lmFileSummary{}, err
 	}
 	defer func() { _ = f.Close() }()
-	res, err := transcript.ParseLMStudio(f)
+	res, err := transcript.SummarizeLMStudio(f)
 	if err != nil {
 		return lmFileSummary{}, err
 	}
 
-	s := lmFileSummary{timeZone: res.Metadata.TimeZone}
-	for _, req := range res.LMStudioRequests {
+	s := lmFileSummary{timeZone: res.TimeZone}
+	for _, req := range res.Requests {
 		s.requests = append(s.requests, lmRequestSummary{
 			id:        lmRequestID(file.key, req.StartLine),
 			threadID:  req.ThreadID,
@@ -230,7 +230,7 @@ func summarizeLMStudioFile(file lmLogFile) (lmFileSummary, error) {
 			model:     req.Model,
 		})
 	}
-	empty := len(res.LMStudioRequests) == 0 && len(res.Entries) == 0
+	empty := len(res.Requests) == 0 && !res.HasLogEntries
 	for _, w := range res.Warnings {
 		switch {
 		case w.Code == transcript.WarningTimeZone:

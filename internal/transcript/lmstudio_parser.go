@@ -166,6 +166,8 @@ type lmParser struct {
 	entries     []Entry
 	warnings    []ParseWarning
 	unsupported []*lmUnsupported // first-seen order
+	summary     bool             // listing pass: keep request metadata only
+	sawLog      bool             // summary pass: a record that would have produced an unattributed entry
 }
 
 // ParseLMStudioRecords parses one LM Studio log file or stream: included
@@ -347,6 +349,10 @@ func (p *lmParser) record(rec *lmRecord) {
 		p.warn(rec.start, WarningUnrecognizedRecord, fmt.Sprintf("record names %s but is not a recognised request record (%s)", path, rec.lines()))
 	}
 	if tail, ok := lmResponseBody(rec.message); ok {
+		if p.summary {
+			p.sawLog = true
+			return
+		}
 		p.response(rec, tail)
 		return
 	}
@@ -354,11 +360,19 @@ func (p *lmParser) record(rec *lmRecord) {
 		p.warn(rec.start, WarningUnrecognizedRecord, fmt.Sprintf("record looks like a logged response but has no recognised marker (%s)", rec.lines()))
 	}
 	if m := lmPostPathPattern.FindStringSubmatch(rec.message); m != nil && !lmIncludedEndpoints[m[1]] && !lmExcludedEndpoints[m[1]] {
+		if p.summary {
+			p.sawLog = true
+			return
+		}
 		p.unsupportedEndpoint(rec, m[1])
 		return
 	}
 	switch strings.ToUpper(rec.level) {
 	case "WARN", "WARNING", "ERROR":
+		if p.summary {
+			p.sawLog = true
+			return
+		}
 		p.diagnostic(rec)
 	default:
 		p.headerLikeLines(rec)
@@ -416,7 +430,9 @@ func (p *lmParser) request(rec *lmRecord, endpoint string, hasBody bool, tail st
 		body, req.BodyState = p.decodeBody(rec, tail, "request")
 	}
 
-	if body != nil {
+	if body != nil && p.summary {
+		req.Model, req.ThreadID = lmRequestIdentity(body)
+	} else if body != nil {
 		tr := translateLMRequest(endpoint, body, "req:"+req.ID+":")
 		req.Model = tr.model
 		req.ThreadID, req.ParentThreadID, req.RequestKind = tr.threadID, tr.parentThreadID, tr.requestKind
@@ -623,4 +639,65 @@ func annotateExtensions(requests []LMStudioRequest, entriesByRequest map[string]
 			req.ContextDiscontinuity = true
 		}
 	}
+}
+
+// lmRequestIdentity reads only the recorded model and thread identifier from
+// a request body, skipping the translation listing does not use.
+func lmRequestIdentity(body json.RawMessage) (model, threadID string) {
+	fields, ok := orderedFields(body)
+	if !ok {
+		return "", ""
+	}
+	if raw, ok := fieldValue(fields, "model"); ok {
+		model, _ = jsonString(raw)
+	}
+	if raw, ok := fieldValue(fields, "client_metadata"); ok {
+		threadID, _, _ = lmClientMetadata(raw)
+	}
+	return model, threadID
+}
+
+// LMStudioRequestSummary is the listing metadata of one included request.
+type LMStudioRequestSummary struct {
+	StartLine    int
+	Size         int
+	ResolvedTime time.Time // zero when the wall time has no unique instant
+	Model        string
+	ThreadID     string
+}
+
+// LMStudioFileSummary is what a listing pass needs from one log file.
+type LMStudioFileSummary struct {
+	Requests      []LMStudioRequestSummary // source order
+	HasLogEntries bool                     // a response, WARN/ERROR or unsupported-endpoint record exists
+	Warnings      []ParseWarning           // text outside records, and the one time-zone warning
+	TimeZone      string
+}
+
+// SummarizeLMStudio reads one log file for listing. It lexes records and
+// decodes each request body for its model and thread identifier, but builds no
+// entries, digests or translation warnings, so a listing refresh of a growing
+// log costs far less than ParseLMStudio. Its requests match ParseLMStudio's
+// by start line, size, time, model and thread.
+func SummarizeLMStudio(r io.Reader) (*LMStudioFileSummary, error) {
+	zone := zoneFromEnvironment()
+	p := &lmParser{zone: zone, summary: true, requests: []LMStudioRequest{}, entries: []Entry{}, warnings: []ParseWarning{}}
+	if err := p.lex(r); err != nil {
+		return nil, err
+	}
+	out := &LMStudioFileSummary{HasLogEntries: p.sawLog, TimeZone: zone.label}
+	for _, req := range p.requests {
+		out.Requests = append(out.Requests, LMStudioRequestSummary{
+			StartLine: req.StartLine, Size: req.Size, ResolvedTime: req.ResolvedTime, Model: req.Model, ThreadID: req.ThreadID,
+		})
+	}
+	for _, w := range p.warnings {
+		if w.Code == WarningUnparsedText {
+			out.Warnings = append(out.Warnings, w)
+		}
+	}
+	if zone.warning != "" {
+		out.Warnings = append([]ParseWarning{{Code: WarningTimeZone, Message: zone.warning}}, out.Warnings...)
+	}
+	return out, nil
 }
