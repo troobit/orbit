@@ -244,6 +244,14 @@ func summarizeLMStudioFile(file lmLogFile) (lmFileSummary, error) {
 }
 
 // lmCache keeps file summaries across listing passes within one process.
+//
+// It does not reuse cached[T] because the two differ in ways that tests and
+// callers depend on: lmCache has its own mutex and no pass lifecycle, so
+// buildLMStudioIndex works without a Lister (a nil cache, or overlapping
+// passes sharing one lmCache), while fileCache relies on Lister.mu plus
+// beginPass/endPass. A fingerprint error here is reported as an unreadable
+// file (WarningPathUnreadable); cached[T] treats it as a miss and computes.
+// Pruning is by index membership, not by pass.
 type lmCache struct {
 	mu      sync.Mutex
 	entries map[string]lmCacheEntry // canonical path -> fingerprint and summary

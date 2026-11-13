@@ -261,12 +261,11 @@ Cache a lightweight per-file summary (thread groupings, request counts, first-kn
 
 ### Rationale
 
-The user chose to descope native Windows fingerprinting for this feature rather than repeat the sibling's unresolved verification blocker. The Unix fingerprint is not itself blocked — unlike Windows, Unix/macOS development hardware is available, so building and testing it carries none of the sibling's stalled risk. An always-miss cache on other platforms keeps correctness identical everywhere (no risk of a weak heuristic serving stale data); it only forgoes the performance optimisation there, which the requirement's wording ("within one apsis serve process") does not make a correctness requirement.
+An always-miss cache on other platforms keeps correctness identical everywhere (no risk of a weak heuristic serving stale data); it only forgoes the performance optimisation there, which the requirement's wording ("within one apsis serve process") does not make a correctness requirement.
 
 ### Alternatives Considered
 
 - **Size+mtime heuristic on every platform:** rejected because it reintroduces exactly the false-cache-hit risk the sibling spec's Decision 23 already rejected for the same problem, for no platform-coverage benefit over the always-miss stub.
-- **Full native fingerprint including Windows:** rejected because it repeats the sibling's unverified native-Windows blocker and the user explicitly asked to descope Windows for simplicity.
 - **Persist an index on disk:** rejected because it introduces stored identifiers and a cache-format lifecycle without demonstrated need.
 - **Require a fixed time budget for a fixed byte volume everywhere:** rejected because hardware, record count and payload shape affect runtime and no reference environment was agreed.
 
@@ -279,7 +278,7 @@ The user chose to descope native Windows fingerprinting for this feature rather 
 
 **Negative:**
 
-- Windows `apsis serve` re-reads the configured root's bodies on every refresh; large unthreaded roots pay that cost repeatedly on that platform.
+- On non-Unix platforms `apsis serve` re-reads the configured root's bodies on every refresh; large unthreaded roots pay that cost repeatedly.
 - Each new CLI process still pays cold parsing cost, matching every other source's existing per-invocation behaviour.
 
 ---

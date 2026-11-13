@@ -793,6 +793,10 @@ const (
 
 // readClaudeHead returns the first nonempty cwd and entrypoint within the
 // first claudeHeadLines lines and claudeHeadBytes bytes of a Claude transcript.
+// It ignores scanner errors, so a read failure after the timestamp scan has
+// succeeded can cache partial project or origin until the file changes. This is
+// accepted: such a failure after a successful open is rare, and changing the
+// file refreshes the entry.
 func readClaudeHead(r io.Reader) (cwd, entrypoint string) {
 	scanner := bufio.NewScanner(io.LimitReader(r, claudeHeadBytes))
 	scanner.Buffer(make([]byte, 0, 64*1024), claudeHeadBytes+1)

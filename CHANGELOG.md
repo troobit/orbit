@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The listing cache specs and agent notes drop Windows-specific cache wording, record why the LM Studio cache stays separate from the generic one, and document that a read failure mid-scan can cache partial Claude project and origin metadata until the file changes.
 - The `apsis serve` listing warning banner now refreshes with the session list.
 - The LM Studio log support spec clarifies truncated thread identifiers, discovery identifier scope, and unsupported POST path handling, and consolidates its decision log.
 

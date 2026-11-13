@@ -70,7 +70,7 @@
 | Q64 | 2026-11-05 | Keep current Claude-model and Kiro-IDE-provider omission inside approved scope | Possible scope expansions, later answered as U1 (Q92) and U2 (Q93) |
 | Q65 | 2026-11-05 | Admit the test-only schema validator as a reversible local technical choice | Both design drafts and non-author reviews support it; the user approved it as U3 (Q94) |
 | Q66 | 2026-11-05 | Publish the complete known v1 schema initially, with an unknown-block extension branch (Decision 25) | Initial-schema validation must keep accepting later producers; a mutable upstream $id cannot update a cached validator |
-| Q67 | 2026-11-05 | Share the existing Unix fingerprint across every cached source instead of a new package (Decision 26) | With Windows out of scope a separate package duplicates the LM Studio fingerprint |
+| Q67 | 2026-11-05 | Share the existing Unix fingerprint across every cached source instead of a new package (Decision 26) | A separate package duplicates the LM Studio fingerprint |
 | Q68 | 2026-11-05 | Four PR slices and three streams; module writes serialized after task 3.2 (Decision 27) | go.mod/go.sum have one writer at a time, and the cache slice comes last |
 | Q69 | 2026-11-05 | Record reproducible synthetic benchmark dimensions and cold/warm measurements; 1.5 s is only an investigation budget | No evidence supports a host-independent timing acceptance test; zero unchanged body reads stays mandatory |
 | Q70 | 2026-11-05 | Report Kiro CLI's actual matched database key in project scope and inject all-project discovery too | Current GetSession returns only a reader; listKiro's all-projects path bypasses its discover injection, so both need explicit coverage |
@@ -896,7 +896,7 @@ The indexed rollout must be the one that source/identifier opening reaches. Keep
 
 ### Context
 
-Requirement 5.9 requires zero body reads on unchanged refreshes and detection of changed inputs. Size/mtime alone can miss equal-size replacements preserving modification time. Windows is out of scope (human decision 2026-11-13); macOS and Linux are the supported platforms.
+Requirement 5.9 requires zero body reads on unchanged refreshes and detection of changed inputs. Size/mtime alone can miss equal-size replacements preserving modification time.
 
 ### Decision
 
@@ -904,7 +904,7 @@ Keep the long-lived mutex-guarded Lister cache, companion absence keys and fresh
 
 ### Rationale
 
-Unix stat metadata preserves the no-body-read outcome without pretending that a weak key detects replacements. Windows is not a supported platform, so no Windows adapter or native evidence is required.
+Unix stat metadata preserves the no-body-read outcome without pretending that a weak key detects replacements.
 
 ### Alternatives Considered
 
@@ -921,8 +921,9 @@ Unix stat metadata preserves the no-body-read outcome without pretending that a 
 
 **Negative:**
 
-- Windows gets no unchanged-refresh cache.
+- Non-Unix platforms get no unchanged-refresh cache.
 - An unsupported storage environment remains a real dependency rather than an approved exception.
+- `readClaudeHead` ignores scanner errors, so a read failure after the timestamp scan succeeds can cache partial project or origin metadata until the file's fingerprint changes. Accepted: the failure is rare after a successful open and any change to the file refreshes the entry.
 ---
 
 ## Decision 24: Preserve First-Known Parsed Summaries Without Requiring Assistant Content
@@ -1005,7 +1006,7 @@ Later slices do not invalidate consumers holding the first schema, and malformed
 
 ### Context
 
-Decision 23 requires Unix identity/change fingerprints before cache admission. The LM Studio cache already fingerprints files by size, mtime, ctime, inode and device (`statFingerprint`), and `golang.org/x/sys` is already a direct requirement. A separate `internal/fileidentity` package was planned to keep parallel work apart, but with Windows out of scope it would duplicate that function.
+Decision 23 requires Unix identity/change fingerprints before cache admission. The LM Studio cache already fingerprints files by size, mtime, ctime, inode and device (`statFingerprint`), and `golang.org/x/sys` is already a direct requirement. A separate `internal/fileidentity` package was planned to keep parallel work apart, but it would duplicate that function.
 
 ### Decision
 
@@ -1033,7 +1034,7 @@ One fingerprint means one definition of "unchanged" for all sources, and no new 
 
 **ID**: 27
 **Date**: 2026-11-14
-**Status**: accepted; human-approved 2026-11-13 with one amendment: Windows is out of scope and no native Windows gate applies (Decision 23)
+**Status**: accepted; human-approved 2026-11-13
 
 ### Context
 
