@@ -371,6 +371,13 @@ details.read-item:last-child {
     font-style: italic;
 }
 
+/* Token usage */
+.usage {
+    margin: 0.5rem 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
 /* Todo list */
 .todo-list {
     list-style: none;
@@ -425,6 +432,32 @@ details.read-item:last-child {
         background-color: rgba(220, 53, 69, 0.3);
         color: #ff6b6b;
     }
+}
+
+/* LM Studio log transcripts */
+.lm-note {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.lm-note.warning {
+    color: var(--error-color);
+}
+
+.message.lm-request,
+.message.lm-events {
+    margin-top: 1.5rem;
+    border-left-color: var(--tool-accent);
+}
+
+.lm-meta {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+details.lm-event {
+    margin: 0.75rem 0;
 }
 
 /* Navigation */

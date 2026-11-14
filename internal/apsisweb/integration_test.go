@@ -109,6 +109,7 @@ func TestIntegrationEndToEnd(t *testing.T) {
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("expected 404, got %d", resp.StatusCode)
 		}
+		readBody(t, resp)
 	})
 
 	t.Run("invalid source returns 404", func(t *testing.T) {
@@ -121,6 +122,7 @@ func TestIntegrationEndToEnd(t *testing.T) {
 		if resp.StatusCode != http.StatusNotFound {
 			t.Errorf("expected 404, got %d", resp.StatusCode)
 		}
+		readBody(t, resp)
 	})
 
 	t.Run("security headers present", func(t *testing.T) {
@@ -140,6 +142,7 @@ func TestIntegrationEndToEnd(t *testing.T) {
 				t.Errorf("%s = %q, want %q", header, got, want)
 			}
 		}
+		readBody(t, resp)
 	})
 
 	t.Run("HTMX fragment endpoint returns partial HTML", func(t *testing.T) {
@@ -158,7 +161,10 @@ func TestIntegrationEndToEnd(t *testing.T) {
 		assert.Contains(t, body, sessionID, "fragment should contain session ID")
 	})
 
-	// Clean shutdown
+	// Clean shutdown. The client may hold a dialled connection it never sent a
+	// request on; Shutdown treats such a connection as active for 5 seconds,
+	// so close the client's idle connections first.
+	http.DefaultClient.CloseIdleConnections()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {

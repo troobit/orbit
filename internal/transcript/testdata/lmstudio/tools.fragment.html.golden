@@ -1,0 +1,387 @@
+        <p class="lm-note"><strong>Time zone:</strong> UTC, assumed for every logged wall time; the log records no zone.</p>
+        <p class="lm-note"><strong>Request attribution unknown:</strong> the log does not record which request produced a logged response, warning or error, so none is shown as a request&#39;s output.</p>
+        <section class="message lm-request">
+            <div class="message-header">
+                <span class="icon">📨</span>
+                <span class="message-role">Request <code>POST /v1/chat/completions</code></span>
+            </div>
+            <div class="message-content">
+                <p class="lm-meta">lines 1-48 · 2026-03-06T11:00:00Z (assumed UTC) · model <code>example-model-a</code> · singleton session (no valid thread ID)</p>
+                <details class="tool-collapsible">
+                    <summary><span class="icon">🎛️</span> Request parameters · stream true · tools: list_files, read_file</summary>
+                    <div class="tool-content">
+                        <pre><code>{
+  &#34;tools&#34;: [
+    {
+      &#34;type&#34;: &#34;function&#34;,
+      &#34;function&#34;: {
+        &#34;name&#34;: &#34;list_files&#34;
+      }
+    },
+    {
+      &#34;type&#34;: &#34;function&#34;,
+      &#34;function&#34;: {
+        &#34;name&#34;: &#34;read_file&#34;
+      }
+    }
+  ],
+  &#34;stream&#34;: true
+}</code></pre>
+                    </div>
+                </details>
+            </div>
+        </section>
+        <section class="message user">
+            <div class="message-header">
+                <span class="icon">👤</span>
+                <span class="message-role">User</span>
+            </div>
+            <div class="message-content">
+                <p>List the files.</p>
+            </div>
+        </section>
+        <section class="message assistant">
+            <div class="message-header">
+                <span class="icon">🤖</span>
+                <span class="message-role">Assistant</span>
+                <span class="message-meta"><span>supplied context</span></span>
+            </div>
+            <div class="message-content">
+                <div class="thinking-block">
+                    <div class="thinking-header">💭 Thinking</div>
+                    <div class="thinking-content markdown-content">
+<p>I should list the files.</p>
+                    </div>
+                </div>
+                <details class="tool-collapsible">
+                    <summary><span class="icon">✅</span> 🔧 list_files</summary>
+                    <div class="tool-content">
+                        <div class="tool-input-section">
+                            <strong>Input:</strong>
+                            <pre><code>{
+  &#34;path&#34;: &#34;.&#34;
+}</code></pre>
+                        </div>
+                        <div class="tool-result-section">
+                            <strong>Result:</strong>
+                            <pre><code>a.txt
+b.txt</code></pre>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </section>
+        <section class="message user">
+            <div class="message-header">
+                <span class="icon">👤</span>
+                <span class="message-role">User</span>
+            </div>
+            <div class="message-content">
+                <p>Now read the first file and report every line of it from the ... &lt;Truncated in logs&gt; ... to the end of the file.</p>
+                <p class="truncated">✂️ (truncated in logs)</p>
+            </div>
+        </section>
+        <section class="message lm-request">
+            <div class="message-header">
+                <span class="icon">📨</span>
+                <span class="message-role">Request <code>POST /v1/chat/completions</code></span>
+            </div>
+            <div class="message-content">
+                <p class="lm-meta">lines 49-75 · 2026-03-06T11:00:01Z (assumed UTC) · model <code>example-model-b</code> · singleton session (no valid thread ID)</p>
+            </div>
+        </section>
+        <section class="message user">
+            <div class="message-header">
+                <span class="icon">👤</span>
+                <span class="message-role">User</span>
+            </div>
+            <div class="message-content">
+                <p>A different client.</p>
+            </div>
+        </section>
+        <section class="message assistant">
+            <div class="message-header">
+                <span class="icon">🤖</span>
+                <span class="message-role">Assistant</span>
+                <span class="message-meta"><span>supplied context</span></span>
+            </div>
+            <div class="message-content">
+                <details class="tool-collapsible">
+                    <summary><span class="icon">✅</span> 🔧 read_file</summary>
+                    <div class="tool-content">
+                        <div class="tool-input-section">
+                            <strong>Input:</strong>
+                            <pre><code>not json</code></pre>
+                        </div>
+                        <div class="tool-result-section">
+                            <strong>Result:</strong>
+                            <pre><code>file contents</code></pre>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </section>
+        <details class="tool-collapsible lm-event">
+            <summary><span class="icon">🤖</span> Unattributed · response · line 76 · 2026-03-06T11:00:02Z (assumed UTC) · model <code>example-model-b</code></summary>
+            <div class="tool-content">
+                <details class="tool-collapsible">
+                    <summary><span class="icon">🔧</span> Tool call: read_file</summary>
+                    <div class="tool-content">
+                        <div class="tool-input-section">
+                            <strong>Input:</strong>
+                            <pre><code>{
+  &#34;path&#34;: &#34;a.txt&#34;
+}</code></pre>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </details>
+        <section class="message lm-request">
+            <div class="message-header">
+                <span class="icon">📨</span>
+                <span class="message-role">Request <code>POST /v1/messages</code></span>
+            </div>
+            <div class="message-content">
+                <p class="lm-meta">lines 101-172 · 2026-03-06T11:00:03Z (assumed UTC) · model <code>example-model-a</code> · singleton session (no valid thread ID)</p>
+                <details class="tool-collapsible">
+                    <summary><span class="icon">🎛️</span> Request parameters</summary>
+                    <div class="tool-content">
+                        <pre><code>{
+  &#34;max_tokens&#34;: 1024
+}</code></pre>
+                    </div>
+                </details>
+            </div>
+        </section>
+        <section class="message system">
+            <div class="message-header">
+                <span class="icon">⚙️</span>
+                <span class="message-role">System</span>
+            </div>
+            <div class="message-content">
+                <p>System block.</p>
+            </div>
+        </section>
+        <section class="message user">
+            <div class="message-header">
+                <span class="icon">👤</span>
+                <span class="message-role">User</span>
+            </div>
+            <div class="message-content">
+                <p>Check the build.</p>
+            </div>
+        </section>
+        <section class="message assistant">
+            <div class="message-header">
+                <span class="icon">🤖</span>
+                <span class="message-role">Assistant</span>
+                <span class="message-meta"><span>supplied context</span></span>
+            </div>
+            <div class="message-content">
+                <div class="thinking-block">
+                    <div class="thinking-header">💭 Thinking</div>
+                    <div class="thinking-content markdown-content">
+<p>Plan the check.</p>
+                    </div>
+                </div>
+                <div class="markdown-content">
+<p>Running it.</p>
+                </div>
+                <details class="tool-collapsible">
+                    <summary><span class="icon">✅</span> 🔧 bash</summary>
+                    <div class="tool-content">
+                        <div class="tool-input-section">
+                            <strong>Input:</strong>
+                            <pre><code>{
+  &#34;command&#34;: &#34;make&#34;
+}</code></pre>
+                        </div>
+                        <div class="tool-result-section">
+                            <strong>Result:</strong>
+                            <pre><code>ok</code></pre>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </section>
+                <details class="tool-collapsible error">
+                    <summary><span class="icon">❌</span> Tool Error</summary>
+                    <div class="tool-content">
+                        <pre><code>[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;orphan&#34;}]</code></pre>
+                    </div>
+                </details>
+        <section class="message user">
+            <div class="message-header">
+                <span class="icon">👤</span>
+                <span class="message-role">User</span>
+            </div>
+            <div class="message-content">
+                <details class="tool-collapsible">
+                    <summary><span class="icon">📦</span> Event: image</summary>
+                    <div class="tool-content">
+                        <pre><code>{
+  &#34;type&#34;: &#34;image&#34;,
+  &#34;source&#34;: {
+    &#34;type&#34;: &#34;base64&#34;,
+    &#34;media_type&#34;: &#34;image/png&#34;,
+    &#34;data&#34;: &#34;AAAA&#34;
+  }
+}</code></pre>
+                    </div>
+                </details>
+            </div>
+        </section>
+        <section class="message lm-request">
+            <div class="message-header">
+                <span class="icon">📨</span>
+                <span class="message-role">Request <code>POST /v1/responses</code></span>
+            </div>
+            <div class="message-content">
+                <p class="lm-meta">lines 173-218 · 2026-03-06T11:00:04Z (assumed UTC) · model <code>example-model-a</code> · singleton session (no valid thread ID)</p>
+            </div>
+        </section>
+        <section class="message system">
+            <div class="message-header">
+                <span class="icon">⚙️</span>
+                <span class="message-role">Developer</span>
+            </div>
+            <div class="message-content">
+                <p>Developer note.</p>
+            </div>
+        </section>
+        <section class="message assistant">
+            <div class="message-header">
+                <span class="icon">🤖</span>
+                <span class="message-role">Assistant</span>
+                <span class="message-meta"><span>supplied context</span></span>
+            </div>
+            <div class="message-content">
+                <div class="thinking-block">
+                    <div class="thinking-header">💭 Thinking</div>
+                    <div class="thinking-content markdown-content">
+<p>Thinking about it.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        <section class="message assistant">
+            <div class="message-header">
+                <span class="icon">🤖</span>
+                <span class="message-role">Assistant</span>
+                <span class="message-meta"><span>supplied context</span></span>
+            </div>
+            <div class="message-content">
+                <details class="tool-collapsible">
+                    <summary><span class="icon">✅</span> 🔧 apply_patch</summary>
+                    <div class="tool-content">
+                        <div class="tool-input-section">
+                            <strong>Input:</strong>
+                            <pre><code>*** Begin Patch</code></pre>
+                        </div>
+                        <div class="tool-result-section">
+                            <strong>Result:</strong>
+                            <pre><code>Done</code></pre>
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </section>
+        <section class="message user">
+            <div class="message-header">
+                <span class="icon">👤</span>
+                <span class="message-role">User</span>
+            </div>
+            <div class="message-content">
+                <details class="tool-collapsible">
+                    <summary><span class="icon">📦</span> Event: web_search_call</summary>
+                    <div class="tool-content">
+                        <pre><code>{
+  &#34;type&#34;: &#34;web_search_call&#34;,
+  &#34;id&#34;: &#34;ws_1&#34;,
+  &#34;status&#34;: &#34;completed&#34;
+}</code></pre>
+                    </div>
+                </details>
+            </div>
+        </section>
+        <section class="message user">
+            <div class="message-header">
+                <span class="icon">👤</span>
+                <span class="message-role">User</span>
+            </div>
+            <div class="message-content">
+                <details class="tool-collapsible">
+                    <summary><span class="icon">📦</span> Event: input_image</summary>
+                    <div class="tool-content">
+                        <pre><code>{
+  &#34;type&#34;: &#34;input_image&#34;,
+  &#34;image_url&#34;: &#34;data:image/png;base64,AAAA&#34;
+}</code></pre>
+                    </div>
+                </details>
+            </div>
+        </section>
+        <details class="tool-collapsible lm-event">
+            <summary><span class="icon">🤖</span> Unattributed · response · line 219 · 2026-03-06T11:00:05Z (assumed UTC) · model <code>example-model-b</code></summary>
+            <div class="tool-content">
+                <div class="thinking-block">
+                    <div class="thinking-header">💭 Thinking</div>
+                    <div class="thinking-content markdown-content">
+<p>Look up the weather.</p>
+                    </div>
+                </div>
+                <details class="tool-collapsible">
+                    <summary><span class="icon">✅</span> 🔧 get_weather</summary>
+                    <div class="tool-content">
+                        <div class="tool-input-section">
+                            <strong>Input:</strong>
+                            <pre><code>{
+  &#34;city&#34;: &#34;Example City&#34;
+}</code></pre>
+                        </div>
+                        <div class="tool-result-section">
+                            <strong>Result:</strong>
+                            <pre><code>Sunny</code></pre>
+                        </div>
+                    </div>
+                </details>
+                <div class="markdown-content">
+<p>It is sunny.</p>
+                </div>
+                <details class="tool-collapsible">
+                    <summary><span class="icon">📦</span> Event: invalid_tool_call</summary>
+                    <div class="tool-content">
+                        <pre><code>{
+  &#34;type&#34;: &#34;invalid_tool_call&#34;,
+  &#34;reason&#34;: &#34;Unknown tool&#34;,
+  &#34;metadata&#34;: {
+    &#34;type&#34;: &#34;invalid_name&#34;,
+    &#34;tool_name&#34;: &#34;get_time&#34;
+  }
+}</code></pre>
+                    </div>
+                </details>
+                <div class="usage">Token usage (stats): input_tokens 40 · total_output_tokens 12 · reasoning_output_tokens 4 · tokens_per_second 30.5 · time_to_first_token_seconds 0.2</div>
+            </div>
+        </details>
+        <details class="tool-collapsible lm-event">
+            <summary><span class="icon">🤖</span> Unattributed · response · line 260 · 2026-03-06T11:00:06Z (assumed UTC) · model <code>example-model-a</code></summary>
+            <div class="tool-content">
+                <div class="markdown-content">
+<p>The build passes.</p>
+                </div>
+                <details class="tool-collapsible">
+                    <summary><span class="icon">🔧</span> Tool call: bash</summary>
+                    <div class="tool-content">
+                        <div class="tool-input-section">
+                            <strong>Input:</strong>
+                            <pre><code>{
+  &#34;command&#34;: &#34;make test&#34;
+}</code></pre>
+                        </div>
+                    </div>
+                </details>
+                <div class="usage">Token usage: input_tokens 50 · output_tokens 9</div>
+            </div>
+        </details>

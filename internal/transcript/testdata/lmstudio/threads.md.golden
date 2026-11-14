@@ -1,0 +1,296 @@
+# Session Transcript
+
+**Session ID:** `example-log`
+
+---
+
+**Time zone:** UTC, assumed for every logged wall time; the log records no zone.
+
+**Request attribution unknown:** the log does not record which request produced a logged response, warning or error, so none is shown as a request's output.
+
+---
+
+## 📨 Request · `POST /v1/responses`
+
+lines 1-42 · 2026-03-05T14:00:00Z (assumed UTC) · model `example-model-a` · thread `thread-alpha` · request kind `turn`
+
+<details>
+<summary>🎛️ Request parameters · stream true · tools: shell</summary>
+
+```json
+{
+  "tools": [
+    {
+      "type": "function",
+      "name": "shell",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "stream": true,
+  "store": false,
+  "prompt_cache_key": "thread-alpha",
+  "client_metadata": {
+    "x-codex-installation-id": "install-example",
+    "session_id": "session-example",
+    "thread_id": "thread-alpha",
+    "x-codex-window-id": "window-example",
+    "turn_id": "turn-1",
+    "x-codex-turn-metadata": "{\"request_kind\":\"turn\",\"thread_id\":\"thread-alpha\",\"turn_id\":\"turn-1\"}"
+  }
+}
+```
+
+</details>
+
+### ⚙️ System
+
+You are a coding agent.
+
+### 👤 User
+
+Fix the failing test.
+
+---
+
+<details>
+<summary>⚠️ Unattributed · WARN · line 43 · 2026-03-05T14:00:01Z (assumed UTC) · model <code>example-model-a</code></summary>
+
+```
+Field 'tool_choice' is not supported and will be ignored.
+```
+
+</details>
+
+---
+
+## 📨 Request · `POST /v1/responses`
+
+lines 44-48 · 2026-03-05T14:00:02Z (assumed UTC) · model `example-model-a` · singleton session (no valid thread ID)
+
+<details>
+<summary>🎛️ Request parameters</summary>
+
+```json
+{
+  "max_output_tokens": 64
+}
+```
+
+</details>
+
+### 👤 User
+
+An unrelated question.
+
+---
+
+## 📨 Request · `POST /v1/responses`
+
+lines 49-86 · 2026-03-05T14:00:03Z (assumed UTC) · model `example-model-a` · thread `thread-alpha` · request kind `turn` · extends prior request
+
+⤷ repeats the first 2 items of the thread's previous request
+
+<details>
+<summary>🎛️ Request parameters · stream true</summary>
+
+```json
+{
+  "stream": true,
+  "store": false,
+  "prompt_cache_key": "thread-alpha",
+  "client_metadata": {
+    "x-codex-installation-id": "install-example",
+    "session_id": "session-example",
+    "thread_id": "thread-alpha",
+    "x-codex-window-id": "window-example",
+    "turn_id": "turn-1",
+    "x-codex-turn-metadata": "{\"request_kind\":\"turn\",\"thread_id\":\"thread-alpha\",\"turn_id\":\"turn-1\"}"
+  }
+}
+```
+
+</details>
+
+### 🤖 Assistant · supplied context
+
+<details>
+<summary>✅ 🔧 shell</summary>
+
+**Input:**
+```json
+{
+  "command": "make test"
+}
+```
+
+**Result:**
+```
+FAIL example_test
+```
+
+</details>
+
+---
+
+<details>
+<summary>🤖 Unattributed · response · line 87 · 2026-03-05T14:00:04Z (assumed UTC) · model <code>example-model-a</code></summary>
+
+<details>
+<summary>🔧 Tool call: shell</summary>
+
+**Input:**
+```json
+{
+  "command": "make test"
+}
+```
+
+</details>
+
+</details>
+
+---
+
+## 📨 Request · `POST /v1/responses`
+
+lines 100-120 · 2026-03-05T14:00:05Z (assumed UTC) · model `example-model-a` · thread `thread-alpha` · request kind `compaction` · ⚠ context discontinuity
+
+<details>
+<summary>🎛️ Request parameters</summary>
+
+```json
+{
+  "client_metadata": {
+    "thread_id": "thread-alpha",
+    "turn_id": "turn-2",
+    "x-codex-turn-metadata": "{\"request_kind\":\"compaction\",\"thread_id\":\"thread-alpha\",\"turn_id\":\"turn-2\"}"
+  }
+}
+```
+
+</details>
+
+### ⚙️ System
+
+You are a coding agent.
+
+### 👤 User
+
+Summary of the earlier work.
+
+---
+
+<details>
+<summary>❌ Unattributed · ERROR · line 121 · 2026-03-05T14:00:06Z (assumed UTC) · model <code>example-model-a</code></summary>
+
+```
+Generation failed: context length exceeded
+```
+
+</details>
+
+---
+
+## 📨 Request · `POST /v1/responses`
+
+lines 122-129 · 2026-03-05T14:00:07Z (assumed UTC) · model `example-model-b` · thread `thread-alpha` · request kind `memory` · ⚠ context discontinuity
+
+<details>
+<summary>🎛️ Request parameters</summary>
+
+```json
+{
+  "client_metadata": {
+    "thread_id": "thread-alpha",
+    "x-codex-turn-metadata": "{\"request_kind\":\"memory\"}"
+  }
+}
+```
+
+</details>
+
+### 👤 User
+
+Record a memory about the work.
+
+---
+
+## 📨 Request · `POST /v1/responses`
+
+lines 130-138 · 2026-03-05T14:00:08Z (assumed UTC) · model `example-model-a` · thread `thread-beta` · parent thread `thread-alpha`
+
+<details>
+<summary>🎛️ Request parameters</summary>
+
+```json
+{
+  "client_metadata": {
+    "thread_id": "thread-beta",
+    "x-codex-parent-thread-id": "thread-alpha",
+    "x-codex-turn-metadata": "{\"request_kind\":\"turn\",\"thread_id\":\"thread-beta\",\"sandbox\":\"wor ... <Truncated in logs> ... \"}"
+  }
+}
+```
+
+</details>
+
+### 👤 User
+
+Review the change as a sub-agent.
+
+---
+
+## 📨 Request · `POST /v1/responses`
+
+lines 139-145 · 2026-03-05T14:00:09Z (assumed UTC) · model `example-model-a` · singleton session (no valid thread ID)
+
+<details>
+<summary>🎛️ Request parameters</summary>
+
+```json
+{
+  "client_metadata": {
+    "thread_id": "thread-gam ... <Truncated in logs> ... mma-long"
+  }
+}
+```
+
+</details>
+
+### 👤 User
+
+A request whose thread identifier was cut.
+
+---
+
+## 📨 Request · `POST /v1/responses`
+
+lines 146-152 · 2026-03-05T14:00:10Z (assumed UTC) · model `example-model-a` · singleton session (no valid thread ID)
+
+<details>
+<summary>🎛️ Request parameters</summary>
+
+```json
+{
+  "client_metadata": {
+    "thread_id": ""
+  }
+}
+```
+
+</details>
+
+### 👤 User
+
+A request with an empty thread identifier.
+
+---
+

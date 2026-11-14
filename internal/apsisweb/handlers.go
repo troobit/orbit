@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/arjenschwarz/orbit/internal/sessions"
@@ -52,18 +53,12 @@ func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {
 	const maxSize = 50 * 1024 * 1024
 	if resolved.Metadata.Size > maxSize {
 		s.renderError(w, http.StatusRequestEntityTooLarge,
-			"This transcript is too large to render in the browser. Use the CLI instead: apsis "+id)
+			"This transcript is too large to render in the browser. Use the CLI instead: "+cliCommand(source, id))
 		return
 	}
 
-	// Parse transcript — thread cost path for Kiro IDE sessions
-	var result *transcript.ParseResult
-	if resolved.Metadata.CostPath != "" {
-		opts := transcript.ParseOptions{KiroIDECostPath: resolved.Metadata.CostPath}
-		result, err = transcript.ParseJSONLWithFormat(resolved.Reader, transcript.FormatKiroIDE, opts)
-	} else {
-		result, err = transcript.Parse(resolved.Reader)
-	}
+	// Parse with default options; the helper threads the Kiro IDE cost path.
+	result, err := sessions.ParseResolved(resolved)
 	if err != nil {
 		s.renderError(w, http.StatusInternalServerError, "Failed to parse transcript")
 		return
@@ -71,6 +66,7 @@ func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {
 
 	opts := transcript.RenderOptions{
 		SessionID: id,
+		LMStudio:  transcript.NewLMStudioView(result),
 	}
 	if result.Metadata != nil {
 		opts.TotalCost = result.Metadata.TotalCost
@@ -91,7 +87,33 @@ func (s *Server) handleTranscript(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    createdAt,
 		Size:         sessions.FormatSize(resolved.Metadata.Size),
 	}
+	// Exec streams and LM Studio sessions show their parse warnings and
+	// thread ID, and exec streams their file time; other sources' views are
+	// unchanged (Q47).
+	if source == sessions.SourceCodexExec || source == sessions.SourceLMStudio {
+		data.FileTime = resolved.Metadata.TimeFromFilesystem
+		if result.Metadata != nil {
+			data.ThreadID = result.Metadata.ThreadID
+		}
+		for _, w := range result.Warnings {
+			if w.Line > 0 {
+				data.Warnings = append(data.Warnings, fmt.Sprintf("line %d: %s", w.Line, w.Message))
+			} else {
+				data.Warnings = append(data.Warnings, w.Message)
+			}
+		}
+	}
 	s.renderTemplate(w, "transcript.html", data)
+}
+
+// cliCommand is the apsis command that opens a session outside the browser.
+// An LM Studio session opens only by source in all-projects scope
+// (requirement 7.1 of apsis-lmstudio-logs).
+func cliCommand(source, id string) string {
+	if source == sessions.SourceLMStudio {
+		return "apsis --all-projects -s lmstudio " + id
+	}
+	return "apsis " + id
 }
 
 // handleTranscriptCSS serves the transcript CSS from the transcript package.
@@ -99,6 +121,26 @@ func (s *Server) handleTranscriptCSS(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	_, _ = fmt.Fprint(w, transcript.TranscriptCSS())
+}
+
+// lmStudioDetails is an LM Studio row's second line: the recorded model,
+// client thread and assumed zone, which tell its opaque identifiers apart
+// (requirement 7.2 of apsis-lmstudio-logs). Other sources have none.
+func lmStudioDetails(si sessions.SessionInfo) string {
+	if si.Source != sessions.SourceLMStudio {
+		return ""
+	}
+	var parts []string
+	if si.Model != "" {
+		parts = append(parts, si.Model)
+	}
+	if si.ThreadID != "" {
+		parts = append(parts, "thread "+si.ThreadID)
+	}
+	if si.TimeZone != "" {
+		parts = append(parts, "time assumed in "+si.TimeZone)
+	}
+	return strings.Join(parts, " · ")
 }
 
 // buildSessionListData builds the session list data shared by full page and HTMX fragment.
@@ -123,23 +165,34 @@ func (s *Server) buildSessionListData() (SessionListData, error) {
 		if len(displayID) > 40 {
 			displayID = displayID[:37] + "..."
 		}
-		views = append(views, SessionView{
+		view := SessionView{
 			ID:          si.ID,
 			DisplayID:   displayID,
 			Source:      si.Source,
 			SourceClass: "source-" + si.Source,
-			CreatedAt:   si.CreatedAt.UTC().Format(time.RFC3339),
-			Size:        sessions.FormatSize(si.Size),
+			Size:        si.SizeLabel(),
 			URL:         fmt.Sprintf("/sessions/%s/%s", si.Source, si.ID),
-		})
+			FileTime:    si.Source == sessions.SourceCodexExec && si.TimeFromFilesystem,
+			Details:     lmStudioDetails(si),
+		}
+		// An LM Studio session whose first request has no unique time shows
+		// none (requirement 5.4 of apsis-lmstudio-logs).
+		if !si.CreatedAt.IsZero() {
+			view.CreatedAt = si.CreatedAt.UTC().Format(time.RFC3339)
+		}
+		if s.config.AllProjects {
+			view.Project = si.Project
+		}
+		views = append(views, view)
 	}
 
 	return SessionListData{
 		TemplateData: TemplateData{Title: "Sessions", CSSVersion: CSSVersion},
 		Sessions:     views,
 		Warnings:     warningMessages,
-		Sources:      sessions.AllSources(),
+		Sources:      s.lister.Sources(),
 		Empty:        len(views) == 0,
+		AllProjects:  s.config.AllProjects,
 	}, nil
 }
 

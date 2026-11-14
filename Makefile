@@ -1,4 +1,6 @@
-.PHONY: build build-orbit build-apsis test test-short test-verbose test-coverage lint clean install modernize
+.PHONY: build build-orbit build-apsis test test-short test-verbose test-coverage test-local lint clean install install-local-next-task modernize
+
+BIN_DIR ?= $(HOME)/.local/bin
 
 # Build metadata
 VERSION := $(shell git describe --tags --always 2>/dev/null || echo "dev")
@@ -25,6 +27,10 @@ test:
 test-short:
 	go test -short ./...
 
+# Local dispatch, real rune integration, agent output and cancellation checks
+test-local:
+	go test ./cmd/orbit ./internal/orbit ./internal/agents ./internal/agents/codex ./internal/rune
+
 # Run tests with verbose output
 test-verbose:
 	go test -v ./...
@@ -34,9 +40,12 @@ test-coverage:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
-# Run linter
+# Run linter, then vet the build-tagged LM Studio cache for the other release
+# platforms, since CI runs on Linux only
 lint:
 	golangci-lint run
+	GOOS=darwin go vet ./internal/sessions/...
+	GOOS=windows go vet ./internal/sessions/...
 
 # Clean build artifacts
 clean:
@@ -46,6 +55,18 @@ clean:
 install:
 	go install ./cmd/orbit
 	go install ./cmd/apsis
+
+# Replace the agentic-coding prototype with Orbit's compatibility entry point.
+install-local-next-task: build-orbit
+	@mkdir -p "$(BIN_DIR)"
+	@if [ -e "$(BIN_DIR)/local-next-task" ] || [ -L "$(BIN_DIR)/local-next-task" ]; then \
+		case "$$(readlink "$(BIN_DIR)/local-next-task")" in \
+			orbit|"$(BIN_DIR)/orbit"|*/agentic-coding/scripts/local_next_task.py) ;; \
+			*) echo "Refusing to replace unrelated $(BIN_DIR)/local-next-task" >&2; exit 1 ;; \
+		esac; \
+	fi
+	install -m 755 orbit "$(BIN_DIR)/orbit"
+	ln -sfn orbit "$(BIN_DIR)/local-next-task"
 
 # Run modernize to update code to modern Go idioms
 modernize:

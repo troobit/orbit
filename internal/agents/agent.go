@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"io"
 	"time"
 )
 
@@ -42,29 +43,33 @@ type SessionInfo struct {
 
 // RunOptions configures an execution.
 type RunOptions struct {
-	Prompt      string
-	WorkDir     string
-	SessionID   string            // Pre-generated UUID for tracking
-	Timeout     time.Duration     // 0 = no timeout
-	Env         map[string]string
-	ExtraArgs   []string          // Agent-specific CLI arguments
+	Prompt       string
+	WorkDir      string
+	SessionID    string        // Pre-generated UUID for tracking
+	Timeout      time.Duration // 0 = no timeout
+	Env          map[string]string
+	ExtraArgs    []string  // Agent-specific CLI arguments
+	Stdout       io.Writer // Optional live stdout destination
+	Stderr       io.Writer // Optional live stderr destination
+	ProcessGroup bool      // Terminate child processes on cancellation (Unix)
 }
 
 // RunResult contains the outcome of an execution.
 type RunResult struct {
-	SessionID  string
-	ExitCode   int
-	Duration   time.Duration
-	Cost       *CostMetrics
-	LogPath    string
-	Output     string
-	Stderr     string
-	RawJSON    []byte
-	Error      error
-	ErrorClass ErrorClass
-	NumTurns   int      // Number of conversation turns
-	IsError    bool     // Whether the agent reported an error condition
-	Errors     []string // Error messages from agent output
+	SessionID   string
+	ExitCode    int
+	Duration    time.Duration
+	Cost        *CostMetrics
+	LogPath     string
+	Output      string
+	FinalOutput string // Final assistant text, when provided by the agent
+	Stderr      string
+	RawJSON     []byte
+	Error       error
+	ErrorClass  ErrorClass
+	NumTurns    int      // Number of conversation turns
+	IsError     bool     // Whether the agent reported an error condition
+	Errors      []string // Error messages from agent output
 }
 
 // CostMetrics tracks usage costs in agent-specific units.

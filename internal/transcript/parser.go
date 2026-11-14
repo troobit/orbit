@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 )
@@ -58,14 +59,24 @@ var infrastructureTypes = map[string]bool{
 // Returns the detected format, the initial bytes read (with BOM stripped), and any error.
 //
 // Detection strategy:
-// 1. Read a chunk of content (up to 64KB to handle long JSONL lines)
-// 2. Try parsing as complete JSON with Kiro markers - if successful, it's Kiro format
-// 3. Otherwise, treat as JSONL and detect based on first format-defining line
+//  1. Read a chunk of content (up to 64KB to handle long JSONL lines)
+//  2. Try parsing as complete JSON with Kiro markers - if successful, it's Kiro format
+//  3. Look for an LM Studio header recording an included request within the
+//     chunk; its signature wins over other formats' body-marker heuristics
+//  4. Probe for a Codex exec stream by whole lines, reading past the chunk when
+//     its first JSON object is longer (Decision 21); only a valid thread.started
+//     selects FormatCodexExec
+//  5. Otherwise, use a substring-only Kiro match, then detect JSONL based on the
+//     first format-defining line of the chunk
+//
+// The returned bytes are everything read from r, so callers replay them before
+// the rest of r. When the chunk holds LM Studio headers but no included
+// request, the error is errLMStudioWithoutRequest.
 //
 // Note: Cannot use first-byte check alone because both JSON and JSONL start with '{'
 func DetectFormat(r io.Reader) (Format, []byte, error) {
 	// Read up to 64KB for format detection (handles long JSONL lines)
-	chunk := make([]byte, 65536)
+	chunk := make([]byte, detectChunkBytes)
 	n, err := io.ReadFull(r, chunk)
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return FormatUnknown, nil, err
@@ -79,18 +90,61 @@ func DetectFormat(r io.Reader) (Format, []byte, error) {
 	chunk = stripBOM(chunk)
 
 	// First, try to detect Kiro format (plain JSON with specific structure)
-	if format := detectKiroFormat(chunk); format != FormatUnknown {
-		return format, chunk, nil
+	kiroFormat, validated := detectKiroFormat(chunk)
+	if validated {
+		return kiroFormat, chunk, nil
+	}
+
+	// A full chunk may end inside a line, so its last line counts only when
+	// the request path visibly ends before the read limit.
+	lmRequest, lmHeaders := probeLMStudio(chunk, n < detectChunkBytes)
+	if lmRequest {
+		return FormatLMStudio, chunk, nil
+	}
+
+	// The exec probe may read beyond the chunk; keep every byte it consumes.
+	var more bytes.Buffer
+	probe, err := ProbeExecStream(io.MultiReader(bytes.NewReader(chunk), io.TeeReader(r, &more)))
+	consumed := chunk
+	if more.Len() > 0 {
+		consumed = append(slices.Clip(chunk), more.Bytes()...)
+	}
+	if err != nil {
+		return FormatUnknown, consumed, err
+	}
+	if probe.Outcome == ExecProbeExec {
+		return FormatCodexExec, consumed, nil
+	}
+	// LM Studio headers cannot occur in Kiro JSON, so they rule out a guess
+	// from Kiro key names inside a log body.
+	if kiroFormat != FormatUnknown && !lmHeaders {
+		return kiroFormat, consumed, nil
 	}
 
 	// Fall back to JSONL detection based on first line
-	return detectJSONLFormat(chunk)
+	format, _, err := detectJSONLFormat(chunk)
+	if err != nil && lmHeaders {
+		err = errLMStudioWithoutRequest
+	}
+	return format, consumed, err
 }
+
+// detectChunkBytes bounds the content format detection examines up front.
+const detectChunkBytes = 65536
+
+// errLMStudioWithoutRequest reports LM Studio log headers without an included
+// request inside the detection bound: a header alone does not identify the
+// format, so parsing it must be forced (requirement 1.1).
+var errLMStudioWithoutRequest = fmt.Errorf(
+	"LM Studio log headers found, but no included inference request in the first %d bytes; force a parser with -a lmstudio or another -a format",
+	detectChunkBytes)
 
 // detectKiroFormat checks if content is Kiro plain JSON format (CLI or IDE).
 // Kiro CLI format is a single JSON object with conversation_id and non-empty history fields.
 // Kiro IDE format is a single JSON object with executionId, chat array, and metadata fields.
-func detectKiroFormat(data []byte) Format {
+// validated reports a complete, structurally checked object rather than a
+// substring match on a truncated chunk.
+func detectKiroFormat(data []byte) (format Format, validated bool) {
 	// Kiro sessions can be large; we only need to check the beginning structure.
 	// Look for the characteristic fields: conversation_id and history array start.
 	var kiroCheck struct {
@@ -107,20 +161,20 @@ func detectKiroFormat(data []byte) Format {
 			strings.Contains(dataStr, `"history"`) &&
 			!strings.Contains(dataStr, "\n{") { // JSONL would have newline + brace
 			// Likely Kiro but truncated - still return as Kiro since full file would parse
-			return FormatKiro
+			return FormatKiro, false
 		}
 		// Check for truncated Kiro IDE format
 		if strings.Contains(dataStr, `"executionId"`) &&
 			strings.Contains(dataStr, `"chat"`) &&
 			strings.Contains(dataStr, `"metadata"`) {
-			return FormatKiroIDE
+			return FormatKiroIDE, false
 		}
-		return FormatUnknown
+		return FormatUnknown, false
 	}
 
 	// Must have both fields populated to be valid Kiro CLI format
 	if kiroCheck.ConversationID != "" && len(kiroCheck.History) > 0 {
-		return FormatKiro
+		return FormatKiro, true
 	}
 
 	// Check for Kiro IDE format: executionId + chat + metadata
@@ -131,11 +185,11 @@ func detectKiroFormat(data []byte) Format {
 	}
 	if err := json.Unmarshal(data, &ideCheck); err == nil {
 		if ideCheck.ExecutionID != "" && ideCheck.Chat != nil && ideCheck.Metadata != nil {
-			return FormatKiroIDE
+			return FormatKiroIDE, true
 		}
 	}
 
-	return FormatUnknown
+	return FormatUnknown, false
 }
 
 // detectJSONLFormat detects format from the first format-defining line of JSONL content.
@@ -248,40 +302,86 @@ func detectFormatFromLine(line []byte) (Format, error) {
 	return FormatUnknown, fmt.Errorf("unrecognized log format: type field value '%s'", obj.Type)
 }
 
-// ParseResultMetadata contains optional format-specific metadata.
+// ParseResultMetadata contains optional source metadata and cost information.
 type ParseResultMetadata struct {
-	TotalCost *float64 // nil = not available, pointer to value = available
-	CostUnit  string   // e.g., "credits"
+	TotalCost     *float64 // nil = not available, pointer to value = available
+	CostUnit      string   // e.g., "credits"
+	StartedAt     string   // Recorded source timestamp; never a filesystem fallback
+	Project       string   // First recorded project directory
+	FirstModel    string   // First known source model, independently of assistant content
+	FirstProvider string   // First known source provider
+	Origin        string   // First recorded client entry point or originator, as recorded
+	ThreadID      string   // Codex exec thread identifier from the first valid thread.started
+	TimeZone      string   // LM Studio: the zone logged wall times are assumed to be in; the log records none
 }
 
 // ParseResult contains the parsed entries and any warnings encountered.
 type ParseResult struct {
 	Entries  []Entry
 	Warnings []ParseWarning
-	Metadata *ParseResultMetadata // nil for formats without metadata
+	Metadata *ParseResultMetadata // May be non-nil without cost information
+	Format   Format               // FormatUnknown when Parse uses the Claude fallback
+
+	// LMStudioRequests is parallel to Entries, in source order; empty for every
+	// other format. It carries per-request boundary metadata written once rather
+	// than duplicated on every message item the request produced.
+	LMStudioRequests []LMStudioRequest
+
+	// LMStudioEvents replaces the unattributed entries of the files a
+	// logical-session view draws on, one summary per contributing file in
+	// discovery order. Session assembly sets it; nil for direct views.
+	LMStudioEvents []LMStudioEventSummary
 }
 
 // ParseWarning represents a non-fatal parsing issue.
 type ParseWarning struct {
 	Line    int
 	Message string
+	Code    string // One of the Warning* codes
+	Unit    string // Empty = physical line; otherwise a WarningUnit* value
 }
+
+// Warning units name what a ParseWarning's one-based Line counts when it is not a physical line.
+const (
+	WarningUnitChatMessage     = "chat-message"     // Kiro IDE chat message index
+	WarningUnitExecutionAction = "execution-action" // Kiro IDE execution-detail action index
+)
+
+// Warning codes classify parse warnings where they are created (Q80).
+const (
+	WarningMalformedLine       = "malformed_line"        // a physical line is not valid JSON
+	WarningOversizedLine       = "oversized_line"        // a physical line exceeds the scanner limit
+	WarningInvalidRecord       = "invalid_record"        // a record lacks a required field or its payload does not decode
+	WarningUnrecognizedRecord  = "unrecognized_record"   // an unknown record, event, item, role, content or action type
+	WarningUnmatchedToolResult = "unmatched_tool_result" // a tool output without its call
+	WarningThreadMismatch      = "thread_mismatch"       // a Codex exec thread.started records a different thread ID
+	WarningItemDecodeFailed    = "item_decode_failed"    // a known Codex exec item lacks a valid ID or typed fields
+	WarningOversizedRecord     = "oversized_record"      // an LM Studio log record exceeds the parser byte limit
+	WarningUnsupportedEndpoint = "unsupported_endpoint"  // LM Studio records report a POST path that is neither translated nor excluded
+	WarningUnparsedText        = "unparsed_text"         // LM Studio log text outside every recognised record or body
+	WarningTimeZone            = "time_zone"             // the TZ override could not be loaded; wall times are not interpreted
+)
 
 // Parse reads a transcript file and automatically detects its format.
 // It handles all supported formats: Claude JSONL, Codex JSONL, Kiro CLI JSON, Kiro IDE JSON, and Copilot JSONL.
 // When format detection fails (e.g., file contains only unknown entry types), falls back to
 // Claude format parsing which gracefully skips unrecognized entries.
 // Use this function when the format is unknown; use ParseJSONLWithFormat when the format is known.
-func Parse(r io.Reader) (*ParseResult, error) {
+func Parse(r io.Reader, opts ...ParseOptions) (*ParseResult, error) {
 	// Use DetectFormat to identify the format (handles both JSON and JSONL)
 	format, chunk, err := DetectFormat(r)
 	if err != nil {
 		// When no recognized format is found (e.g., only unknown entry types),
 		// fall back to Claude parser which skips unknown types gracefully.
-		// This produces 0 entries rather than a hard error.
-		if chunk != nil {
+		// This produces 0 entries rather than a hard error. LM Studio log
+		// headers instead report that the format must be forced.
+		if chunk != nil && !errors.Is(err, errLMStudioWithoutRequest) {
 			combined := io.MultiReader(bytes.NewReader(chunk), r)
-			return parseClaudeJSONL(combined)
+			result, parseErr := parseClaudeJSONL(combined)
+			if result != nil {
+				result.Format = FormatUnknown
+			}
+			return result, parseErr
 		}
 		return nil, fmt.Errorf("failed to detect format: %w", err)
 	}
@@ -289,12 +389,14 @@ func Parse(r io.Reader) (*ParseResult, error) {
 	// Combine the chunk we read for detection with the remaining content
 	combined := io.MultiReader(bytes.NewReader(chunk), r)
 
-	return ParseJSONLWithFormat(combined, format)
+	return ParseJSONLWithFormat(combined, format, opts...)
 }
 
 // ParseOptions provides optional configuration for format-specific parsers.
 type ParseOptions struct {
-	KiroIDECostPath string // execution detail file path for cost extraction
+	KiroIDECostPath      string // Execution detail file path for cost extraction
+	AllowEmptyCodex      bool   // Retain metadata-only Codex results for shared JSON
+	PreserveModelChanges bool   // Split adjacent Codex model changes for shared JSON
 }
 
 // ParseJSONLWithFormat reads JSONL from the provided reader using the specified format.
@@ -303,7 +405,7 @@ type ParseOptions struct {
 func ParseJSONLWithFormat(r io.Reader, format Format, opts ...ParseOptions) (*ParseResult, error) {
 	switch format {
 	case FormatCodex:
-		return ParseCodexJSONL(r)
+		return ParseCodexJSONL(r, opts...)
 	case FormatClaude:
 		return parseClaudeJSONL(r)
 	case FormatKiro:
@@ -315,6 +417,10 @@ func ParseJSONLWithFormat(r io.Reader, format Format, opts ...ParseOptions) (*Pa
 			return ParseKiroIDEWithCostPath(r, opts[0].KiroIDECostPath)
 		}
 		return ParseKiroIDE(r)
+	case FormatCodexExec:
+		return ParseCodexExec(r)
+	case FormatLMStudio:
+		return ParseLMStudio(r)
 	default:
 		return nil, fmt.Errorf("unsupported format: %d", format)
 	}
@@ -392,6 +498,8 @@ func parseClaudeJSONL(r io.Reader) (*ParseResult, error) {
 	result := &ParseResult{
 		Entries:  []Entry{},
 		Warnings: []ParseWarning{},
+		Metadata: &ParseResultMetadata{},
+		Format:   FormatClaude,
 	}
 	lineNum := 0
 
@@ -410,9 +518,22 @@ func parseClaudeJSONL(r io.Reader) (*ParseResult, error) {
 			result.Warnings = append(result.Warnings, ParseWarning{
 				Line:    lineNum,
 				Message: fmt.Sprintf("failed to parse JSON: %v", err),
+				Code:    WarningMalformedLine,
 			})
 			continue
 		}
+		if result.Metadata.StartedAt == "" {
+			if _, ok := parseTimestamp(entry.Timestamp); ok {
+				result.Metadata.StartedAt = entry.Timestamp
+			}
+		}
+		if result.Metadata.Project == "" {
+			result.Metadata.Project = entry.Cwd
+		}
+		if result.Metadata.Origin == "" {
+			result.Metadata.Origin = entry.Origin
+		}
+		entry.RecordID = entry.UUID
 
 		// Only process known entry types (user, assistant)
 		// Skip infrastructure types (queue-operation) and unknown types silently
@@ -433,6 +554,7 @@ func parseClaudeJSONL(r io.Reader) (*ParseResult, error) {
 			result.Warnings = append(result.Warnings, ParseWarning{
 				Line:    lineNum + 1,
 				Message: "line exceeds 10MB buffer limit",
+				Code:    WarningOversizedLine,
 			})
 		} else {
 			return nil, fmt.Errorf("scanner error: %w", err)
