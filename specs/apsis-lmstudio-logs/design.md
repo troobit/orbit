@@ -17,7 +17,7 @@ LM Studio's disk server log is a physical-line, header-delimited text grammar, n
 | `internal/transcript/parser.go` | LM Studio probe in `DetectFormat`, ahead of the exec probe (see [Detection](#detection)); new warning codes |
 | `internal/transcript/markdown.go`, `html.go`, `metadata.go` | Request-boundary headers, unattributed-event blocks, parameters block, one-time attribution notice |
 | `internal/sessions/lmstudio.go` (new) | Root resolution, `YYYY-MM/YYYY-MM-DD.N.log` discovery, per-file summary cache, thread grouping, identifiers, listing, resolution |
-| `internal/sessions/fingerprint.go`, `fingerprint_unix.go`, `fingerprint_other.go` (build-tagged) | Per-file change fingerprint: real on `unix`, a no-op (always-miss) stub elsewhere (see [Cache](#5-discovery-identity-and-cache)) |
+| `internal/sessions/lmstudio_cache_unix.go`, `lmstudio_cache_other.go` (new, build-tagged) | Per-file change fingerprint: real on `unix`, a no-op (always-miss) stub elsewhere (see [Cache](#5-discovery-identity-and-cache)) |
 | `internal/sessions/types.go`, `lister.go`, `resolver.go`, `parse.go` | New source, options, listing/resolve branches, ordering priority |
 | `internal/sharedjson/` | Session/listing projection for the new entry shapes and listing fields |
 | `cmd/apsis/main.go` | `-a lmstudio`, `--lmstudio-log-dir`, `APSIS_LMSTUDIO_LOG_DIR`, follow/raw-JSON rejection |
@@ -185,16 +185,16 @@ type lmRequestSummary struct {
     model     string
 }
 
-// fingerprintFile reports whether a file's identity can be fingerprinted at
+// lmFingerprint reports whether a file's identity can be fingerprinted at
 // all, and if so, its current fingerprint. cacheable is checked before fp is
 // ever stored or compared — a non-cacheable result is never a cache hit,
 // regardless of what fp holds, so a "same zero value" stub can never be
 // mistaken for "unchanged" (see Risks and Assumptions for why this shape,
 // not an opaque always-equal/always-unequal value, is the one that matters).
-func fingerprintFile(path string, info os.FileInfo) (fp fileFingerprint, cacheable bool, err error)
+func lmFingerprint(path string, info os.FileInfo) (fp lmFileFingerprint, cacheable bool, err error)
 ```
 
-`fingerprintFile` has two build-tagged implementations, selected through an injected package-level function variable for testability: `fingerprint_unix.go` (`//go:build unix`) returns `cacheable: true` with `fp` from `golang.org/x/sys/unix`'s `Stat_t` (size, mtime, ctime, inode, device — using that package rather than raw `syscall.Stat_t` because its field names, unlike `syscall.Stat_t`'s, are consistent across Linux and Darwin), promoting `golang.org/x/sys` to a direct module requirement; `fingerprint_other.go` (every other platform, in practice Windows) always returns `cacheable: false`, so the cache degenerates to "always miss" there rather than risking a false hit from a weaker heuristic. The same fingerprint now keys the listing cache of every other source (`apsis-shared-json` Decision 26), so `fingerprintFile` is shared rather than LM Studio specific. CI runs Ubuntu only, so lint additionally runs `GOOS=darwin go vet ./internal/sessions/...` to check the Darwin build path without native hardware. This platform split is a deliberate, scoped choice (Decision 6), not a parity gap in the format or feature set — see [Risks and Assumptions](#risks-and-assumptions).
+`lmFingerprint` has two build-tagged implementations, selected through an injected package-level function variable for testability: `lmstudio_cache_unix.go` (`//go:build unix`) returns `cacheable: true` with `fp` from `golang.org/x/sys/unix`'s `Stat_t` (size, mtime, ctime, inode, device — using that package rather than raw `syscall.Stat_t` because its field names, unlike `syscall.Stat_t`'s, are consistent across Linux and Darwin), promoting `golang.org/x/sys` to a direct module requirement; `lmstudio_cache_other.go` (every other platform, in practice Windows) always returns `cacheable: false`, so the cache degenerates to "always miss" there rather than risking a false hit from a weaker heuristic. `internal/fileidentity` — the equivalent isolated package `apsis-shared-json` planned for its own generic cache — does not exist in the codebase yet (that PR phase is unimplemented), so there is nothing to reuse today; `lmFingerprint`'s narrow signature is a deliberate seam this cache can redirect to that package later without changing any caller. CI runs Ubuntu only, so lint additionally runs `GOOS=darwin go vet ./internal/sessions/...` to check the Darwin build path without native hardware. This platform split is a deliberate, scoped choice (Decision 6), not a parity gap in the format or feature set — see [Risks and Assumptions](#risks-and-assumptions).
 
 ```go
 type lmCache struct {
@@ -202,7 +202,7 @@ type lmCache struct {
     entries map[string]lmCacheEntry // canonical file path -> fingerprint + summary
 }
 type lmCacheEntry struct {
-    fingerprint fileFingerprint
+    fingerprint lmFileFingerprint
     summary     lmFileSummary
 }
 
@@ -230,7 +230,7 @@ A `Lister` held across `apsis serve` refreshes carries one `*lmCache`, created l
 
 Implementation (Q53): a cache miss reads the file with `transcript.SummarizeLMStudio`, not `ParseLMStudio`. It shares the record lexer and request classification, decodes a request body only for `model` and `client_metadata`, and returns per-request start line, size, time, model and thread, plus whether any response, WARN/ERROR or unsupported-endpoint record exists (which the "no recognised records" warning needs) and the `unparsed_text` and `time_zone` warnings. Entry translation, item digests, extension annotation and translation warnings are skipped, since only a session view uses them. `TestSummarizeLMStudioMatchesFullParse` keeps the two paths in agreement on every fixture.
 
-Implementation (Q34–Q38): `fingerprintFile(path)` has no `os.FileInfo` argument. The summary keeps `transcript.LMStudioEventCounts` plus event start lines instead of the `unattributedCounts` map, so session assembly can fill `LMStudioEventSummary` directly. *(Superseded by Q39: the summary keeps no event counts and `lmIndex` no file list, since session assembly counts events from its own parse.)* `buildLMStudioIndex` returns an `*lmIndex` (discovered files, per-file summaries, session ID → contributing files, session order); its error reports only an unreadable root. `lmStudioRoot`/`findLMStudioFiles` follow the root rules above, and a symlinked file is keyed by its target's root-relative path (Q37). A request's byte span comes from the new `LMStudioRequest.Size` (Q36). Listing warnings are file-level only (Q35).
+Implementation (Q34–Q38): `lmFingerprint(path)` has no `os.FileInfo` argument. The summary keeps `transcript.LMStudioEventCounts` plus event start lines instead of the `unattributedCounts` map, so session assembly can fill `LMStudioEventSummary` directly. *(Superseded by Q39: the summary keeps no event counts and `lmIndex` no file list, since session assembly counts events from its own parse.)* `buildLMStudioIndex` returns an `*lmIndex` (discovered files, per-file summaries, session ID → contributing files, session order); its error reports only an unreadable root. `lmStudioRoot`/`findLMStudioFiles` follow the root rules above, and a symlinked file is keyed by its target's root-relative path (Q37). A request's byte span comes from the new `LMStudioRequest.Size` (Q36). Listing warnings are file-level only (Q35).
 
 **Listing** (7.1, 7.2, 7.4). `listLMStudio(projectPath string)` returns nothing when `projectPath != ""`, unconditionally — this source never appears in project scope regardless of configuration, unlike `codex-exec`'s project-matching branch. In all-projects scope, `buildLMStudioIndex` (using the `Lister`'s persistent cache) returns one `SessionInfo` per thread index key: `ID`, `RequestCount` (new field, not `Size` — see [Data Models](#data-models)), `Model` (first request's), `Provider: "lmstudio"`, `ThreadID` (reusing the existing field `codex-exec` defined), and `CreatedAt` from the thread's first request **in discovery order** (files ordered by filename date, then numeric suffix, then physical position — the Terms section's "source order," not chronological order by recorded time). When that specific first request has no uniquely interpretable time, `CreatedAt` stays zero — unknown, per the existing extended-ordering "unknown times first" rule — rather than substituting a later request's time or a filesystem time; 5.4 forbids both. A missing or unreadable configured root yields no sessions and no warning when it is the untouched default, and a `root_unreadable`/`path_unreadable` warning (reusing the existing codes) when the root was explicitly configured (7.4).
 

@@ -243,6 +243,17 @@ func summarizeLMStudioFile(file lmLogFile) (lmFileSummary, error) {
 	return s, nil
 }
 
+// lmFileFingerprint identifies a file's state. statFingerprint fills it on
+// Unix; elsewhere it is never compared.
+type lmFileFingerprint struct {
+	size, mtime, ctime int64
+	inode, device      uint64
+}
+
+// lmFingerprint fingerprints a file and reports whether the fingerprint can
+// be trusted for a cache hit. Tests replace it.
+var lmFingerprint = statFingerprint
+
 // lmCache keeps file summaries across listing passes within one process.
 type lmCache struct {
 	mu      sync.Mutex
@@ -250,7 +261,7 @@ type lmCache struct {
 }
 
 type lmCacheEntry struct {
-	fingerprint fileFingerprint
+	fingerprint lmFileFingerprint
 	summary     lmFileSummary
 }
 
@@ -259,7 +270,7 @@ type lmCacheEntry struct {
 // stored when cacheable. The flag, not fingerprint equality, gates every hit,
 // so a platform without fingerprints never reuses a summary. Callers hold mu.
 func (c *lmCache) summary(file lmLogFile) (lmFileSummary, error) {
-	fp, cacheable, err := fingerprintFile(file.path)
+	fp, cacheable, err := lmFingerprint(file.path)
 	if err != nil {
 		delete(c.entries, file.path)
 		return lmFileSummary{}, err

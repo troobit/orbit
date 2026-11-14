@@ -67,24 +67,24 @@ func (r *lmReads) reset() {
 	r.opened, r.fingerprints = nil, 0
 }
 
-// countLMReads replaces lmOpen and fingerprintFile with counting wrappers.
+// countLMReads replaces lmOpen and lmFingerprint with counting wrappers.
 func countLMReads(t testing.TB) *lmReads {
 	t.Helper()
 	reads := &lmReads{}
-	open, fingerprint := lmOpen, fingerprintFile
+	open, fingerprint := lmOpen, lmFingerprint
 	lmOpen = func(path string) (io.ReadCloser, error) {
 		reads.mu.Lock()
 		reads.opened = append(reads.opened, path)
 		reads.mu.Unlock()
 		return open(path)
 	}
-	fingerprintFile = func(path string) (fileFingerprint, bool, error) {
+	lmFingerprint = func(path string) (lmFileFingerprint, bool, error) {
 		reads.mu.Lock()
 		reads.fingerprints++
 		reads.mu.Unlock()
 		return fingerprint(path)
 	}
-	t.Cleanup(func() { lmOpen, fingerprintFile = open, fingerprint })
+	t.Cleanup(func() { lmOpen, lmFingerprint = open, fingerprint })
 	return reads
 }
 
@@ -426,7 +426,7 @@ func TestLMCache_NotCacheableNeverHits(t *testing.T) {
 	tree.write(lmReq("2026-11-10 10:00:00", "", "m"), "root", "2026-11", "2026-11-10.2.log")
 	reads := countLMReads(t)
 	// Identical fingerprints on every call: only the flag may stop a hit.
-	fingerprintFile = func(string) (fileFingerprint, bool, error) { return fileFingerprint{}, false, nil }
+	lmFingerprint = func(string) (lmFileFingerprint, bool, error) { return lmFileFingerprint{}, false, nil }
 	l := lmLister(t, tree.path("root"), true)
 
 	for range 2 {

@@ -38,7 +38,7 @@ references:
 
 ## Phase 5: Discovery, identity and cache (sessions)
 
-- [x] 12. Implement the build-tagged fingerprintFile and per-file summary cache
+- [x] 12. Implement the build-tagged lmFingerprint and per-file summary cache
 
 - [x] 13. Implement root resolution, file discovery and buildLMStudioIndex
 

@@ -16,7 +16,6 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/arjenschwarz/orbit/internal/agents/claudecode"
@@ -28,12 +27,6 @@ import (
 // kiroDiscoverFunc abstracts Kiro session discovery for testing.
 type kiroDiscoverFunc func(ctx context.Context, dir string) ([]logs.SessionMetadata, error)
 
-// kiroDiscoverAllFunc abstracts all-directories Kiro session discovery for testing.
-type kiroDiscoverAllFunc func(ctx context.Context) ([]logs.SessionMetadata, error)
-
-// kiroDBPathFunc abstracts the Kiro database location for testing.
-type kiroDBPathFunc func() (string, error)
-
 // kiroIDEBasePathFunc abstracts Kiro IDE base path resolution for testing.
 type kiroIDEBasePathFunc func() (string, error)
 
@@ -42,12 +35,8 @@ type Lister struct {
 	homeDir         string
 	opts            Options
 	kiroDiscover    kiroDiscoverFunc    // nil → logs.DiscoverForDirectory
-	kiroDiscoverAll kiroDiscoverAllFunc // nil → logs.DiscoverAll
-	kiroDBPath      kiroDBPathFunc      // nil → logs.DBPath
 	kiroIDEBasePath kiroIDEBasePathFunc // nil → transcript.KiroIDEBasePath
 	lmCache         *lmCache            // LM Studio file summaries kept across ListAll calls; nil → none
-	cache           *fileCache          // per-file extraction results kept across ListAll calls; nil → none
-	mu              sync.Mutex          // held for a whole ListAll pass, so passes never interleave cache updates
 }
 
 // NewLister creates a Lister.
@@ -57,18 +46,13 @@ func NewLister(opts ...Option) (*Lister, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
-	return &Lister{homeDir: homeDir, opts: applyOptions(opts), lmCache: &lmCache{}, cache: &fileCache{}}, nil
+	return &Lister{homeDir: homeDir, opts: applyOptions(opts), lmCache: &lmCache{}}, nil
 }
 
 // ListAll returns all sessions for the given project path, or for every
 // project when it is empty, sorted by creation time (oldest first).
 // Warnings are returned for agent sources that failed to list.
 func (l *Lister) ListAll(projectPath string) ([]SessionInfo, []ListWarning, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.cache.beginPass()
-	defer l.cache.endPass()
-
 	var warnings []ListWarning
 
 	// In all-projects scope each collector lists an identifier found in
@@ -219,59 +203,23 @@ func (l *Lister) listClaudeDir(projectDir string) ([]SessionInfo, error) {
 			Size:   info.Size(),
 			Source: SourceClaude,
 		}
-		head, _ := cached(l.cache, "claude:"+filePath, []string{filePath}, func() (claudeHead, error) {
-			return extractClaudeHead(filePath, info)
-		})
-		session.CreatedAt, session.Project, session.Origin = head.created, head.project, head.origin
-		session.TimeFromFilesystem = head.fromFilesystem
+		f, err := os.Open(filePath)
+		if err == nil {
+			session.CreatedAt, err = transcript.ParseFirstTimestamp(f)
+			if _, seekErr := f.Seek(0, io.SeekStart); seekErr == nil {
+				session.Project, session.Origin = readClaudeHead(f)
+			}
+			_ = f.Close()
+		}
+		if err != nil {
+			session.CreatedAt = info.ModTime()
+			session.TimeFromFilesystem = true
+		}
 
 		sessions = append(sessions, session)
 	}
 
 	return sessions, nil
-}
-
-// claudeHead is what one read of a Claude transcript's start yields for its
-// listing row.
-type claudeHead struct {
-	created        time.Time
-	project        string
-	origin         string
-	fromFilesystem bool // created is the modification time, not a recorded one
-}
-
-// extractClaudeHead reads the timestamp, project and origin of a Claude
-// transcript. An unreadable or timestamp-less file falls back to its
-// modification time, which is a usable row. When the fallback follows a
-// filesystem failure the error is returned with it, so the row is shown but
-// not cached (see transientIOError).
-func extractClaudeHead(path string, info fs.FileInfo) (claudeHead, error) {
-	var head claudeHead
-	f, err := os.Open(path)
-	if err == nil {
-		head.created, err = transcript.ParseFirstTimestamp(f)
-		if _, seekErr := f.Seek(0, io.SeekStart); seekErr == nil {
-			head.project, head.origin = readClaudeHead(f)
-		}
-		_ = f.Close()
-	}
-	if err != nil {
-		head.created = info.ModTime()
-		head.fromFilesystem = true
-	}
-	return head, transientIOError(err)
-}
-
-// transientIOError returns err when it is a filesystem failure (open or read)
-// that a later attempt may not repeat, and nil for outcomes decided by the
-// file's content. The cache stores a result only when its compute returns nil,
-// so a transient failure is shown for one pass and retried on the next.
-func transientIOError(err error) error {
-	var pathErr *fs.PathError
-	if errors.As(err, &pathErr) {
-		return err
-	}
-	return nil
 }
 
 // Sources returns the sources this Lister can list: every source, except
@@ -320,11 +268,7 @@ func (l *Lister) listCodexIndexed(projectPath string) ([]SessionInfo, []ListWarn
 			return nil
 		}
 
-		scan, _ := cached(l.cache, "codex:"+path, []string{path}, func() (codexScan, error) {
-			head, err := readCodexHead(path)
-			return codexScan{head: head, err: err}, transientIOError(err)
-		})
-		head, headErr := scan.head, scan.err
+		head, headErr := readCodexHead(path)
 		var headWarning *ListWarning
 		if winner {
 			headWarning = codexHeadWarning(id, path, head, headErr)
@@ -362,14 +306,6 @@ func (l *Lister) listCodexIndexed(projectPath string) ([]SessionInfo, []ListWarn
 		return nil, warnings, nil, err
 	}
 	return sessions, warnings, threads, nil
-}
-
-// codexScan is one bounded scan of a rollout's head with its outcome. A
-// content error (an over-long line) repeats as reliably as a clean read, so the
-// cache keeps both; a filesystem error is not cached (transientIOError).
-type codexScan struct {
-	head codexHead
-	err  error
 }
 
 // codexHeadWarning reports why a selected rollout cannot be listed across
@@ -456,9 +392,7 @@ func (l *Lister) listCopilot(projectPath string) ([]SessionInfo, []ListWarning, 
 			continue
 		}
 
-		ws, err := cached(l.cache, "copilot:"+workspacePath, []string{workspacePath}, func() (*copilotWorkspace, error) {
-			return parseCopilotWorkspace(workspacePath)
-		})
+		ws, err := parseCopilotWorkspace(workspacePath)
 		if err != nil {
 			warnings = append(warnings, ListWarning{
 				Source: SourceCopilot,
@@ -513,38 +447,13 @@ func (l *Lister) listKiro(cwd string) ([]SessionInfo, error) {
 		discover = logs.DiscoverForDirectory
 	}
 
-	discoverAll := l.kiroDiscoverAll
-	if discoverAll == nil {
-		discoverAll = logs.DiscoverAll
-	}
-	run := func() ([]logs.SessionMetadata, error) {
-		if cwd == "" {
-			return discoverAll(context.Background())
-		}
-		return discover(context.Background(), cwd)
-	}
-
-	// A database whose three files keep their fingerprints is not opened.
-	// Injected discovery without an injected path never touches the real
-	// database, so it is not cached.
 	var kiroSessions []logs.SessionMetadata
 	var err error
-	dbPath := l.kiroDatabasePath()
-	if dbPath == "" {
-		kiroSessions, err = run()
+
+	if cwd == "" {
+		kiroSessions, err = logs.DiscoverAll(context.Background())
 	} else {
-		// Discovery queries the symlink-resolved directory too, so the key
-		// names it: re-pointing a project symlink must not hit.
-		key := "kiro-cli:" + cwd
-		if cwd != "" {
-			key += "\x00" + normalizePath(cwd)
-		}
-		// SQLite keeps -wal and -journal beside the real file, not beside a
-		// symlink to it.
-		if resolved, err := filepath.EvalSymlinks(dbPath); err == nil {
-			dbPath = resolved
-		}
-		kiroSessions, err = cached(l.cache, key, []string{dbPath, dbPath + "-wal", dbPath + "-journal"}, run)
+		kiroSessions, err = discover(context.Background(), cwd)
 	}
 
 	if err != nil {
@@ -568,23 +477,6 @@ func (l *Lister) listKiro(cwd string) ([]SessionInfo, error) {
 	return result, nil
 }
 
-// kiroDatabasePath returns the database file whose fingerprints key the Kiro
-// CLI cache, or "" when the sessions cannot be cached.
-func (l *Lister) kiroDatabasePath() string {
-	pathFn := l.kiroDBPath
-	if pathFn == nil {
-		if l.kiroDiscover != nil || l.kiroDiscoverAll != nil {
-			return ""
-		}
-		pathFn = logs.DBPath
-	}
-	path, err := pathFn()
-	if err != nil {
-		return ""
-	}
-	return path
-}
-
 // listKiroIDE returns all Kiro IDE sessions for a project directory.
 // When projectPath is empty, scans all workspace directories.
 func (l *Lister) listKiroIDE(projectPath string) ([]SessionInfo, []ListWarning, error) {
@@ -606,7 +498,7 @@ func (l *Lister) listKiroIDE(projectPath string) ([]SessionInfo, []ListWarning, 
 
 // listKiroIDEWorkspace scans a single workspace directory for Kiro IDE sessions.
 func (l *Lister) listKiroIDEWorkspace(workspaceDir string) ([]SessionInfo, error) {
-	best, err := kiroIDEWorkspaceCandidates(l.cache, workspaceDir)
+	best, err := kiroIDEWorkspaceCandidates(workspaceDir)
 	if err != nil {
 		return nil, err
 	}
@@ -634,7 +526,7 @@ func (l *Lister) listKiroIDEAll() ([]SessionInfo, []ListWarning, error) {
 		return nil, nil, fmt.Errorf("kiro ide base path: %w", err)
 	}
 
-	all, err := kiroIDEAllCandidates(l.cache, base)
+	all, err := kiroIDEAllCandidates(base)
 	if err != nil {
 		return nil, nil, err
 	}

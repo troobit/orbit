@@ -14,7 +14,6 @@ type codexParser struct {
 	sessionID     string
 	model         string // Model from session_meta, set on assistant entries by default
 	turnModel     string // Latest nonempty turn_context model, set on entries with PreserveModelChanges
-	firstFromTurn bool   // metadata.FirstModel already holds the first turn_context model
 	provider      string // Provider from session_meta, set on assistant entries
 	metadata      ParseResultMetadata
 	options       ParseOptions
@@ -167,10 +166,7 @@ func (p *codexParser) processTurnContext(entry *CodexEntry) {
 		return
 	}
 	p.turnModel = turn.Model
-	// The first turn_context model outranks a session_meta model, matching the
-	// listing (Decision 29).
-	if !p.firstFromTurn {
-		p.firstFromTurn = true
+	if p.metadata.FirstModel == "" {
 		p.metadata.FirstModel = turn.Model
 	}
 }
