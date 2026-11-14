@@ -26,8 +26,8 @@ harness files ──parse──▶ transcript.ParseResult (Entries, Warnings, Me
 | `internal/sharedjson/` (new) | Document types, `Session`, `Listing`, `Write`, `SchemaVersion`; imports `transcript` and `sessions`, so neither imports it |
 | `docs/schemas/apsis-shared-json.v1.schema.json` (new) | Published JSON Schema (draft 2020-12) for both document kinds |
 | `internal/sessions/codexexec.go` (new) | Root canonicalisation, walk, qualification, identifier, repository root, suppression |
-| `internal/sessions/cache.go` (new) | Stat-keyed listing-metadata cache |
-| `internal/fileidentity/` (new) | Metadata-only Unix/Windows identity/change fingerprints behind one injectable interface; the cache consumes this isolated package (Decision 26) |
+| `internal/sessions/cache.go` (new) | Fingerprint-keyed cache of per-file extraction results |
+| `internal/sessions/fingerprint*.go` | The Unix file fingerprint (size, mtime, ctime, inode, device) shared by every cached source, moved out of the LM Studio cache (Decision 26) |
 | `internal/sessions/lister.go`, `resolver.go`, `types.go` | New source, listing fields, all-projects resolution, de-duplication, ordering |
 | `internal/sessions/parse.go` (new) | `ParseResolved`, shared by CLI and web |
 | `internal/agents/kiro/logs/session.go`, `discover.go` | `GetSessionByID`; deterministic tie order in `DiscoverAll` |
@@ -244,7 +244,7 @@ func (l *Lister) Sources() []string // AllSources minus codex-exec when no roots
 
 1. Holds `l.mu` for the whole pass, so a page load and an HTMX poll never interleave cache updates.
 2. Enumerates directories and stats candidates and their companions without opening transcript bodies.
-3. Looks up `cache[path]`. Unix keys include size, mtime, ctime, inode and device. Windows keys include size, last-write time, change time, volume serial number and file ID, queried through a metadata-only handle using the existing `golang.org/x/sys/windows` module. Companion files are part of the key, and an absent companion is recorded as absent, so creating one changes the key. A fingerprint failure is an explicit warning/error outcome, never a cache hit based on size/mtime alone; the platform capability gate below must pass before this cache slice is admitted.
+3. Looks up `cache[path]`. Unix keys include size, mtime, ctime, inode and device. Companion files are part of the key, and an absent companion is recorded as absent, so creating one changes the key. A fingerprint failure is an explicit warning/error outcome, never a cache hit based on size/mtime alone. Platforms without these stat fields are unsupported and use no cache.
 4. On a hit, reuses the cached metadata. On a miss, runs the source's extraction (table below), restats, and caches the result only when the key is unchanged; a changed key uses the result for this pass and retries on the next.
 5. Omits a changed file whose extraction fails, with a warning, rather than serving its previous metadata. An existing source's documented timestamp-to-mtime fallback is a successful extraction outcome, not a new fatal failure.
 6. Sweeps cache entries not seen in the pass.
@@ -263,7 +263,7 @@ Repository roots for exec streams are found by statting ancestors on each pass, 
 
 Listing `model`/`provider`/`origin` come only from these extraction reads; the session document is authoritative. Copilot, Kiro CLI, Kiro IDE and codex-exec rows carry no origin.
 
-The Kiro discovery injection must cover both project and all-projects branches: today `listKiro("")` bypasses `kiroDiscover` and calls `logs.DiscoverAll` directly. Count both paths in cache tests. The fingerprint package uses local Windows ABI structs for `FileIdInfo`/`FileBasicInfo`, since the existing x/sys version exposes the query and class constants but not those structs; promote x/sys to a direct module requirement only after the schema-validator task releases module-file ownership.
+The Kiro discovery injection must cover both project and all-projects branches: today `listKiro("")` bypasses `kiroDiscover` and calls `logs.DiscoverAll` directly. Count both paths in cache tests. Promote `golang.org/x/sys` to a direct module requirement only after the schema-validator task releases module-file ownership.
 
 **Ordering and uniqueness** (4.4). In extended mode sort by `CreatedAt` ascending, unknown times first, then source priority (claude, copilot, codex, kiro-cli, kiro-ide, codex-exec), then identifier. The CLI enables `ExtendedOrdering` for shared JSON, all-projects scope or configured exec roots; the web enables it for all-projects scope or configured roots. No-flag project listings/latest retain the existing sort and timestamp/fallback behaviour (5.1). In all-projects scope a `(source, id)` pair appears once: a duplicate keeps the candidate the resolver opens and adds a `duplicate_session` warning. The resolver's choice is first in sorted directory order for Claude, the existing first filename match in walk order for Codex rollouts, the shared best-candidate rule for Kiro IDE, and most recent `updated_at` then lowest `key` for Kiro CLI. Codex all-projects row deduplication, resolution and global suppression share `selectCodexCandidate`; an invalid selected head is omitted from all-projects rows with a warning, and a later valid duplicate is not silently promoted. Project-scope Codex rows retain existing per-file enumeration and cwd filtering, even when a different project holds the global winner (Q49/Q62). Each collector de-duplicates beside its own selection rule before sorting, returning its warnings (Q106), and every selected Codex rollout, duplicated or not, must pass the head checks to be listed across projects (Decision 33).
 
@@ -310,7 +310,7 @@ The CLI keeps explicit `-a` dispatch before the helper and passes the same optio
 | `--all-projects` | lists, `latest` and ID lookups use project `""`; usage error with `-p`/`--project`; no environment variable (Q31) |
 | `-s`, `--source <source>` | the positional argument is an identifier of that source, using source names (`claude`, `codex`, `codex-exec`, `copilot`, `kiro-cli`, `kiro-ide`); no file-path detection; usage error without an argument, with an unknown source, or with stdin, `--list` or `latest` |
 | `--codex-exec-dir <dir>` (repeatable) | exec roots; any occurrence replaces `APSIS_CODEX_EXEC_DIRS` entirely; a single empty value means no roots; mixing empty and nonempty values is a usage error |
-| `APSIS_CODEX_EXEC_DIRS` | split with `filepath.SplitList` (`:` on Unix, `;` on Windows); unset or empty means no roots |
+| `APSIS_CODEX_EXEC_DIRS` | split with `filepath.SplitList` (`:`); unset or empty means no roots |
 | `-a codex-exec` | forces the exec parser |
 
 `apsis serve` accepts `--all-projects` and `--codex-exec-dir`, and reads the same environment variable (5.4). Relative roots resolve against the working directory.
@@ -417,9 +417,9 @@ Warning codes: `malformed_line`, `oversized_line`, `thread_mismatch`, `item_deco
 
 ## Delivery and ownership
 
-The rune plan has four PR phases: shared JSON sessions/provider (tasks 1–4), listing across projects (5–8), exec streams (9–14), then unchanged-refresh caching (15–16). Requirement 5.9 remains unfinished until the fourth slice passes. Native Windows evidence gates only the fingerprint green task and cache consumers; it never blocks the first three slices. See [prerequisites.md](prerequisites.md) for the exact native checks; cross-compilation is insufficient and no CI change is implied.
+The rune plan has four PR phases: shared JSON sessions/provider (tasks 1–4), listing across projects (5–8), exec streams (9–14), then unchanged-refresh caching (15–16). Requirement 5.9 remains unfinished until the fourth slice passes.
 
-Streams split transcript/projection work, sessions/CLI/web work, and the isolated fingerprint package. Dependencies serialize shared files: listing follows the session CLI, exec rendering follows listing projection, direct exec CLI follows scope wiring, and fingerprint module mutations follow the validator's go.mod/go.sum changes. README/CHANGELOG updates and Makefile checks ride with each slice's last implementation task. Documents and local implementation admissions are agent decisions; no design/tasks human approval is recorded.
+Streams split transcript/projection work, sessions/CLI/web work, and the fingerprint tests. Dependencies serialize shared files: listing follows the session CLI, exec rendering follows listing projection and direct exec CLI follows scope wiring. README/CHANGELOG updates and Makefile checks ride with each slice's last implementation task. Documents and local implementation admissions are agent decisions; no design/tasks human approval is recorded.
 
 ## Error Handling
 
@@ -438,7 +438,7 @@ Streams split transcript/projection work, sessions/CLI/web work, and the isolate
 
 - Risk: walking large configured roots every 15 s may be slow even with zero body reads | Verify: benchmark `ListAll` on a synthetic tree of 10,000 files in the first discovery task | If wrong: reuse a directory's cached entry list while its own mtime is unchanged, still statting every known file so in-place edits are detected.
 - Risk: Kiro CLI may commit through WAL without changing the stat key of `data.sqlite3`, `-wal` or `-journal` | Verify: test two writes through a WAL-mode connection between refreshes | If wrong: run the discover query on every refresh and record its measured page reads against 5.9.
-- Risk: a supported Windows filesystem may not provide the identity/change metadata required for zero-read invalidation | Verify: an early fingerprint task tests equal-size preserved-mtime replacement through the injected adapter and native Windows integration, before cache consumers | If wrong: block cache admission and record the storage/platform limitation for a requirements decision; do not substitute size/mtime or claim 5.9 passes.
+- Risk: a supported Unix filesystem may not provide the identity/change metadata required for zero-read invalidation | Verify: an early fingerprint task tests equal-size preserved-mtime replacement through the injected adapter and a real Unix filesystem, before cache consumers | If wrong: block cache admission and record the storage/platform limitation for a requirements decision; do not substitute size/mtime or claim 5.9 passes.
 - Risk: cold listings stay costly because Kiro IDE extraction reads whole `.chat` files | Verify: benchmark a cold multi-source listing with generated fixtures in the cache task | If wrong: stream-decode only `executionId`, `chat` length and `metadata`.
 - Assumption: serde writes `web_search` items with two `id` keys and `encoding/json` keeps the last consistently across started and completed events, so lifecycle keying stays stable | Verify: fixture built from the pinned definition with both keys, in the parser task.
 
@@ -465,6 +465,6 @@ Fixtures are synthetic. Exec fixtures record their provenance (pinned definition
 | 4.1, 4.2, 5.8 | `t.Setenv("HOME", …)` (plus XDG on Linux) with synthetic fixtures for every source, including a Kiro CLI test database with one conversation under two keys and Kiro IDE execution details; list through the CLI and `httptest`, then open each row from an unrelated working directory; identical identifiers across sources |
 | 5.1 | Existing golden and CLI tests unchanged; no-flags Claude input with first timestamp beyond 50 lines/1 MiB and a long Codex metadata line preserve listing/`latest`; with no roots configured, output and web pills are unchanged |
 | 5.2, 5.3, 5.4 | Malformed middle line on all three surfaces; every follow combination including `latest`; flag and environment precedence, empty environment value, empty flag value, mixed values; raw JSON of a BOM-prefixed stream keeps `thread.started` |
-| 5.9 | Early Unix/Windows fingerprint tests (adapter plus native Windows): equal-size preserved-mtime replacement/rewrite invalidates, unsupported metadata cannot yield a weak cache hit; then counting-opener/discover counters assert unchanged refresh reads 0 body bytes, normal and companion-only changes and nested repositories refresh, unaffected IDs remain stable, and web reversal does not mutate the next listing |
+| 5.9 | Early Unix fingerprint tests (adapter plus real filesystem): equal-size preserved-mtime replacement/rewrite invalidates, unsupported metadata cannot yield a weak cache hit; then counting-opener/discover counters assert unchanged refresh reads 0 body bytes, normal and companion-only changes and nested repositories refresh, unaffected IDs remain stable, and web reversal does not mutate the next listing |
 
 The schema validator, `github.com/santhosh-tekuri/jsonschema/v6`, is imported only from `_test.go` files, loads the schema from disk with network loading disabled, and stays out of the binaries (Decision 25, unanswered question U3; technical admission only).

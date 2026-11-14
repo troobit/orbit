@@ -378,7 +378,6 @@ Versioned JSON output with one layout for every Apsis source, plus Codex exec st
 
 - [decision_log.md](apsis-shared-json/decision_log.md)
 - [design.md](apsis-shared-json/design.md)
-- [prerequisites.md](apsis-shared-json/prerequisites.md)
 - [requirements.md](apsis-shared-json/requirements.md)
 - [tasks-cache.md](apsis-shared-json/tasks-cache.md)
 - [tasks.md](apsis-shared-json/tasks.md)

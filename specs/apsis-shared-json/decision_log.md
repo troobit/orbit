@@ -67,11 +67,11 @@
 | Q61 | 2026-11-05 | Agent proposal: Lister and Resolver apply the same Option functions to a shared Options value rather than a Lister-specific closure | The design's earlier Option func(*Lister) cannot directly configure a Resolver; one settings type keeps root precedence consistent without coupling their runtime state |
 | Q62 | 2026-11-05 | Clarify Decision 22's listing scope: the global selected winner governs suppression in every scope and all-projects row deduplication; project-scope rollout rows keep existing per-file cwd filtering under Q49 | The final revision check found ambiguous global-listing wording that could remove a later duplicate from its legacy project list, violating 5.1; this does not change human-approved global stream suppression |
 | Q63 | 2026-11-05 | Correct the freeze attribution: it was the dispatching coordinator's ownership instruction, not a human decision | Checked 19:00Z note and current SPEC-DRIVE authorisation permit reviewed local planning and implementation; preserve human decisions and existing owners, and never infer human approval |
-| Q64 | 2026-11-05 | Keep current Claude-model and Kiro-IDE-provider omission inside approved scope | U1/U2 remain unanswered possible scope expansions, not prerequisites or answered choices |
-| Q65 | 2026-11-05 | Admit the test-only schema validator as a reversible local technical choice | Both design drafts and non-author reviews support it; U3 remains unanswered and no human approval is implied |
+| Q64 | 2026-11-05 | Keep current Claude-model and Kiro-IDE-provider omission inside approved scope | Possible scope expansions, later answered as U1 (Q92) and U2 (Q93) |
+| Q65 | 2026-11-05 | Admit the test-only schema validator as a reversible local technical choice | Both design drafts and non-author reviews support it; the user approved it as U3 (Q94) |
 | Q66 | 2026-11-05 | Publish the complete known v1 schema initially, with an unknown-block extension branch (Decision 25) | Initial-schema validation must keep accepting later producers; a mutable upstream $id cannot update a cached validator |
-| Q67 | 2026-11-05 | Isolate metadata fingerprints in internal/fileidentity (Decision 26) | Separate native tests and disjoint package ownership let the cache capability gate run without blocking sessions work |
-| Q68 | 2026-11-05 | Four PR slices and three streams; module writes serialized after task 3.2 (Decision 27) | Native Windows blocks cache only, and go.mod/go.sum have one writer at a time |
+| Q67 | 2026-11-05 | Share the existing Unix fingerprint across every cached source instead of a new package (Decision 26) | With Windows out of scope a separate package duplicates the LM Studio fingerprint |
+| Q68 | 2026-11-05 | Four PR slices and three streams; module writes serialized after task 3.2 (Decision 27) | go.mod/go.sum have one writer at a time, and the cache slice comes last |
 | Q69 | 2026-11-05 | Record reproducible synthetic benchmark dimensions and cold/warm measurements; 1.5 s is only an investigation budget | No evidence supports a host-independent timing acceptance test; zero unchanged body reads stays mandatory |
 | Q70 | 2026-11-05 | Report Kiro CLI's actual matched database key in project scope and inject all-project discovery too | Current GetSession returns only a reader; listKiro's all-projects path bypasses its discover injection, so both need explicit coverage |
 | Q71 | 2026-11-05 | Shared JSON alone enables ParseOptions.AllowEmptyCodex through backward-compatible parser options | Header-only Codex currently errors; retain legacy acceptance/errors while the new format preserves header metadata with entries: [] |
@@ -88,7 +88,7 @@
 | Q82 | 2026-11-05 | A Codex metadata transition starts a new assistant entry only at a model-produced item (message, reasoning, function call, agent message or reasoning); a function call output joins the current entry | Keeps a tool result in the same entry as its call (peer m4) |
 | Q83 | 2026-11-05 | Shared JSON listings keep extended ordering in every scope; the README states that no-flag `apsis latest` keeps the legacy tie order, and task 6.1 tests the documented difference | Changing no-flag `latest` would break 5.1, and selecting by output format would surprise users (peer m3) |
 | Q84 | 2026-11-05 | Reopen task 2 for one red/green follow-up pair, reset tasks 3/3.1 and 9/9.1 to pending, and release the owners of 3, 3.1, 3.2, 9, 9.1 and 9.2 | Their claims were released at 22:49Z with no output; both now depend on the reopened task 2 (peer m1). Task 2 keeps its recorded owner for provenance; the new subtasks are unowned |
-| Q85 | 2026-11-05 | Ask the user U4: should Markdown and HTML assistant headers show the Codex model? Until answered, the Codex model appears only in shared JSON documents and listings | Showing it in headers changes existing output beyond the provider exception in 5.1; the user's direction asks for Markdown/HTML parity, so this is the user's choice (peer M1) |
+| Q85 | 2026-11-05 | The Codex model appears only in shared JSON documents and listings; whether Markdown and HTML headers show it is U4 (answered in Q95) | Showing it in headers changes existing output beyond the provider exception in 5.1; the user's direction asks for Markdown/HTML parity, so this is the user's choice (peer M1) |
 | Q86 | 2026-11-05 | The user approved requirements revision 4, adding 1.7 (recorded session origin) and 1.8 (recorded entry identifiers) in shared JSON only | Decision 31; design and tasks must absorb both before task 3 publishes the schema |
 | Q87 | 2026-11-05 | Session origin is Claude Code's first nonempty `entrypoint` and Codex's first nonempty `session_meta.payload.originator`; no other source field is mapped to origin. Copilot's `session.start` `data.producer` stays unmapped until the user answers U5, and Codex `session_meta.payload.source`/`thread_source` are not used | 1.7 names these two fields. Pinned rust-v0.166.0 `SessionMeta.originator` is a required string, set to `codex_exec` by `codex exec` and defaulting to `codex_cli_rs`. `producer` names the program that wrote the log rather than a client entry point (one value across six local sessions), and Codex `source`/`thread_source` are classifications, which Decision 31 rejects. Adding a mapping later is additive under 1.3 |
 | Q88 | 2026-11-05 | Shared JSON names the fields `origin` in the shared session-metadata definition (so listing rows inherit it) and `id` on the entry | 4.3 names origin; the entry `id` sits at entry level, apart from the block-level tool `id` and `tool_use_id`, and is never a tool-linking identifier (1.8) |
@@ -100,7 +100,7 @@
 | Q94 | 2026-11-05 | U3 answered by the user: add `github.com/santhosh-tekuri/jsonschema/v6`, imported only from `_test.go` files | A maintained Draft 2020-12 validator checks fixtures; it stays out of the binaries (Decision 25) |
 | Q95 | 2026-11-05 | U4 answered by the user: the Codex model appears in shared JSON and listings only; Markdown and HTML headers show the provider without it until a follow-up amends 5.1 | Meets approved 1.6 without changing protected Codex output |
 | Q96 | 2026-11-05 | U5 answered by the user: Copilot's `producer` is not mapped to origin | It records the program that wrote the log rather than a client entry point, and does not tell sessions apart |
-| Q97 | 2026-11-05 | The user approved design and tasks; PR 4 (unchanged-refresh cache, former tasks 15–16) moves to `tasks-cache.md`, and orbit drives `tasks.md` (PR 1–3) with local commits | `orbit run` re-runs a phase whose tasks cannot complete (orbit `specs/run-termination/`), and task 15.2 needs native Windows evidence; a separate file lets PR 1–3 run unattended and PR 4 run once that evidence exists |
+| Q97 | 2026-11-05 | The user approved design and tasks; PR 4 (unchanged-refresh cache, former tasks 15–16) moves to `tasks-cache.md`, and orbit drives `tasks.md` (PR 1–3) with local commits | `orbit run` re-runs a phase whose tasks cannot complete (orbit `specs/run-termination/`), so a separate file keeps PR 4 apart from PR 1–3, which orbit runs unattended |
 | Q98 | 2026-11-05 | Agent decision (task 3): the closed test copy of the schema adds `unevaluatedProperties: false`, not `additionalProperties: false`, to the apsis-owned definitions | Listing rows and blocks reuse shared definitions through `$ref`, which `additionalProperties` cannot see, so it would reject valid rows; `unevaluatedProperties` closes composed objects correctly |
 | Q99 | 2026-11-05 | Agent decision (task 3): `sharedjson.SessionContext` carries `Source`, `ID` and `Resolved` only; the canonical input path joins it with its first consumer, exec-stream project assignment | superseded by Q110 |
 | Q100 | 2026-11-05 | Agent decision (task 3): `other` blocks carry `source_type` only when the parsed item records a type | Avoids inventing a value for an untyped item; the field stays defined for every recorded kind |
@@ -510,7 +510,7 @@ These are testable boundaries and caching outcomes without a machine-specific co
 ## Decision 12: Extend the Shared Entry and Project It to JSON Separately
 
 **Date**: 2026-11-05
-**Status**: proposed
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -581,7 +581,7 @@ Opening by identifier in a new CLI process then reads only that session, rather 
 ## Decision 14: Exec Identifier From a Thread Prefix and a Full Path Digest
 
 **Date**: 2026-11-05
-**Status**: proposed
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -617,7 +617,7 @@ The identifier depends only on facts about the stream itself, so no other file c
 ## Decision 15: Resolve the Exec Lifecycle per Turn and Item at End of Stream
 
 **Date**: 2026-11-05
-**Status**: proposed
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -652,7 +652,7 @@ Per-turn keys survive ID reuse in the parser, and turn-qualified tool IDs carry 
 ## Decision 16: Show the Provider Wherever the Model Is Shown
 
 **Date**: 2026-11-05
-**Status**: proposed
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -816,7 +816,7 @@ One rule gives the same answer for direct conversion and discovery at any prefix
 
 **ID**: 21
 **Date**: 2026-11-05
-**Status**: proposed; supersedes Decision 20
+**Status**: accepted; supersedes Decision 20; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -854,7 +854,7 @@ A heuristic is insufficient to override the approved exec signature. Restricting
 
 **ID**: 22
 **Date**: 2026-11-05
-**Status**: proposed; supersedes Decision 17
+**Status**: accepted; supersedes Decision 17; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -892,38 +892,37 @@ The indexed rollout must be the one that source/identifier opening reaches. Keep
 
 **ID**: 23
 **Date**: 2026-11-05
-**Status**: proposed; supersedes Decision 13
+**Status**: accepted; human scoped to Unix and macOS 2026-11-13; implemented and verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
-Requirement 5.9 requires zero body reads on unchanged refreshes and detection of changed inputs. Size/mtime alone can miss equal-size replacements preserving modification time. The existing x/sys module exposes Windows metadata-handle queries; their storage-specific behaviour still needs implementation verification.
+Requirement 5.9 requires zero body reads on unchanged refreshes and detection of changed inputs. Size/mtime alone can miss equal-size replacements preserving modification time. Windows is out of scope (human decision 2026-11-13); macOS and Linux are the supported platforms.
 
 ### Decision
 
-Keep the long-lived mutex-guarded Lister cache, companion absence keys and fresh result slices. Require Unix identity/change stat fields and Windows volume/file identity plus last-write/change times through a platform adapter. Use metadata-only handles; never silently downgrade to size/mtime. Gate cache consumers on early adapter and native Windows replacement tests. If required metadata is unavailable, block admission and record the platform limitation for a requirements decision.
+Keep the long-lived mutex-guarded Lister cache, companion absence keys and fresh result slices. Fingerprint files with Unix identity/change stat fields (size, mtime, ctime, inode, device) using metadata only; never silently downgrade to size/mtime. Gate cache consumers on early adapter tests, including equal-size replacement on a real Unix filesystem. If required metadata is unavailable, the file is not cached.
 
 ### Rationale
 
-Platform-specific metadata can preserve the no-body-read outcome without pretending that a weak key detects replacements. Microsoft's [file identity](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info) and [basic file information](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_basic_info) define the Windows fields; [GetFileInformationByHandleEx](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex) documents the query and driver dependence. This research establishes the interface, not successful runtime verification.
+Unix stat metadata preserves the no-body-read outcome without pretending that a weak key detects replacements. Windows is not a supported platform, so no Windows adapter or native evidence is required.
 
 ### Alternatives Considered
 
-- **Use size/mtime on Windows:** rejected because the design would knowingly miss required changes.
+- **Use size/mtime only:** rejected because the design would knowingly miss required changes.
 - **Hash every transcript on each refresh:** rejected because it violates zero body reads.
-- **Assume API support without an early gate:** rejected because filesystem capabilities and errors must not become hidden correctness exceptions.
+- **Assume filesystem support without an early gate:** rejected because filesystem capabilities and errors must not become hidden correctness exceptions.
 
 ### Consequences
 
 **Positive:**
 
-- The cache contract has a concrete cross-platform verification path.
+- The cache contract has a concrete verification path on Unix.
 - Identity replacement is distinct from content modification and companion changes.
 
 **Negative:**
 
-- Platform adapters and native Windows checks are required before cache admission.
+- Windows gets no unchanged-refresh cache.
 - An unsupported storage environment remains a real dependency rather than an approved exception.
-
 ---
 
 ## Decision 24: Preserve First-Known Parsed Summaries Without Requiring Assistant Content
@@ -968,7 +967,7 @@ Summary metadata exists independently of assistant content. Keeping it in the co
 
 **ID**: 25
 **Date**: 2026-11-05
-**Status**: proposed; local technical admission, supersedes Decision 18
+**Status**: accepted; local technical admission, supersedes Decision 18; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -978,7 +977,7 @@ Both task cross-reviews identify a compatibility hole: adding a new discriminato
 
 Publish both session/listing kinds and every known v1 field/block in PR 1. Known block types use disjoint branches; an open extension branch excludes those known discriminators and accepts other type strings. Consumers ignore unsupported block types as well as unknown fields. Current unknown source content still projects as `other`. Preserve an exact initial-schema test fixture; later listing and exec output must validate against it. Removing a field or changing its meaning still raises the version.
 
-Retain Decision 18's test-only local validator and dual validation. The closed test copy closes known apsis-owned structural objects, while input, payload, counters and unknown extension objects stay open. U3 remains unanswered; the dependency is admitted as a reversible agent technical choice.
+Retain Decision 18's test-only local validator and dual validation. The closed test copy closes known apsis-owned structural objects, while input, payload, counters and unknown extension objects stay open. The user approved the dependency (U3, Q94).
 
 ### Rationale
 
@@ -998,67 +997,67 @@ Later slices do not invalidate consumers holding the first schema, and malformed
 
 ---
 
-## Decision 26: Isolate Fingerprint Adapters for Independent Native Verification
+## Decision 26: Reuse the Existing Unix Fingerprint for the Listing Cache
 
 **ID**: 26
 **Date**: 2026-11-05
-**Status**: proposed; local technical admission
+**Status**: accepted; implemented and verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
-Decision 23 requires native Windows identity/change evidence before cache admission. The design originally put adapters inside sessions, where parallel list/open work also compiles and edits files. The existing x/sys module exposes Windows queries but lacks the matching result structs.
+Decision 23 requires Unix identity/change fingerprints before cache admission. The LM Studio cache already fingerprints files by size, mtime, ctime, inode and device (`statFingerprint`), and `golang.org/x/sys` is already a direct requirement. A separate `internal/fileidentity` package was planned to keep parallel work apart, but with Windows out of scope it would duplicate that function.
 
 ### Decision
 
-Place the metadata-only interface and Unix/Windows adapters in internal/fileidentity; the sessions cache consumes it. Define the required Windows ABI structs locally, use metadata-only handles and preserve unsupported/error outcomes. Test equal-size replacement and in-place rewrite with restored mtime on native Windows as well as Unix and injected adapters. Cross-compilation cannot satisfy the native gate. Task 15.2 waits for schema task 3.2 before editing go.mod/go.sum, promotes x/sys to direct, and stays incomplete without native evidence.
+Move the LM Studio cache's fingerprint into shared files in `internal/sessions` (`fingerprint.go`, `fingerprint_unix.go`, `fingerprint_other.go`) and use it for every source. Add a companion fingerprint that records a missing file as absent. Platforms without the stat fields report files as not cacheable, so nothing is cached there. Test equal-size replacement and in-place rewrite with restored mtime on a real Unix filesystem.
 
 ### Rationale
 
-This reviewed package placement keeps platform ownership disjoint and makes the native prerequisite runnable without the full sessions stack. It changes placement, not Decision 23's fingerprint or cache contract.
+One fingerprint means one definition of "unchanged" for all sources, and no new package or module change is needed.
 
 ### Alternatives Considered
 
-- **Keep the adapters in sessions:** rejected because the independent capability stream then shares a changing package and heavier native test dependencies with listing work.
-- **Reuse transcript follow-mode file info:** rejected because its Windows identity is absent and it has different lifecycle needs.
-- **Use size/mtime or mocked Windows evidence:** rejected because preserved-mtime replacement/rewrite is the reason for the capability gate.
+- **A new `internal/fileidentity` package:** rejected because it would duplicate the existing fingerprint for no remaining benefit.
+- **Reuse transcript follow-mode file info:** rejected because it has different lifecycle needs.
+- **Use size/mtime only:** rejected because preserved-mtime replacement/rewrite is the reason for the capability gate.
 
 ### Consequences
 
-**Positive:** native verification has a small target; cache consumers share one adapter; sessions and fingerprint implementation can progress separately.
+**Positive:** every source shares one tested fingerprint; the LM Studio cache and the listing cache cannot disagree about change detection.
 
-**Negative:** one additional internal package is introduced; module mutation is serialized; cache completion still requires unavailable external native evidence.
+**Negative:** the LM Studio cache's types are renamed, so its tests changed with them.
 
 ---
 
 ## Decision 27: Separate Delivery Slices and Preserve Canonical Task Identity
 
 **ID**: 27
-**Date**: 2026-11-05
-**Status**: proposed; local planning admission, not human approval
+**Date**: 2026-11-14
+**Status**: accepted; human-approved 2026-11-13 with one amendment: Windows is out of scope and no native Windows gate applies (Decision 23)
 
 ### Context
 
-The Codex draft's predecessor chain blocks listing and exec work on unavailable Windows evidence and groups too many behaviours together. The Claude draft has useful PR boundaries and red/green pairs, but its independent module writers conflict. Existing canonical tasks carry stable identities and one live baseline owner.
+The Codex draft's single predecessor chain makes listing and exec work wait on the cache slice and groups too many behaviours together. The Claude draft has useful PR boundaries and red/green pairs, but its independent module writers conflict. Existing canonical tasks carry stable identities and one live baseline owner.
 
 ### Decision
 
-Merge four PR phases: shared JSON/provider, cross-project listing, exec streams, then cache. Keep fifteen adjacent red/green child pairs under sixteen parents. Preserve canonical numbered/stable IDs 1–11 and every status/owner; retain the byte-exact earlier file and scope map. Streams cover transcript/projection, sessions/CLI/web, and isolated fingerprints. Block shared-file consumers explicitly; task 15.2's module writes wait for task 3.2. Native Windows gates only fingerprint completion and cache consumers. Requirement 5.9 stays unfinished until the cache slice passes.
+Merge four PR phases: shared JSON/provider, cross-project listing, exec streams, then cache. Keep adjacent red/green child pairs under their parents. Preserve canonical numbered/stable IDs 1–11 and every status/owner; retain the byte-exact earlier file and scope map. Streams cover transcript/projection, sessions/CLI/web, and the shared fingerprint and cache. Block shared-file consumers explicitly; the cache slice's module writes wait for task 3.2. Requirement 5.9 stays unfinished until the cache slice passes.
 
 Each PR's last green task includes its README/CHANGELOG changes and Makefile checks. Benchmarks record fixture dimensions, platform/filesystem and cold/warm measurements; any 1.5 s local budget prompts investigation only. Zero unchanged transcript-body bytes remains a hard assertion. No commits, pushes, CI changes or policy relaxations are admitted here.
 
 ### Rationale
 
-The task list can advance reviewed local implementation without destroying provenance or making unrelated work depend on absent native evidence. Both non-author task cross-reviews supply the corrective evidence; a fresh critique and peer review must assess this merged revision before implementation admission beyond the separately verified baseline repair.
+The task list can advance reviewed local implementation without destroying provenance or making unrelated work depend on the cache slice. Both non-author task cross-reviews supply the corrective evidence; a fresh critique and peer review must assess this merged revision before implementation admission beyond the separately verified baseline repair.
 
 ### Alternatives Considered
 
-- **Keep the single predecessor chain:** rejected because it makes Windows a prerequisite for work the design leaves ungated.
+- **Keep the single predecessor chain:** rejected because it makes listing and exec work depend on the cache slice.
 - **Replace canonical tasks with the draft:** rejected because generated draft IDs/pending status would erase original ownership and identity.
 - **One stream per PR with independent module writes:** rejected because the CLI/schema/module files overlap across PR boundaries.
 
 ### Consequences
 
-**Positive:** first three slices progress independently of native Windows; small paired work units and preserved provenance support review; shared module writes are ordered.
+**Positive:** first three slices progress independently of the cache slice; small paired work units and preserved provenance support review; shared module writes are ordered.
 
 **Negative:** the feature remains incomplete after PR 3 because 5.9 waits for PR 4; cross-stream test runs need compile coordination; four slices require more integration checkpoints.
 
@@ -1102,7 +1101,7 @@ One parser and the existing common Entry model can express the new-format fideli
 
 **ID**: 29
 **Date**: 2026-11-05
-**Status**: proposed; supersedes Decision 28; reversible local technical choice awaiting verification by an agent other than its author
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -1110,7 +1109,7 @@ Decision 28 split Codex assistant entries when `session_meta.payload.model` chan
 
 ### Decision
 
-The active Codex model is the latest nonempty `turn_context.payload.model`, else `session_meta.payload.model` for older files. `FirstModel` and the Codex listing model take the first nonempty value in transcript order; the listing reads it within the existing `codexMetaScanLimit`. With `ParseOptions.PreserveModelChanges`, set only by shared-JSON callers, assistant entries take the active model when created, and a change without an intervening user boundary starts a new entry at the next model-produced item (Q82). Without the option, `Entry.Model` keeps its legacy session_meta-only value, so default Markdown, HTML and web output change only by the provider label (5.1). Provider handling, identical-metadata consolidation, first-known summaries and `AllowEmptyCodex` stay as Decision 28 described. Whether headers also show the Codex model is user question U4 (Q85).
+The active Codex model is the latest nonempty `turn_context.payload.model`, else `session_meta.payload.model` for older files. `FirstModel` and the Codex listing model take the first nonempty `turn_context.payload.model`, else `session_meta.payload.model` (human-confirmed 2026-11-13); the listing reads it within the existing `codexMetaScanLimit`. With `ParseOptions.PreserveModelChanges`, set only by shared-JSON callers, assistant entries take the active model when created, and a change without an intervening user boundary starts a new entry at the next model-produced item (Q82). Without the option, `Entry.Model` keeps its legacy session_meta-only value, so default Markdown, HTML and web output change only by the provider label (5.1). Provider handling, identical-metadata consolidation, first-known summaries and `AllowEmptyCodex` stay as Decision 28 described. Headers do not show the Codex model (U4, Q95).
 
 ### Rationale
 
@@ -1119,7 +1118,7 @@ The active Codex model is the latest nonempty `turn_context.payload.model`, else
 ### Alternatives Considered
 
 - **Keep session_meta as the only model source:** rejected because Codex 0.166.0 never writes it there, so shared JSON and listings would never carry a Codex model.
-- **Apply turn_context models to every entry by default:** rejected for now because Codex Markdown/HTML headers would gain a model label, beyond 5.1's provider exception; offered to the user as U4.
+- **Apply turn_context models to every entry by default:** rejected for now because Codex Markdown/HTML headers would gain a model label, beyond 5.1's provider exception; the user kept headers unchanged (U4, Q95).
 - **Add a separate model-history field to the schema:** rejected because entry-level `model` already expresses changes.
 
 ### Consequences
@@ -1129,16 +1128,15 @@ The active Codex model is the latest nonempty `turn_context.payload.model`, else
 - Default rendering stays unchanged apart from the approved provider label.
 
 **Negative:**
-- Until U4 is answered, shared JSON shows a Codex model that Markdown/HTML headers do not.
+- Shared JSON shows a Codex model that Markdown/HTML headers do not (U4, Q95).
 - The completed task 2 is reopened for a follow-up pair.
-
 ---
 
 ## Decision 30: Prefer Recorded Creation Records Over First-Message Times
 
 **ID**: 30
 **Date**: 2026-11-05
-**Status**: proposed; supersedes Decision 24; reversible local technical choice awaiting verification by an agent other than its author
+**Status**: accepted; supersedes Decision 24; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -1208,7 +1206,7 @@ Both fields are recorded by the source, so they follow Q3 and Decision 6: apsis 
 ## Decision 32: Entry Identifiers Come From the Single Record an Entry Is Built From
 
 **Date**: 2026-11-05
-**Status**: proposed; reversible local technical choice implementing approved 1.8, awaiting verification by an agent other than its author
+**Status**: accepted; verified against the code and tests by an independent agent 2026-11-13
 
 ### Context
 
@@ -1244,7 +1242,7 @@ An identifier from one of several merged records would mislabel the rest of the 
 ## Decision 33: Validate Every Selected Codex Rollout in All-Projects Listings
 
 **Date**: 2026-11-06
-**Status**: proposed (agent decision during task 7; not human-approved)
+**Status**: accepted; human-approved 2026-11-13 as implemented
 
 ### Context
 

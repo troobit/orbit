@@ -149,7 +149,7 @@ references:
     - Later tasks add producers/projection branches against this existing full schema; they do not widen a previously closed discriminator enum. Do not add unused representation types or runtime options before their first consumer.
     - The projection reads parsed data only and never calls renderer helpers
     - go.mod/go.sum gain the validator, used only by tests
-    - Own go.mod/go.sum changes for the test-only validator. Task 15.2 waits for this task before promoting x/sys, so module writes never overlap.
+    - Own go.mod/go.sum changes for the test-only validator. The cache slice (`tasks-cache.md`) starts after this task, so module writes never overlap.
     - The initial warning definition includes execution_action beside line/chat_message; project each known Unit to its matching position key, never label an action index as a chat-message index. Existing stderr output remains unchanged.
     - Project `created_at` with the Decision 30 order and copy each warning's `Code`; never invent an empty code
     - Project `Metadata.Origin` as `session.origin` and `Entry.RecordID` as the entry `id`, omitting empty values; add both string fields to the schema's session-metadata and entry definitions (Decision 32, Q88)
@@ -414,7 +414,7 @@ references:
     - Suppression (Decision 22): a stream whose thread ID equals the selected rollout's verified recorded ID is dropped in both scopes before project filtering, including when rollout and stream sit in different projects; an invalid first duplicate rollout followed by a valid one suppresses nothing; a failed rollout scan never suppresses
     - Rows carry `ThreadID`, `TimeFromFilesystem` and size; shared JSON listings emit `thread_id` and `file_modified_at`; text listings print ` (file modified)` after the time; configured roots enable extended ordering
     - With no roots configured, listings, `latest` and the serve page are unchanged
-    - Add a benchmark of `ListAll` over a synthetic 10,000-file tree (design risk 1); record the warm-pass time in this task's notes for task 16
+    - Add a benchmark of `ListAll` over a synthetic 10,000-file tree (design risk 1); record the warm-pass time in this task's notes for the cache slice (`tasks-cache.md` task 2)
     - Inject only the path-digest helper in tests to force two distinct canonical paths to one digest. With identical thread prefixes both paths are omitted with identifier_conflict, regardless of root order. Production continues using full SHA-256; do not try to generate a cryptographic collision.
     - For the 10,000-file benchmark record file/source counts, sizes, nesting/skip distribution, platform/filesystem, cold versus warm state and measurements. A 1.5 s local investigation budget may prompt comparison of the documented directory-entry cache fallback, but is not a portable pass/fail limit; zero unchanged body bytes remains a hard task-16 assertion.
     - Blocked-by: 9kwhroa (Resolve every source across projects with the listing's candidate rules), 9kwhrof (Convert exec stream files and stdin from the CLI)

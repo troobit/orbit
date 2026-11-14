@@ -278,7 +278,9 @@ func (l *Lister) listCodexExec(projectPath string, rolloutThreads map[string]boo
 	byID := make(map[string][]stream)
 	var ids []string
 	for _, c := range candidates {
-		probe, err := probeExecFile(c.path)
+		probe, err := cached(l.cache, "codex-exec:"+c.path, []string{c.path}, func() (transcript.ExecProbe, error) {
+			return probeExecFile(c.path)
+		})
 		if err != nil {
 			warnings = append(warnings, ListWarning{Source: SourceCodexExec, Code: WarningPathUnreadable, Err: err})
 			continue
